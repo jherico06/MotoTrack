@@ -163,11 +163,11 @@ export default function RiderEarningsView({
         </View>
       </View>
 
-      {/* Period Filter Tabs */}
+      {/* Period Filter Tabs (Customer Segmented Pill Track) */}
       <View
         style={[
           styles.segmentedTrack,
-          { backgroundColor: palette.isDark ? palette.bgCard : '#ECEEF0' },
+          { backgroundColor: palette.pillTrackBg || (palette.isDark ? '#1E2025' : '#EFECE6') },
         ]}
       >
         {[
@@ -183,17 +183,17 @@ export default function RiderEarningsView({
                 styles.segmentBtn,
                 active && [
                   styles.segmentBtnActive,
-                  { backgroundColor: palette.bgSheet },
+                  { backgroundColor: palette.pillActiveBg || '#141D2E' },
                 ],
               ]}
               onPress={() => setPeriod(tab.id)}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               <Text
                 style={[
                   styles.segmentText,
                   {
-                    color: active ? palette.textPrimary : palette.textMuted,
+                    color: active ? '#FFFFFF' : palette.textMuted,
                     fontWeight: active ? '600' : '500',
                   },
                 ]}
@@ -334,13 +334,18 @@ export default function RiderEarningsView({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingTop: 10,
     gap: 14,
   },
   heroCard: {
-    backgroundColor: '#202426',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: '#141D2E',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 4,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -351,27 +356,27 @@ const styles = StyleSheet.create({
     fontFamily: RIDER_FONT,
     fontSize: 10.5,
     lineHeight: 14,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    color: '#FF4D00',
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    color: '#EA580C',
   },
   heroAmount: {
     fontFamily: RIDER_FONT,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
     color: '#FFFFFF',
     marginTop: 4,
     fontVariant: ['tabular-nums'],
   },
   heroIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 77, 0, 0.16)',
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(234, 88, 12, 0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 77, 0, 0.34)',
+    borderColor: 'rgba(234, 88, 12, 0.36)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -380,17 +385,19 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 17,
     fontWeight: '400',
-    color: '#9BA3AA',
+    color: '#94A3B8',
     marginTop: 4,
   },
   heroStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2F32',
-    borderRadius: 12,
-    paddingVertical: 11,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    marginTop: 15,
+    marginTop: 16,
   },
   heroStatItem: {
     flex: 1,
@@ -399,17 +406,17 @@ const styles = StyleSheet.create({
   heroStatDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#3A4044',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   heroStatLabel: {
     fontFamily: RIDER_FONT,
     fontSize: 11,
     fontWeight: '500',
-    color: '#9BA3AA',
+    color: '#94A3B8',
   },
   heroStatValue: {
     fontFamily: RIDER_FONT,
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 2,
@@ -417,19 +424,19 @@ const styles = StyleSheet.create({
   },
   segmentedTrack: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 9999,
     padding: 4,
     gap: 4,
   },
   segmentBtn: {
     flex: 1,
-    minHeight: 38,
-    borderRadius: 9,
+    minHeight: 40,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmentBtnActive: {
-    shadowColor: '#202426',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
@@ -437,12 +444,12 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontFamily: RIDER_FONT,
-    fontSize: 12.5,
+    fontSize: 13,
   },
   ledgerSheet: {
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 15,
+    padding: 16,
   },
   ledgerHeader: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 /**
  * Minimalist Booking Workflow Stepper Component
@@ -18,6 +19,9 @@ import BootstrapIcon from './BootstrapIcon.jsx';
  * Row 4:  ⑩ Ready for Pickup ───────────────────────────────── ⑪ Completed
  */
 export default function BookingWorkflowTracker({ progress = [] }) {
+  const { isDarkMode } = useTheme();
+  const isDark = Platform.OS === 'web' && isDarkMode;
+
   if (!progress || progress.length === 0) return null;
 
   // Use progress steps directly (11 steps)
@@ -36,14 +40,14 @@ export default function BookingWorkflowTracker({ progress = [] }) {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       {/* Header Bar */}
-      <View style={styles.headerTitleRow}>
+      <View style={[styles.headerTitleRow, isDark && styles.headerTitleRowDark]}>
         <View style={styles.headerLeft}>
-          <BootstrapIcon name="diagram-3" size={15} color="#EA580C" />
-          <Text style={styles.headerTitleText}>Service Workflow Tracker</Text>
+          <BootstrapIcon name="diagram-3" size={15} color={isDark ? '#FF5A00' : '#EA580C'} />
+          <Text style={[styles.headerTitleText, isDark && styles.headerTitleTextDark]}>Service Workflow Tracker</Text>
         </View>
-        <Text style={styles.headerSubtitleText}>Live Progress</Text>
+        <Text style={[styles.headerSubtitleText, isDark && styles.headerSubtitleTextDark]}>Live Progress</Text>
       </View>
 
       <View style={styles.stepperContainer}>
@@ -51,15 +55,15 @@ export default function BookingWorkflowTracker({ progress = [] }) {
         <View style={styles.rowBlock}>
           <View style={styles.rowContent}>
             {/* Step 1 */}
-            {renderStepNode(steps[0], 1)}
-            {renderHorizontalLine(steps[0]?.done)}
+            {renderStepNode(steps[0], 1, isDark)}
+            {renderHorizontalLine(steps[0]?.done, isDark)}
 
             {/* Step 2 */}
-            {renderStepNode(steps[1], 2)}
-            {renderHorizontalLine(steps[1]?.done)}
+            {renderStepNode(steps[1], 2, isDark)}
+            {renderHorizontalLine(steps[1]?.done, isDark)}
 
             {/* Step 3 */}
-            {renderStepNode(steps[2], 3)}
+            {renderStepNode(steps[2], 3, isDark)}
           </View>
         </View>
 
@@ -67,15 +71,15 @@ export default function BookingWorkflowTracker({ progress = [] }) {
         <View style={styles.rowBlock}>
           <View style={styles.rowContent}>
             {/* Step 4 */}
-            {renderStepNode(steps[3], 4)}
-            {renderHorizontalLine(steps[3]?.done)}
+            {renderStepNode(steps[3], 4, isDark)}
+            {renderHorizontalLine(steps[3]?.done, isDark)}
 
             {/* Step 5 */}
-            {renderStepNode(steps[4], 5)}
-            {renderHorizontalLine(steps[4]?.done)}
+            {renderStepNode(steps[4], 5, isDark)}
+            {renderHorizontalLine(steps[4]?.done, isDark)}
 
             {/* Step 6 */}
-            {renderStepNode(steps[5], 6)}
+            {renderStepNode(steps[5], 6, isDark)}
           </View>
         </View>
 
@@ -83,15 +87,15 @@ export default function BookingWorkflowTracker({ progress = [] }) {
         <View style={styles.rowBlock}>
           <View style={styles.rowContent}>
             {/* Step 7 */}
-            {renderStepNode(steps[6], 7)}
-            {renderHorizontalLine(steps[6]?.done)}
+            {renderStepNode(steps[6], 7, isDark)}
+            {renderHorizontalLine(steps[6]?.done, isDark)}
 
             {/* Step 8 */}
-            {renderStepNode(steps[7], 8)}
-            {renderHorizontalLine(steps[7]?.done)}
+            {renderStepNode(steps[7], 8, isDark)}
+            {renderHorizontalLine(steps[7]?.done, isDark)}
 
             {/* Step 9 */}
-            {renderStepNode(steps[8], 9)}
+            {renderStepNode(steps[8], 9, isDark)}
           </View>
         </View>
 
@@ -99,13 +103,13 @@ export default function BookingWorkflowTracker({ progress = [] }) {
         <View style={styles.rowBlock}>
           <View style={styles.rowContent}>
             {/* Step 10 (Ready for Pickup) */}
-            {renderStepNode(steps[9], 10)}
+            {renderStepNode(steps[9], 10, isDark)}
 
             {/* Long horizontal line spanning across Col 1 */}
-            {renderLongHorizontalLine(steps[9]?.done)}
+            {renderLongHorizontalLine(steps[9]?.done, isDark)}
 
             {/* Step 11 (Completed) */}
-            {renderStepNode(steps[10], 11)}
+            {renderStepNode(steps[10], 11, isDark)}
           </View>
         </View>
       </View>
@@ -114,7 +118,7 @@ export default function BookingWorkflowTracker({ progress = [] }) {
 }
 
 /** Render a single minimal step node (circle + label underneath) */
-function renderStepNode(step, stepNumber) {
+function renderStepNode(step, stepNumber, isDark = false) {
   if (!step) {
     return <View style={styles.nodeItemContainer} />;
   }
@@ -127,8 +131,8 @@ function renderStepNode(step, stepNumber) {
       {/* Active Stage Badge (Positioned directly above circle) */}
       <View style={styles.badgeSpace}>
         {isCurrent && (
-          <View style={styles.activeBadge}>
-            <Text style={styles.activeBadgeText}>ACTIVE STAGE</Text>
+          <View style={[styles.activeBadge, isDark && styles.activeBadgeDark]}>
+            <Text style={[styles.activeBadgeText, isDark && styles.activeBadgeTextDark]}>ACTIVE STAGE</Text>
           </View>
         )}
       </View>
@@ -137,8 +141,9 @@ function renderStepNode(step, stepNumber) {
       <View
         style={[
           styles.stepCircle,
-          isDone && styles.stepCircleDone,
-          isCurrent && styles.stepCircleCurrent,
+          isDark && styles.stepCircleDark,
+          isDone && (isDark ? styles.stepCircleDoneDark : styles.stepCircleDone),
+          isCurrent && (isDark ? styles.stepCircleCurrentDark : styles.stepCircleCurrent),
         ]}
       >
         {isDone ? (
@@ -147,6 +152,7 @@ function renderStepNode(step, stepNumber) {
           <Text
             style={[
               styles.circleNumberText,
+              isDark && styles.circleNumberTextDark,
               (isDone || isCurrent) && styles.circleNumberTextActive,
             ]}
           >
@@ -159,8 +165,9 @@ function renderStepNode(step, stepNumber) {
       <Text
         style={[
           styles.statusLabelText,
-          isDone && styles.statusLabelTextDone,
-          isCurrent && styles.statusLabelTextCurrent,
+          isDark && styles.statusLabelTextDark,
+          isDone && (isDark ? styles.statusLabelTextDoneDark : styles.statusLabelTextDone),
+          isCurrent && (isDark ? styles.statusLabelTextCurrentDark : styles.statusLabelTextCurrent),
         ]}
         numberOfLines={2}
       >
@@ -171,13 +178,14 @@ function renderStepNode(step, stepNumber) {
 }
 
 /** Render thin straight horizontal connector line */
-function renderHorizontalLine(isCompleted) {
+function renderHorizontalLine(isCompleted, isDark = false) {
   return (
     <View style={styles.horizontalConnectorWrap}>
       <View
         style={[
           styles.horizontalLine,
-          isCompleted && styles.lineCompleted,
+          isDark && styles.horizontalLineDark,
+          isCompleted && (isDark ? styles.lineCompletedDark : styles.lineCompleted),
         ]}
       />
     </View>
@@ -185,13 +193,14 @@ function renderHorizontalLine(isCompleted) {
 }
 
 /** Render spanning horizontal connector line for row 4 */
-function renderLongHorizontalLine(isCompleted) {
+function renderLongHorizontalLine(isCompleted, isDark = false) {
   return (
     <View style={styles.longHorizontalConnectorWrap}>
       <View
         style={[
           styles.horizontalLine,
-          isCompleted && styles.lineCompleted,
+          isDark && styles.horizontalLineDark,
+          isCompleted && (isDark ? styles.lineCompletedDark : styles.lineCompleted),
         ]}
       />
     </View>
@@ -345,5 +354,60 @@ const styles = StyleSheet.create({
   },
   lineCompleted: {
     backgroundColor: '#EA580C',
+  },
+  containerDark: {
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
+  },
+  headerTitleRowDark: {
+    borderBottomColor: '#292B2F',
+  },
+  headerTitleTextDark: {
+    color: '#F5F5F5',
+  },
+  headerSubtitleTextDark: {
+    color: '#A1A1AA',
+  },
+  activeBadgeDark: {
+    backgroundColor: '#3A241B',
+    borderColor: '#8A3D19',
+  },
+  activeBadgeTextDark: {
+    color: '#FF5A00',
+  },
+  stepCircleDark: {
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
+  },
+  stepCircleDoneDark: {
+    backgroundColor: '#FF5A00',
+    borderColor: '#FF5A00',
+  },
+  stepCircleCurrentDark: {
+    backgroundColor: '#FF5A00',
+    borderColor: '#FF5A00',
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 0 0 3px rgba(255, 90, 0, 0.25)' }
+      : { elevation: 2 }),
+  },
+  circleNumberTextDark: {
+    color: '#A1A1AA',
+  },
+  statusLabelTextDark: {
+    color: '#A1A1AA',
+  },
+  statusLabelTextDoneDark: {
+    color: '#F2F2F3',
+    fontWeight: '700',
+  },
+  statusLabelTextCurrentDark: {
+    color: '#FF5A00',
+    fontWeight: '700',
+  },
+  horizontalLineDark: {
+    backgroundColor: '#303236',
+  },
+  lineCompletedDark: {
+    backgroundColor: '#FF5A00',
   },
 });

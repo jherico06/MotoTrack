@@ -45,9 +45,34 @@ import {
   compatibilityService,
   COMPAT_STATUS,
 } from '../../../services/products/compatibilityService.js';
-import { getProductDetailImageUrl } from '../../../utils/imageUrl.js';
 import { promoService } from '../../../services/products/promoService.js';
 import { sanitizeCompareAtPrice, productHasCustomerRatings } from '../../../utils/productCatalog.js';
+
+function resolveProductDetailImage(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+
+  // Revert Supabase /render/image/ transform URLs (403 FeatureNotEnabled on free tier)
+  if (raw.includes('/storage/v1/render/image/public/')) {
+    return raw.replace('/storage/v1/render/image/public/', '/storage/v1/object/public/').split('?')[0];
+  }
+  if (raw.includes('/storage/v1/object/public/')) {
+    return raw;
+  }
+  if (/images\.unsplash\.com/i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      u.searchParams.set('w', '900');
+      u.searchParams.set('q', '80');
+      u.searchParams.set('auto', 'format');
+      return u.toString();
+    } catch (_e) {
+      return raw;
+    }
+  }
+  return raw;
+}
 
 function StarRow({ rating = 0, size = 13 }) {
   const score = Math.max(0, Math.min(5, Number(rating) || 0));
@@ -261,9 +286,22 @@ export default function ProductDetailsPage({
   const totalReviewsCount = reviewListCount;
   const realSoldCount = Number(product?.sold || product?.sold_count || product?.sales_count || 0);
 
-  const activeImage = getProductDetailImageUrl(
-    (selectedColor && getColorImage(product, selectedColor)) || product?.image
+  const activeImage = useMemo(
+    () =>
+      resolveProductDetailImage(
+        (selectedColor && getColorImage(product, selectedColor)) ||
+          product?.image ||
+          product?.imageUrl ||
+          product?.image_url ||
+          ''
+      ),
+    [product, selectedColor]
   );
+  const [heroImageError, setHeroImageError] = useState(false);
+
+  useEffect(() => {
+    setHeroImageError(false);
+  }, [activeImage]);
 
   // Available stock calculation
   const availableStock = selectedSize
@@ -638,11 +676,25 @@ export default function ProductDetailsPage({
       >
         {/* ─── HERO GALLERY SHOWCASE ─── */}
         <View style={styles.heroContainer}>
-          {activeImage ? (
-            <Image source={{ uri: activeImage }} style={styles.heroImage} resizeMode="contain" />
+          {activeImage && !heroImageError ? (
+            <Image
+              source={{ uri: activeImage }}
+              style={styles.heroImage}
+              resizeMode="contain"
+              onError={() => setHeroImageError(true)}
+            />
           ) : (
-            <View style={[styles.heroImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }]}>
-              <BootstrapIcon name="box-seam" size={64} color="#CBD5E1" />
+            <View
+              style={[
+                styles.heroImage,
+                {
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isDarkMode ? '#14171A' : '#F8FAFC',
+                },
+              ]}
+            >
+              <BootstrapIcon name="box-seam" size={64} color={isDarkMode ? '#475569' : '#CBD5E1'} />
               <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 8, fontWeight: '600' }}>
                 No image available
               </Text>

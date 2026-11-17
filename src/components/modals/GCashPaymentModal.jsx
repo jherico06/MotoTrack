@@ -289,7 +289,7 @@ export default function GCashPaymentModal({
                 <Text style={gStyles.stepHeading}>Enter Authentication Code</Text>
                 <Text style={gStyles.stepSub}>
                   Sent via SMS to{' '}
-                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                     +63 {mobileNumber}
                   </Text>
                 </Text>
@@ -423,13 +423,13 @@ export default function GCashPaymentModal({
                   <View
                     style={[
                       gStyles.breakdownLine,
-                      { borderTopWidth: 1, borderTopColor: isDarkMode ? '#282D34' : '#E2E8F0', paddingTop: 8, marginTop: 4 },
+                      { borderTopWidth: 1, borderTopColor: isDarkMode ? '#303236' : '#E2E8F0', paddingTop: 8, marginTop: 4 },
                     ]}
                   >
                     <Text
                       style={[
                         gStyles.breakdownLabel,
-                        { fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A', fontSize: 13 },
+                        { fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A', fontSize: 13 },
                       ]}
                     >
                       Total Amount
@@ -473,7 +473,7 @@ export default function GCashPaymentModal({
                 <Text style={gStyles.receiptPaidTitle}>Payment Successful!</Text>
                 <Text style={gStyles.receiptPaidSub}>
                   You have successfully paid{' '}
-                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                     ₱{totalAmountFormatted}
                   </Text>{' '}
                   to {GCASH_CONFIG.MERCHANT_NAME}.
@@ -547,9 +547,9 @@ const createGStyles = (isDarkMode) =>
     },
     container: {
       width: '100%',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       overflow: 'hidden',
@@ -640,11 +640,11 @@ const createGStyles = (isDarkMode) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? '#181B1F' : '#F0F7FF',
+      backgroundColor: isDarkMode ? '#18181B' : '#F0F7FF',
       paddingHorizontal: 20,
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderBottomColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     merchantLabel: {
       fontSize: 10.5,
@@ -654,7 +654,7 @@ const createGStyles = (isDarkMode) =>
     merchantName: {
       fontSize: 12.5,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       marginTop: 1,
     },
     merchantAmount: {
@@ -696,7 +696,7 @@ const createGStyles = (isDarkMode) =>
     stepHeading: {
       fontSize: 16,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     stepSub: {
       fontSize: 12.5,
@@ -715,7 +715,7 @@ const createGStyles = (isDarkMode) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       paddingHorizontal: 12,
       paddingVertical: 12,
       borderRadius: 12,
@@ -728,7 +728,7 @@ const createGStyles = (isDarkMode) =>
     countryCodeText: {
       fontSize: 14,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     phoneTextInput: {
       flex: 1,
@@ -740,7 +740,7 @@ const createGStyles = (isDarkMode) =>
       paddingVertical: 11,
       fontSize: 16,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       letterSpacing: 1,
     },
 
@@ -792,15 +792,15 @@ const createGStyles = (isDarkMode) =>
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 8,
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       padding: 10,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     sandboxTipText: {
       fontSize: 11,
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
       flex: 1,
       lineHeight: 16,
     },
@@ -848,15 +848,15 @@ const createGStyles = (isDarkMode) =>
     verifiedBadgeText: {
       fontSize: 9.5,
       fontWeight: '600',
-      color: isDarkMode ? '#4ADE80' : '#166534',
+      color: isDarkMode ? '#00C98D' : '#166534',
     },
 
     breakdownCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       borderRadius: 14,
       padding: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       gap: 6,
     },
     breakdownLine: {
@@ -870,7 +870,7 @@ const createGStyles = (isDarkMode) =>
     breakdownVal: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
 
     // Buttons
@@ -921,7 +921,7 @@ const createGStyles = (isDarkMode) =>
     receiptPaidTitle: {
       fontSize: 18,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     receiptPaidSub: {
       fontSize: 12.5,
@@ -932,11 +932,11 @@ const createGStyles = (isDarkMode) =>
     },
     receiptBox: {
       width: '100%',
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       borderRadius: 16,
       padding: 14,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       marginTop: 10,
       gap: 8,
     },
@@ -951,7 +951,7 @@ const createGStyles = (isDarkMode) =>
     receiptVal: {
       fontSize: 11.5,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     receiptValBold: {
       fontSize: 12,

@@ -27,11 +27,16 @@ export default class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const isWebDark =
+        Platform.OS === 'web' &&
+        typeof document !== 'undefined' &&
+        document.documentElement?.classList?.contains('dark');
+
       return (
         <SafeAreaView
           style={{
             flex: 1,
-            backgroundColor: '#0A2E28',
+            backgroundColor: isWebDark ? '#111315' : '#0A2E28',
             justifyContent: 'center',
             alignItems: 'center',
             padding: 24,
@@ -39,8 +44,10 @@ export default class ErrorBoundary extends React.Component {
         >
           <View
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isWebDark ? '#191A1D' : '#FFFFFF',
               borderRadius: 24,
+              borderWidth: isWebDark ? 1 : 0,
+              borderColor: isWebDark ? '#303236' : 'transparent',
               padding: 32,
               maxWidth: 500,
               width: '100%',
@@ -57,20 +64,20 @@ export default class ErrorBoundary extends React.Component {
                 width: 64,
                 height: 64,
                 borderRadius: 32,
-                backgroundColor: '#FEF2F2',
+                backgroundColor: isWebDark ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginBottom: 16,
               }}
             >
-              <BootstrapIcon name="exclamation-triangle-fill" size={30} color="#DC2626" />
+              <BootstrapIcon name="exclamation-triangle-fill" size={30} color={isWebDark ? '#F04444' : '#DC2626'} />
             </View>
 
             <Text
               style={{
                 fontSize: 22,
                 fontWeight: '600',
-                color: '#0F172A',
+                color: isWebDark ? '#F5F5F5' : '#0F172A',
                 textAlign: 'center',
                 marginBottom: 8,
               }}
@@ -81,7 +88,7 @@ export default class ErrorBoundary extends React.Component {
             <Text
               style={{
                 fontSize: 13.5,
-                color: '#64748B',
+                color: isWebDark ? '#A1A1AA' : '#64748B',
                 textAlign: 'center',
                 lineHeight: 20,
                 marginBottom: 20,
@@ -95,19 +102,19 @@ export default class ErrorBoundary extends React.Component {
                 style={{
                   maxHeight: 120,
                   width: '100%',
-                  backgroundColor: '#F8FAFC',
+                  backgroundColor: isWebDark ? '#202124' : '#F8FAFC',
                   borderRadius: 12,
                   padding: 12,
                   marginBottom: 20,
                   borderWidth: 1,
-                  borderColor: '#E2E8F0',
+                  borderColor: isWebDark ? '#303236' : '#E2E8F0',
                 }}
               >
                 <Text
                   style={{
                     fontSize: 11,
                     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-                    color: '#DC2626',
+                    color: isWebDark ? '#F87171' : '#DC2626',
                   }}
                 >
                   {this.state.error.toString()}
@@ -117,7 +124,7 @@ export default class ErrorBoundary extends React.Component {
 
             <TouchableOpacity
               style={{
-                backgroundColor: '#EA580C',
+                backgroundColor: isWebDark ? '#FF5A00' : '#EA580C',
                 paddingVertical: 14,
                 paddingHorizontal: 28,
                 borderRadius: 14,

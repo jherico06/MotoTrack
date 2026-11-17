@@ -16,12 +16,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
-import { getThemeTokens } from '../../styles/theme.js';
+import { getAdminThemeTokens as getThemeTokens } from '../../styles/web/admin.web.styles.js';
 import ServiceQuotationPanel from './ServiceQuotationPanel.jsx';
 import PickupQrScannerPanel from './PickupQrScannerPanel.jsx';
 import { garageService } from '../../services/bookings/garageService.js';
 import { rescheduleService, ADMIN_RESCHEDULE_REASONS, STANDARD_TIME_SLOTS } from '../../services/bookings/rescheduleService.js';
 import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { xenditPaymentService } from '../../services/payments/xenditPaymentService.js';
 import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 import { getOptimizedImageUrl } from '../../utils/imageUrl.js';
 import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
@@ -83,8 +84,8 @@ export const BOOKING_FULFILLMENT_STEPS = [
   {
     key: 'in_service',
     status: FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
-    label: 'In bay',
-    shortLabel: 'In bay',
+    label: 'In Service',
+    shortLabel: 'In Service',
   },
   {
     key: 'complete',
@@ -179,35 +180,46 @@ function getBookingStatusExplanation(status, booking) {
 
   switch (norm) {
     case FLEX_BOOKING_STATUS.PENDING_REVIEW:
-      return 'Customer submitted a new appointment request. Review requested services and approve to request the required downpayment or decline with a reason.';
+      return 'Review booking details before approving.';
     case FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT:
     case FLEX_BOOKING_STATUS.APPROVED:
-      return `Booking is approved. Waiting for customer to settle the ${dpPercent}% downpayment (₱${dpAmount.toLocaleString()}) to confirm their bay schedule.`;
+      return `Approved · Awaiting ₱${dpAmount.toLocaleString()} downpayment.`;
     case FLEX_BOOKING_STATUS.RESERVED:
-      return `Downpayment of ₱${dpAmount.toLocaleString()} has been paid and verified. The pit bay slot is reserved for the customer pending technician allocation / bay check-in.`;
+      return `₱${dpAmount.toLocaleString()} downpayment paid · Assign technician below.`;
     case FLEX_BOOKING_STATUS.CONFIRMED:
-      return 'Downpayment has been verified. The appointment date and arrival time window are confirmed for the customer.';
+      return 'Downpayment verified · Slot confirmed.';
     case FLEX_BOOKING_STATUS.SCHEDULED:
-      return 'Appointment is officially scheduled on the garage calendar. When the motorcycle arrives at the workshop, move it to the service bay to begin work.';
+      return 'Scheduled · Move to bay on arrival.';
     case FLEX_BOOKING_STATUS.UNDER_INSPECTION:
-      return 'Technicians are performing diagnostic check and physical inspection of the motorcycle to confirm required labor and replacement parts.';
+      return 'Diagnostic inspection in progress.';
     case FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS:
-      return 'Motorcycle is currently mounted in the service bay with technicians executing scheduled maintenance and repairs.';
+      return 'Service in progress.';
     case FLEX_BOOKING_STATUS.SERVICE_COMPLETED:
     case FLEX_BOOKING_STATUS.FOR_FINAL_BILLING:
-      return 'All service items are completed. Review final labor, replacement parts, and remaining customer balance before releasing.';
+      return 'Service done · Review final bill.';
     case FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT:
-      return 'Final service invoice is prepared. Awaiting collection of remaining balance prior to customer motorcycle release.';
+      return 'Final bill ready · Awaiting remaining balance.';
     case FLEX_BOOKING_STATUS.READY_FOR_PICKUP:
-      return 'Motorcycle service and road test verification are completed. Customer has been notified that the vehicle is ready for release.';
+      return 'Ready for pickup.';
     case FLEX_BOOKING_STATUS.COMPLETED:
-      return 'Work order fulfilled, bike released to customer, and full payment settled.';
-    case FLEX_BOOKING_STATUS.CANCELLED:
-      return 'Booking was cancelled.';
+      return 'Completed and fully paid.';
+    case FLEX_BOOKING_STATUS.CANCELLED: {
+      const refAmt = Number(
+        booking?.refund_amount || Math.round(Number(booking?.amount_paid || dpAmount || 0) * 0.5)
+      );
+      const refRaw = String(booking?.refund_status || '').toLowerCase();
+      if (refRaw.includes('refunded') && !refRaw.includes('pending') && refAmt > 0) {
+        return `Cancelled · 50% downpayment refund (₱${refAmt.toLocaleString()}) issued.`;
+      }
+      if (refAmt > 0) {
+        return `Cancelled by customer · 50% downpayment refund (₱${refAmt.toLocaleString()}) pending.`;
+      }
+      return 'Booking cancelled.';
+    }
     case FLEX_BOOKING_STATUS.REJECTED:
-      return 'Booking request was declined by workshop administrator.';
+      return 'Booking rejected.';
     default:
-      return 'Active workshop service request.';
+      return 'Active booking.';
   }
 }
 function getBookingStatusTone(status, isDark = false) {
@@ -233,7 +245,7 @@ function getBookingStatusTone(status, isDark = false) {
       return {
         bg: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
         border: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
-        color: isDark ? '#34D399' : '#047857',
+        color: isDark ? '#00C98D' : '#047857',
         icon: 'bookmark-check-fill',
       };
     case FLEX_BOOKING_STATUS.CONFIRMED:
@@ -258,7 +270,7 @@ function getBookingStatusTone(status, isDark = false) {
       return {
         bg: isDark ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF',
         border: isDark ? 'rgba(37, 99, 235, 0.35)' : '#BFDBFE',
-        color: isDark ? '#60A5FA' : '#1D4ED8',
+        color: isDark ? '#3B82F6' : '#1D4ED8',
         icon: 'gear-wide-connected',
       };
     case FLEX_BOOKING_STATUS.SERVICE_COMPLETED:
@@ -267,7 +279,7 @@ function getBookingStatusTone(status, isDark = false) {
       return {
         bg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
         border: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
-        color: isDark ? '#34D399' : '#059669',
+        color: isDark ? '#00C98D' : '#059669',
         icon: 'receipt',
       };
     case FLEX_BOOKING_STATUS.READY_FOR_PICKUP:
@@ -282,7 +294,7 @@ function getBookingStatusTone(status, isDark = false) {
       return {
         bg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
         border: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
-        color: isDark ? '#34D399' : '#047857',
+        color: isDark ? '#00C98D' : '#047857',
         icon: 'check-circle-fill',
       };
     case FLEX_BOOKING_STATUS.REJECTED:
@@ -292,14 +304,14 @@ function getBookingStatusTone(status, isDark = false) {
       return {
         bg: isDark ? 'rgba(220, 38, 38, 0.15)' : '#FEF2F2',
         border: isDark ? 'rgba(220, 38, 38, 0.35)' : '#FECACA',
-        color: isDark ? '#F87171' : '#DC2626',
+        color: isDark ? '#F04444' : '#DC2626',
         icon: 'x-circle-fill',
       };
     default:
       return {
         bg: isDark ? 'rgba(100, 116, 139, 0.2)' : '#F8FAFC',
         border: isDark ? 'rgba(100, 116, 139, 0.35)' : '#E2E8F0',
-        color: isDark ? '#94A3B8' : '#475569',
+        color: isDark ? '#A1A1AA' : '#475569',
         icon: 'info-circle-fill',
       };
   }
@@ -326,8 +338,52 @@ function resolveBookingPrimaryAction(booking) {
   const finalTotal = Number(booking.final_service_total || quoteTotal || basePrice);
   const remaining = Math.max(0, finalTotal - (isDpPaid ? dpAmount : 0));
 
+  if (norm === FLEX_BOOKING_STATUS.CANCELLED) {
+    const hasPaidDeposit =
+      booking.payment_status === 'Partially Refunded' ||
+      booking.payment_status === 'DOWNPAYMENT_PAID' ||
+      booking.payment_status === 'FULLY_PAID' ||
+      booking.downpayment_status === 'Paid' ||
+      booking.downpayment_status === 'Settled' ||
+      booking.downpayment_status === '50% Refund Pending' ||
+      booking.downpayment_paid === true ||
+      booking.deposit_paid === true ||
+      Number(booking.amount_paid || 0) > 0 ||
+      Boolean(booking.downpayment_paid_at);
+    const paidDp =
+      Math.round(Number(booking.amount_paid || (hasPaidDeposit ? dpAmount : 0) || 0) * 100) / 100;
+    const refundRaw = String(booking.refund_status || '').toLowerCase();
+    const alreadyRefunded =
+      Boolean(booking.refunded_at) &&
+      Number(booking.refund_amount || 0) > 0 &&
+      refundRaw.includes('refunded') &&
+      !refundRaw.includes('pending');
+    const halfDp = Math.round((Number(booking.refund_amount || 0) || paidDp * 0.5) * 100) / 100;
+
+    if (hasPaidDeposit && paidDp > 0 && !alreadyRefunded && halfDp > 0) {
+      return {
+        kind: 'refund_dp_50',
+        label: `Refund 50% (₱${halfDp.toLocaleString()})`,
+        icon: 'arrow-counterclockwise',
+        disabled: false,
+        needsConfirm: true,
+        confirmTitle: `Issue 50% Downpayment Refund (₱${halfDp.toLocaleString()})?`,
+        confirmBody: `Customer paid ₱${paidDp.toLocaleString()} downpayment and cancelled. Issue a 50% refund of ₱${halfDp.toLocaleString()} via GCash/Xendit and mark this booking Partially Refunded?`,
+        blockedReason: `Booking cancelled · 50% refund pending: ₱${halfDp.toLocaleString()}`,
+      };
+    }
+
+    return {
+      kind: 'none',
+      label: null,
+      disabled: true,
+      blockedReason: alreadyRefunded
+        ? `50% downpayment refund (₱${halfDp.toLocaleString()}) already issued.`
+        : 'This booking has been cancelled and cannot proceed through fulfillment.',
+    };
+  }
+
   if (
-    norm === FLEX_BOOKING_STATUS.CANCELLED ||
     norm === FLEX_BOOKING_STATUS.REJECTED ||
     norm === FLEX_BOOKING_STATUS.BOOKING_EXPIRED
   ) {
@@ -340,7 +396,7 @@ function resolveBookingPrimaryAction(booking) {
           ? booking.rejection_reason
             ? `Booking declined: "${booking.rejection_reason}"`
             : 'This booking was declined.'
-          : 'This booking has been cancelled and cannot proceed through fulfillment.',
+          : 'This booking has expired and cannot proceed through fulfillment.',
     };
   }
 
@@ -694,8 +750,10 @@ function Section({ title, right, children, tokens, isDark, style }) {
   );
 }
 
-function WorkflowStepper({ status, tokens, isDark }) {
+function WorkflowStepper({ status, tokens, isDark, activeViewStep = 0, onSelectStep }) {
   const steps = useMemo(() => getBookingStepStates(status), [status]);
+  const norm = normalizeBookingStatus(status);
+  const currentStepIndex = STEP_INDEX[norm] != null ? STEP_INDEX[norm] : (STEP_INDEX[status] ?? 0);
 
   return (
     <View
@@ -743,19 +801,38 @@ function WorkflowStepper({ status, tokens, isDark }) {
             : '#71717A';
 
         const labelColor = current
-          ? (isDark ? '#F97316' : '#18181B')
+          ? (isDark ? '#FF5A00' : '#18181B')
           : done
-            ? (isDark ? '#F1F5F9' : '#27272A')
+            ? (isDark ? '#F2F2F3' : '#27272A')
             : failed
               ? '#DC2626'
               : isDark
                 ? tokens.textMuted
                 : '#71717A';
 
+        const isViewable = currentStepIndex >= 1 && idx <= 1;
+        const isViewing = isViewable && activeViewStep === idx;
+
         return (
           <React.Fragment key={step.key}>
             {/* Inline Node: Circle and Label side-by-side matching BookingProgressIndicator */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }}>
+            <TouchableOpacity
+              activeOpacity={isViewable ? 0.75 : 1}
+              disabled={!isViewable}
+              onPress={() => isViewable && onSelectStep?.(idx)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingVertical: 3,
+                paddingHorizontal: isViewable ? 6 : 0,
+                borderRadius: 8,
+                backgroundColor: isViewing
+                  ? (isDark ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED')
+                  : 'transparent',
+                cursor: isViewable ? 'pointer' : 'default',
+              }}
+            >
               <View
                 style={{
                   width: 26,
@@ -788,13 +865,13 @@ function WorkflowStepper({ status, tokens, isDark }) {
               <Text
                 style={{
                   fontSize: 12.5,
-                  fontWeight: current ? '700' : done ? '600' : '500',
+                  fontWeight: current || isViewing ? '700' : done ? '600' : '500',
                   color: labelColor,
                 }}
               >
                 {step.shortLabel}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Connecting Divider Line matching BookingProgressIndicator */}
             {idx < steps.length - 1 && (
@@ -802,7 +879,7 @@ function WorkflowStepper({ status, tokens, isDark }) {
                 style={{
                   flex: 1,
                   height: 1.5,
-                  backgroundColor: done ? '#1E2227' : (isDark ? tokens.border : '#E4E4E7'),
+                  backgroundColor: done ? (isDark ? '#FF5A00' : '#1E2227') : (isDark ? tokens.border : '#E4E4E7'),
                   marginHorizontal: 12,
                 }}
               />
@@ -917,25 +994,13 @@ function AdminBookingDetailsPanelInner({
   const [busy, setBusy] = useState(false);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [showRescheduleBox, setShowRescheduleBox] = useState(false);
-  const [activeTab, setActiveTab] = useState('none'); // 'none' | 'quotation' | 'inspection' | 'scanner'
+  const [activeTab, setActiveTab] = useState('none'); // 'none' | 'quotation' | 'scanner'
 
   const [rejectReason, setRejectReason] = useState('');
   const [rescheduleDate, setRescheduleDate] = useState(
     booking?.preferred_date || booking?.appointment_date || ''
   );
   const [rescheduleTime, setRescheduleTime] = useState(booking?.preferred_time || booking?.time_slot || '');
-
-  const [insp, setInsp] = useState({
-    findings: booking?.inspection_notes || '',
-    condition: '',
-    recommended: '',
-    recommendedParts: '',
-    estimatedHours: String(booking?.estimated_labor_hours || ''),
-  });
-  const [progressNotes, setProgressNotes] = useState(booking?.service_notes || '');
-  const [actualHours, setActualHours] = useState(
-    booking?.actual_labor_hours != null ? String(booking.actual_labor_hours) : ''
-  );
 
   const [mechanicsList, setMechanicsList] = useState(() => {
     const fromStorage = garageService.getMechanics();
@@ -1068,6 +1133,11 @@ function AdminBookingDetailsPanelInner({
   const activity = useMemo(() => buildBookingActivity(booking), [booking]);
 
   const bookingId = booking?.booking_id || booking?.id;
+  const [selectedStep, setSelectedStep] = useState(() => (currentStepIndex >= 1 ? 1 : 0));
+
+  useEffect(() => {
+    setSelectedStep(currentStepIndex >= 1 ? 1 : 0);
+  }, [bookingId, currentStepIndex]);
   const isPmsFixed = isPmsFixedBooking(booking);
 
   // Line items
@@ -1245,15 +1315,18 @@ function AdminBookingDetailsPanelInner({
               : '✓ Booking approved · Customer notified by email'
           );
         } else if (primary.kind === 'record_dp') {
-          await garageService.updateBooking(bookingId, {
-            downpayment_status: 'Paid',
-            downpayment_paid: true,
-            amount_paid: dpAmount,
-            downpayment_method: 'Cash / In-Store',
-            downpayment_paid_at: new Date().toISOString(),
-            status: FLEX_BOOKING_STATUS.CONFIRMED,
-            current_stage: 'Downpayment verified',
+          const dpRes = await serviceQuotationService.recordBookingPayment({
+            bookingId,
+            customerId: booking?.customer_id,
+            amount: dpAmount,
+            paymentType: 'DOWNPAYMENT',
+            paymentMethod: 'cash',
+            receivedBy: 'admin',
+            notes: 'Downpayment recorded by admin (Cash / In-Store)',
           });
+          if (!dpRes?.success) {
+            throw new Error(dpRes?.error || 'Failed to record downpayment');
+          }
           onToast?.('✓ Downpayment recorded · Appointment confirmed');
         } else if (primary.kind === 'confirm_schedule' || primary.kind === 'schedule') {
           await garageService.scheduleAppointment(bookingId, {
@@ -1276,14 +1349,22 @@ function AdminBookingDetailsPanelInner({
         } else if (primary.kind === 'finalize_bill') {
           const fin = await serviceQuotationService.finalizeBilling(bookingId);
           if (!fin.success) throw new Error(fin.error || 'Finalize billing failed');
+          if (Number(fin.remaining || 0) > 0) {
+            const payRes = await serviceQuotationService.recordBookingPayment({
+              bookingId,
+              customerId: booking?.customer_id,
+              amount: Number(fin.remaining),
+              paymentType: 'FINAL_PAYMENT',
+              paymentMethod: 'cash',
+              receivedBy: 'admin',
+              notes: 'Remaining balance collected at workshop counter',
+            });
+            if (!payRes?.success) {
+              throw new Error(payRes?.error || 'Failed to record final payment transaction');
+            }
+          }
           await serviceQuotationService.ensurePickupQr(bookingId);
-          await garageService.updateBooking(bookingId, {
-            status: FLEX_BOOKING_STATUS.READY_FOR_PICKUP,
-            current_stage: 'Ready for customer pickup',
-            payment_status: 'FULLY_PAID',
-            remaining_balance: 0,
-          });
-          onToast?.('✓ Billing finalized & Pickup QR issued');
+          onToast?.('✓ Final payment recorded & Pickup QR issued');
         } else if (primary.kind === 'generate_qr') {
           const res = await serviceQuotationService.ensurePickupQr(bookingId);
           if (!res.success) throw new Error(res.error || 'Pickup QR generation failed');
@@ -1300,6 +1381,34 @@ function AdminBookingDetailsPanelInner({
             pickup_verified_at: new Date().toISOString(),
           });
           onToast?.('✓ Motorcycle released · Work order completed');
+        } else if (primary.kind === 'refund_dp_50') {
+          const refundRes = await xenditPaymentService.refundBookingDownpayment({
+            bookingId,
+            reason:
+              booking.cancelled_reason ||
+              booking.cancellation_reason ||
+              'Customer cancellation (50% downpayment refund)',
+            actorName: 'Admin',
+          });
+          if (!refundRes?.success) {
+            throw new Error(refundRes?.error || '50% downpayment refund failed');
+          }
+          await garageService.updateBooking(bookingId, {
+            refund_status: refundRes.refundStatus || '50% Refunded',
+            refund_amount: refundRes.refundAmount,
+            refund_notes: refundRes.refundNotes,
+            refunded_at: refundRes.refundedAt || new Date().toISOString(),
+            payment_status: refundRes.paymentStatus || 'Partially Refunded',
+            downpayment_status: '50% Refunded',
+            current_stage: `Cancelled · 50% Downpayment Refunded (₱${Number(
+              refundRes.refundAmount || 0
+            ).toLocaleString()})`,
+          });
+          onToast?.(
+            `✓ 50% refund (₱${Number(
+              refundRes.refundAmount || 0
+            ).toLocaleString()}) recorded via ${refundRes.channel || 'GCash'}`
+          );
         }
         await refresh();
       });
@@ -1353,61 +1462,6 @@ function AdminBookingDetailsPanelInner({
     });
   };
 
-  const saveInspectionData = async () => {
-    await withBusy(async () => {
-      const inspectedAt = new Date().toISOString();
-      await serviceQuotationService.recordInspection(bookingId, {
-        findings: [
-          insp.condition && `Condition: ${insp.condition}`,
-          insp.findings && `Problems: ${insp.findings}`,
-          insp.recommended && `Recommended: ${insp.recommended}`,
-          insp.recommendedParts && `Parts: ${insp.recommendedParts}`,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        recommendedWork: insp.recommended,
-        photos: media,
-        inspectedBy: 'admin',
-      });
-      await garageService.updateBooking(bookingId, {
-        estimated_labor_hours: insp.estimatedHours
-          ? Number(insp.estimatedHours)
-          : booking.estimated_labor_hours,
-        inspection_notes: [
-          insp.condition && `Condition: ${insp.condition}`,
-          insp.findings,
-          insp.recommended && `Recommended: ${insp.recommended}`,
-          insp.recommendedParts && `Parts: ${insp.recommendedParts}`,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        inspection_started_at: inspectedAt,
-        status: FLEX_BOOKING_STATUS.UNDER_INSPECTION,
-        current_stage: 'Inspection recorded',
-      });
-      onToast?.('✓ Inspection findings recorded');
-      await refresh();
-    });
-  };
-
-  const saveProgressData = async () => {
-    await withBusy(async () => {
-      const patch = {
-        service_notes: progressNotes,
-        status: FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
-        current_stage: 'Service in progress',
-      };
-      if (actualHours !== '') {
-        await serviceQuotationService.setActualLaborHours(bookingId, Number(actualHours), {
-          hourlyRate: booking.quoted_hourly_rate,
-        });
-      }
-      await garageService.updateBooking(bookingId, patch);
-      onToast?.('✓ Service progress logged');
-      await refresh();
-    });
-  };
-
   if (!booking) {
     return (
       <View style={styles.empty}>
@@ -1455,7 +1509,13 @@ function AdminBookingDetailsPanelInner({
               marginBottom: 12,
             }}
           >
-            <WorkflowStepper status={status} tokens={tokens} isDark={isDark} />
+            <WorkflowStepper
+              status={status}
+              tokens={tokens}
+              isDark={isDark}
+              activeViewStep={selectedStep}
+              onSelectStep={(idx) => setSelectedStep(idx >= 1 ? 1 : 0)}
+            />
           </View>
 
           {/* ─────────────────────────────────────────────────────────────
@@ -1484,10 +1544,14 @@ function AdminBookingDetailsPanelInner({
               }}
             >
               {norm === FLEX_BOOKING_STATUS.PENDING_REVIEW || status === 'Pending'
-                ? 'Review the requested service and customer details before approving this booking.'
+                ? 'Review booking details before approving.'
                 : explanation}
             </Text>
           </View>
+
+          {/* ══ STEP 1 CONTENT: RIDER & VEHICLE, SCHEDULE & DELIVERABLES, MECHANIC, ESTIMATED SUMMARY ══ */}
+          {(selectedStep === 0 || currentStepIndex < 0) && (
+            <>
 
           {/* ─────────────────────────────────────────────────────────────
           ROW 1: SIDE-BY-SIDE CARDS (CLEAN, ORGANIZED, AIRY UI)
@@ -1569,20 +1633,20 @@ function AdminBookingDetailsPanelInner({
 
                 <View
                   style={{
-                    backgroundColor: '#ECFDF5',
+                    backgroundColor: isDark ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                     borderRadius: 20,
                     borderWidth: 1,
-                    borderColor: '#A7F3D0',
+                    borderColor: isDark ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 5,
                   }}
                 >
-                  <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
-                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#047857', fontVariant: ['tabular-nums'] }}>
-                    {isDpPaid ? `DP Paid (₱${dpAmount.toLocaleString()})` : `₱${dpAmount.toLocaleString()} Required`}
+                  <BootstrapIcon name="check-circle-fill" size={11} color={isDark ? '#00C98D' : '#059669'} />
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDark ? '#00C98D' : '#047857', fontVariant: ['tabular-nums'] }}>
+                    {isDpPaid ? `DP Paid (₱${dpAmount.toLocaleString()})` : `₱${dpAmount.toLocaleString()} Due`}
                   </Text>
                 </View>
               </View>
@@ -1595,18 +1659,18 @@ function AdminBookingDetailsPanelInner({
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flex: 1, minWidth: 120 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Contact Phone
+                      Phone
                     </Text>
                     <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
-                      {booking.customer_phone || booking.userPhone || 'None provided'}
+                      {booking.customer_phone || booking.userPhone || 'None'}
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 120 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Payment Method
+                      Payment
                     </Text>
                     <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
-                      {booking.downpayment_channel || booking.downpayment_method || booking.payment_method || 'Online (GCash / Card)'}
+                      {booking.downpayment_channel || booking.downpayment_method || booking.payment_method || 'GCash'}
                     </Text>
                   </View>
                 </View>
@@ -1614,7 +1678,7 @@ function AdminBookingDetailsPanelInner({
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flex: 1, minWidth: 120 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Motorcycle Model
+                      Motorcycle
                     </Text>
                     <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
                       {booking.motorcycle_model || booking.bike_model || booking.vehicle || 'Honda ADV 160'}
@@ -1622,7 +1686,7 @@ function AdminBookingDetailsPanelInner({
                   </View>
                   <View style={{ flex: 1, minWidth: 120 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Plate Number
+                      Plate
                     </Text>
                     <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
                       {booking.motorcycle_plate || booking.plate_number || booking.plate || 'N/A-RJCX'}
@@ -1683,7 +1747,7 @@ function AdminBookingDetailsPanelInner({
                         letterSpacing: 0.7,
                       }}
                     >
-                      SCHEDULE & DELIVERABLES
+                      SERVICE & SCHEDULE
                     </Text>
                     <Text
                       style={{
@@ -1730,7 +1794,7 @@ function AdminBookingDetailsPanelInner({
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flex: 1.1, minWidth: 140 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Appointment Schedule
+                      Date & Time
                     </Text>
                     <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
                       {booking.preferred_date || booking.appointment_date || booking.date
@@ -1740,21 +1804,21 @@ function AdminBookingDetailsPanelInner({
                   </View>
                   <View style={{ flex: 0.9, minWidth: 110 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Service Category
+                      Category
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
                       <View
                         style={{
-                          backgroundColor: '#EFF6FF',
+                          backgroundColor: isDark ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF',
                           paddingHorizontal: 7,
                           paddingVertical: 2,
                           borderRadius: 4,
                           borderWidth: 1,
-                          borderColor: '#DBEAFE',
+                          borderColor: isDark ? 'rgba(59, 130, 246, 0.28)' : '#DBEAFE',
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#2563EB' }} numberOfLines={1}>
-                          {booking.category === 'PMS' ? 'Tune-Up & Maintenance' : (booking.category || 'PMS Package')}
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#3B82F6' : '#2563EB' }} numberOfLines={1}>
+                          {booking.category === 'PMS' ? 'PMS' : (booking.category || 'PMS')}
                         </Text>
                       </View>
                     </View>
@@ -1764,18 +1828,15 @@ function AdminBookingDetailsPanelInner({
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flex: 1.1, minWidth: 140 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Workshop Pit Bay
+                      Branch
                     </Text>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
                       {booking.branch?.replace('MotoTrack ', '') || "D'Blockchain Motorparts"}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: isDark ? tokens.textMuted : '#71717A', marginTop: 1 }} numberOfLines={1}>
-                      South Poblacion, Naga, 6037 Cebu
                     </Text>
                   </View>
                   <View style={{ flex: 0.9, minWidth: 110 }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Duration & Bay
+                      Bay & Duration
                     </Text>
                     <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
                       25–35 mins • Bay 1
@@ -1818,14 +1879,14 @@ function AdminBookingDetailsPanelInner({
                     width: 32,
                     height: 32,
                     borderRadius: 16,
-                    backgroundColor: isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED',
+                    backgroundColor: isDark ? '#3A241B' : '#FFF7ED',
                     borderWidth: 1,
-                    borderColor: '#FED7AA',
+                    borderColor: isDark ? '#8A3D19' : '#FED7AA',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <BootstrapIcon name="tools" size={15} color="#EA580C" />
+                  <BootstrapIcon name="tools" size={15} color={isDark ? '#FF5A00' : '#EA580C'} />
                 </View>
                 <View>
                   <Text
@@ -1837,7 +1898,7 @@ function AdminBookingDetailsPanelInner({
                       letterSpacing: 0.6,
                     }}
                   >
-                    PREFERRED SCHEDULE & MECHANIC ALLOCATION
+                    MECHANIC
                   </Text>
                   <Text
                     style={{
@@ -1847,7 +1908,7 @@ function AdminBookingDetailsPanelInner({
                       marginTop: 1,
                     }}
                   >
-                    Technician Availability for Requested Slot
+                    Assign Technician
                   </Text>
                 </View>
               </View>
@@ -1855,19 +1916,19 @@ function AdminBookingDetailsPanelInner({
               {/* Customer Requested Slot Pill */}
               <View
                 style={{
-                  backgroundColor: '#EFF6FF',
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF',
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                   borderRadius: 20,
                   borderWidth: 1,
-                  borderColor: '#BFDBFE',
+                  borderColor: isDark ? 'rgba(59, 130, 246, 0.28)' : '#BFDBFE',
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
                 }}
               >
-                <BootstrapIcon name="calendar-event-fill" size={12} color="#2563EB" />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4ED8' }}>
+                <BootstrapIcon name="calendar-event-fill" size={12} color={isDark ? '#3B82F6' : '#2563EB'} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#3B82F6' : '#1D4ED8' }}>
                   {preferredDate ? formatDateOnly(preferredDate) : 'Preferred Date'} • {preferredTime}
                 </Text>
               </View>
@@ -1875,17 +1936,6 @@ function AdminBookingDetailsPanelInner({
 
             {/* Hairline Divider */}
             <View style={{ height: 1, backgroundColor: isDark ? tokens.border : '#F4F4F5', marginBottom: 14 }} />
-
-            {/* Sub-heading / Instruction */}
-            <Text
-              style={{
-                fontSize: 12,
-                color: isDark ? tokens.textMuted : '#71717A',
-                marginBottom: 12,
-              }}
-            >
-              Review active pit bay technicians below to confirm who is free during the customer's preferred slot ({preferredTime}). Tap to assign technician before approving.
-            </Text>
 
             {/* Mechanics Grid */}
             <View style={{ gap: 10 }}>
@@ -1971,24 +2021,24 @@ function AdminBookingDetailsPanelInner({
                     </View>
 
                     {/* Middle: Live Availability Pill */}
-                    <View style={{ alignItems: 'flex-end', minWidth: 150 }}>
+                    <View style={{ alignItems: 'flex-end' }}>
                       {mech.isAvailable ? (
                         <View
                           style={{
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 5,
-                            backgroundColor: '#ECFDF5',
+                            backgroundColor: isDark ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
                             paddingHorizontal: 9,
-                            paddingVertical: 3.5,
+                            paddingVertical: 4,
                             borderRadius: 12,
                             borderWidth: 1,
-                            borderColor: '#A7F3D0',
+                            borderColor: isDark ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
                           }}
                         >
-                          <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#047857' }}>
-                            Free & Available
+                          <BootstrapIcon name="check-circle-fill" size={11} color={isDark ? '#00C98D' : '#059669'} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#00C98D' : '#047857' }}>
+                            Available
                           </Text>
                         </View>
                       ) : (
@@ -1997,29 +2047,20 @@ function AdminBookingDetailsPanelInner({
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 5,
-                            backgroundColor: '#FEF2F2',
+                            backgroundColor: isDark ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
                             paddingHorizontal: 9,
-                            paddingVertical: 3.5,
+                            paddingVertical: 4,
                             borderRadius: 12,
                             borderWidth: 1,
-                            borderColor: '#FECACA',
+                            borderColor: isDark ? 'rgba(240, 68, 68, 0.28)' : '#FECACA',
                           }}
                         >
-                          <BootstrapIcon name="slash-circle-fill" size={11} color="#DC2626" />
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#B91C1C' }}>
+                          <BootstrapIcon name="slash-circle-fill" size={11} color={isDark ? '#F04444' : '#DC2626'} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#F04444' : '#B91C1C' }}>
                             Busy ({mech.conflictBooking || 'In Bay'})
                           </Text>
                         </View>
                       )}
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: isDark ? tokens.textMuted : '#A1A1AA',
-                          marginTop: 2,
-                        }}
-                      >
-                        {mech.isAvailable ? `Available at ${preferredTime}` : `Conflicting slot at ${preferredTime}`}
-                      </Text>
                     </View>
 
                     {/* Right: Select Action */}
@@ -2084,9 +2125,9 @@ function AdminBookingDetailsPanelInner({
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                 <BootstrapIcon name="info-circle" size={13} color="#EA580C" />
                 <Text style={{ fontSize: 11.5, color: isDark ? tokens.textMuted : '#71717A' }}>
-                  Technician assigned to this service:{' '}
+                  Assigned:{' '}
                   <Text style={{ fontWeight: '700', color: isDark ? tokens.textPrimary : '#18181B' }}>
-                    {selectedMechanic?.name || booking?.mechanic || 'Pit Bay Dispatch upon arrival'}
+                    {selectedMechanic?.name || booking?.mechanic || 'Unassigned'}
                   </Text>
                 </Text>
               </View>
@@ -2108,19 +2149,19 @@ function AdminBookingDetailsPanelInner({
             </View>
           </View>
 
-          {/* ─── CARD 3: ESTIMATED SUMMARY (EXECUTIVE CHARCOAL COLOR SCHEME) ─── */}
+          {/* ─── CARD 3: ESTIMATED SUMMARY ─── */}
           <View
             style={{
-              backgroundColor: '#1E2227',
+              backgroundColor: isDark ? '#202124' : '#FFFFFF',
               borderRadius: 16,
               padding: 20,
               marginBottom: 16,
               borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.08)',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E4E4E7',
               shadowColor: '#000000',
-              shadowOpacity: 0.15,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: isDark ? 0.15 : 0.03,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
             }}
           >
             {/* Header: ESTIMATED SUMMARY matching Reference */}
@@ -2150,7 +2191,7 @@ function AdminBookingDetailsPanelInner({
                 style={{
                   fontSize: 11,
                   fontWeight: '700',
-                  color: '#9CA3AF',
+                  color: isDark ? '#A1A1AA' : '#64748B',
                   letterSpacing: 0.6,
                   textTransform: 'uppercase',
                 }}
@@ -2161,7 +2202,7 @@ function AdminBookingDetailsPanelInner({
                 style={{
                   fontSize: 11,
                   fontWeight: '700',
-                  color: '#9CA3AF',
+                  color: isDark ? '#A1A1AA' : '#64748B',
                   letterSpacing: 0.6,
                   textTransform: 'uppercase',
                 }}
@@ -2174,7 +2215,7 @@ function AdminBookingDetailsPanelInner({
             <View
               style={{
                 height: 1,
-                backgroundColor: 'rgba(255, 255, 255, 0.10)',
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
                 marginTop: 4,
                 marginBottom: 10,
               }}
@@ -2189,11 +2230,11 @@ function AdminBookingDetailsPanelInner({
                 paddingVertical: 5,
               }}
             >
-              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Labor</Text>
+              <Text style={{ fontSize: 13.5, color: isDark ? '#D4D4D8' : '#475569', fontWeight: '500' }}>Labor</Text>
               <Text
                 style={{
                   fontSize: 13.5,
-                  color: '#FFFFFF',
+                  color: isDark ? '#FFFFFF' : '#0F172A',
                   fontWeight: '600',
                   fontVariant: ['tabular-nums'],
                 }}
@@ -2211,11 +2252,11 @@ function AdminBookingDetailsPanelInner({
                 paddingVertical: 5,
               }}
             >
-              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Parts</Text>
+              <Text style={{ fontSize: 13.5, color: isDark ? '#D4D4D8' : '#475569', fontWeight: '500' }}>Parts</Text>
               <Text
                 style={{
                   fontSize: 13.5,
-                  color: '#FFFFFF',
+                  color: isDark ? '#FFFFFF' : '#0F172A',
                   fontWeight: '600',
                   fontVariant: ['tabular-nums'],
                 }}
@@ -2233,11 +2274,11 @@ function AdminBookingDetailsPanelInner({
                 paddingVertical: 5,
               }}
             >
-              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Other Charges</Text>
+              <Text style={{ fontSize: 13.5, color: isDark ? '#D4D4D8' : '#475569', fontWeight: '500' }}>Other Charges</Text>
               <Text
                 style={{
                   fontSize: 13.5,
-                  color: '#FFFFFF',
+                  color: isDark ? '#FFFFFF' : '#0F172A',
                   fontWeight: '600',
                   fontVariant: ['tabular-nums'],
                 }}
@@ -2255,11 +2296,13 @@ function AdminBookingDetailsPanelInner({
                 paddingVertical: 5,
               }}
             >
-              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Discount</Text>
+              <Text style={{ fontSize: 13.5, color: isDark ? '#D4D4D8' : '#475569', fontWeight: '500' }}>Discount</Text>
               <Text
                 style={{
                   fontSize: 13.5,
-                  color: Number(booking?.discount_amount || booking?.discount_php || 0) > 0 ? '#F87171' : '#FFFFFF',
+                  color: Number(booking?.discount_amount || booking?.discount_php || 0) > 0
+                    ? (isDark ? '#F04444' : '#DC2626')
+                    : (isDark ? '#FFFFFF' : '#0F172A'),
                   fontWeight: '600',
                   fontVariant: ['tabular-nums'],
                 }}
@@ -2274,7 +2317,7 @@ function AdminBookingDetailsPanelInner({
             <View
               style={{
                 height: 1,
-                backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
                 marginTop: 10,
                 marginBottom: 10,
               }}
@@ -2289,7 +2332,7 @@ function AdminBookingDetailsPanelInner({
                 paddingVertical: 3,
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFFFFF' }}>Total</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A' }}>Total</Text>
               <Text
                 style={{
                   fontSize: 18,
@@ -2308,7 +2351,7 @@ function AdminBookingDetailsPanelInner({
                 marginTop: 10,
                 paddingTop: 10,
                 borderTopWidth: 1,
-                borderTopColor: 'rgba(255, 255, 255, 0.08)',
+                borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
                 gap: 6,
               }}
             >
@@ -2320,14 +2363,14 @@ function AdminBookingDetailsPanelInner({
                   paddingVertical: 3,
                 }}
               >
-                <Text style={{ fontSize: 13, color: '#A1A1AA', fontWeight: '500' }}>
+                <Text style={{ fontSize: 13, color: isDark ? '#A1A1AA' : '#64748B', fontWeight: '500' }}>
                   {isDpPaid ? 'Downpayment (Paid)' : 'Required Downpayment'}
                 </Text>
                 <Text
                   style={{
                     fontSize: 15,
                     fontWeight: '700',
-                    color: '#EA580C',
+                    color: isDark ? '#FF5A00' : '#B45309',
                     fontVariant: ['tabular-nums'],
                   }}
                 >
@@ -2343,8 +2386,8 @@ function AdminBookingDetailsPanelInner({
                   paddingVertical: 3,
                 }}
               >
-                <Text style={{ fontSize: 13, color: '#A1A1AA', fontWeight: '500' }}>
-                  Remaining Estimated Balance
+                <Text style={{ fontSize: 13, color: isDark ? '#A1A1AA' : '#64748B', fontWeight: '500' }}>
+                  Remaining Balance
                 </Text>
                 <Text
                   style={{
@@ -2359,6 +2402,12 @@ function AdminBookingDetailsPanelInner({
               </View>
             </View>
           </View>
+            </>
+          )}
+
+          {/* ══ STEP 2 CONTENT: NOTES, PHOTOS, WORKSHOP TOOLS & BOOKING ACTIVITY ══ */}
+          {(selectedStep >= 1 || currentStepIndex < 0) && (
+            <>
           {/* Customer Special Notes if present */}
           {Boolean(booking.notes || booking.customer_notes) && (
             <View
@@ -2381,7 +2430,7 @@ function AdminBookingDetailsPanelInner({
                   marginBottom: 8,
                 }}
               >
-                Customer Special Requests & Notes
+                Customer Notes
               </Text>
               <View
                 style={{
@@ -2421,7 +2470,7 @@ function AdminBookingDetailsPanelInner({
                   marginBottom: 10,
                 }}
               >
-                Attached Motorcycle Photos ({media.length})
+                Photos ({media.length})
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {media.map((url, i) => (
@@ -2457,7 +2506,7 @@ function AdminBookingDetailsPanelInner({
                 style={[
                   secondaryBtn,
                   activeTab === 'quotation' && {
-                    backgroundColor: isDark ? '#EA580C' : '#FFF7ED',
+                    backgroundColor: isDark ? '#FF5A00' : '#FFF7ED',
                     borderColor: '#EA580C',
                   },
                 ]}
@@ -2482,34 +2531,8 @@ function AdminBookingDetailsPanelInner({
               <TouchableOpacity
                 style={[
                   secondaryBtn,
-                  activeTab === 'inspection' && {
-                    backgroundColor: isDark ? '#EA580C' : '#FFF7ED',
-                    borderColor: '#EA580C',
-                  },
-                ]}
-                onPress={() => setActiveTab(activeTab === 'inspection' ? 'none' : 'inspection')}
-              >
-                <BootstrapIcon
-                  name="search"
-                  size={13}
-                  color={activeTab === 'inspection' ? (isDark ? '#FFF' : '#EA580C') : tokens.textPrimary}
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: activeTab === 'inspection' ? (isDark ? '#FFF' : '#EA580C') : tokens.textPrimary,
-                  }}
-                >
-                  {activeTab === 'inspection' ? 'Hide Inspection Form' : 'Inspection & Diagnostics'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  secondaryBtn,
                   activeTab === 'scanner' && {
-                    backgroundColor: isDark ? '#EA580C' : '#FFF7ED',
+                    backgroundColor: isDark ? '#FF5A00' : '#FFF7ED',
                     borderColor: '#EA580C',
                   },
                 ]}
@@ -2561,116 +2584,6 @@ function AdminBookingDetailsPanelInner({
                     await refresh();
                   }}
                 />
-              </View>
-            )}
-
-            {/* Tab Sub-Panel: Inspection */}
-            {activeTab === 'inspection' && (
-              <View
-                style={{ paddingTop: 8, borderTopWidth: 1, borderTopColor: tokens.border || '#E2E8F0', gap: 10 }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                  Vehicle Inspection & Diagnostics
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 3 }}>Condition</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="e.g. Good / Forks leaking / Chain slack"
-                      placeholderTextColor="#94A3B8"
-                      value={insp.condition}
-                      onChangeText={(v) => setInsp((p) => ({ ...p, condition: v }))}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 3 }}>
-                      Estimated Labor Hours
-                    </Text>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="e.g. 1.5"
-                      placeholderTextColor="#94A3B8"
-                      value={insp.estimatedHours}
-                      onChangeText={(v) => setInsp((p) => ({ ...p, estimatedHours: v }))}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                </View>
-                <View>
-                  <Text style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 3 }}>
-                    Problems Identified
-                  </Text>
-                  <TextInput
-                    style={[styles.textInput, { minHeight: 55 }]}
-                    placeholder="Diagnostic findings..."
-                    placeholderTextColor="#94A3B8"
-                    value={insp.findings}
-                    onChangeText={(v) => setInsp((p) => ({ ...p, findings: v }))}
-                    multiline
-                  />
-                </View>
-                <TouchableOpacity
-                  onPress={saveInspectionData}
-                  disabled={busy}
-                  style={[
-                    secondaryBtn,
-                    { alignSelf: 'flex-start', backgroundColor: '#1E2227',
-      borderWidth: 1,
-      borderColor: '#373C42', borderColor: '#EA580C' },
-                  ]}
-                >
-                  <BootstrapIcon name="check2" size={13} color="#FFF" />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFF' }}>Save Inspection</Text>
-                </TouchableOpacity>
-
-                <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: tokens.border }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                    Service Execution Progress
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 3 }}>
-                        Actual Labor Hours
-                      </Text>
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g. 2.0"
-                        placeholderTextColor="#94A3B8"
-                        value={actualHours}
-                        onChangeText={setActualHours}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  </View>
-                  <View style={{ marginTop: 6 }}>
-                    <Text style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 3 }}>Service Notes</Text>
-                    <TextInput
-                      style={[styles.textInput, { minHeight: 55 }]}
-                      placeholder="Work completed notes..."
-                      placeholderTextColor="#94A3B8"
-                      value={progressNotes}
-                      onChangeText={setProgressNotes}
-                      multiline
-                    />
-                  </View>
-                  <TouchableOpacity
-                    onPress={saveProgressData}
-                    disabled={busy}
-                    style={[
-                      secondaryBtn,
-                      {
-                        alignSelf: 'flex-start',
-                        marginTop: 8,
-                        backgroundColor: '#EA580C',
-                        borderColor: '#EA580C',
-                      },
-                    ]}
-                  >
-                    <BootstrapIcon name="save" size={13} color="#FFF" />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFF' }}>Save Progress</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
 
@@ -2749,6 +2662,8 @@ function AdminBookingDetailsPanelInner({
               ))
             )}
           </Section>
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -2804,8 +2719,8 @@ function AdminBookingDetailsPanelInner({
                 paddingVertical: 8,
                 borderRadius: 8,
                 borderWidth: 1,
-                borderColor: isDark ? '#373C42' : '#CBD5E1',
-                backgroundColor: isDark ? '#24272B' : '#F8FAFC',
+                borderColor: isDark ? '#3A3B40' : '#CBD5E1',
+                backgroundColor: isDark ? '#191A1D' : '#F8FAFC',
                 cursor: 'pointer',
               }}
               activeOpacity={0.8}
@@ -2858,7 +2773,9 @@ function AdminBookingDetailsPanelInner({
               <Text style={[styles.footerTerminalText, { fontSize: 12 }]}>
                 {norm === FLEX_BOOKING_STATUS.COMPLETED
                   ? '✓ Handover Completed'
-                  : 'No further action required'}
+                  : norm === FLEX_BOOKING_STATUS.CANCELLED && booking?.refunded_at
+                    ? '✓ 50% Downpayment Refunded'
+                    : 'No further action required'}
               </Text>
             </View>
           )}
@@ -3113,7 +3030,7 @@ function createStyles(t, isDark) {
     footerTerminalText: {
       fontSize: 12.5,
       fontWeight: '600',
-      color: isDark ? '#34D399' : '#047857',
+      color: isDark ? '#00C98D' : '#047857',
     },
     wrap: { gap: 12 },
     empty: { padding: 32, alignItems: 'center' },

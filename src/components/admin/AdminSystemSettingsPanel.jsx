@@ -368,7 +368,7 @@ export default function AdminSystemSettingsPanel({
             width: 42,
             height: 42,
             borderRadius: 12,
-            backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
+            backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -552,7 +552,7 @@ export default function AdminSystemSettingsPanel({
                 </Text>
                 <View
                   style={{
-                    backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
+                    backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
                     paddingHorizontal: 8,
                     paddingVertical: 2,
                     borderRadius: 6,
@@ -844,7 +844,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 48,
                         borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
+                        backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
@@ -924,9 +924,9 @@ export default function AdminSystemSettingsPanel({
                         width: 80,
                         height: 48,
                         borderRadius: 8,
-                        backgroundColor: '#1E252D',
+                        backgroundColor: isDarkMode ? '#202124' : '#1E252D',
                         borderWidth: 1,
-                        borderColor: '#334155',
+                        borderColor: isDarkMode ? tokens.border : '#334155',
                       }}
                       resizeMode="cover"
                     />
@@ -2464,7 +2464,7 @@ export default function AdminSystemSettingsPanel({
                   width: 42,
                   height: 42,
                   borderRadius: 12,
-                  backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
+                  backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -2633,7 +2633,7 @@ export default function AdminSystemSettingsPanel({
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
+                    backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -2800,11 +2800,11 @@ export default function AdminSystemSettingsPanel({
                             width: 64,
                             height: 64,
                             borderRadius: 12,
-                            backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
+                            backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderWidth: 1,
-                            borderColor: isDarkMode ? '#EA580C' : '#A7F3D0',
+                            borderColor: isDarkMode ? '#FF5A00' : '#A7F3D0',
                           }}
                         >
                           <BootstrapIcon name="tools" size={28} color="#EA580C" />

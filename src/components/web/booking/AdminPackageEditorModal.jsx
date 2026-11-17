@@ -5,6 +5,7 @@
 // =========================================================================
 
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import {
   View,
   Text,
@@ -25,6 +26,8 @@ export default function AdminPackageEditorModal({
   onSave,
   onDelete,
 }) {
+  const { isDarkMode } = useTheme();
+  const editorStyles = get_editorStyles(isDarkMode);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('PMS');
   const [duration, setDuration] = useState('45 mins');
@@ -227,7 +230,7 @@ export default function AdminPackageEditorModal({
               {image ? (
                 <Image
                   source={{ uri: image }}
-                  style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: '#F1F5F9' }}
+                  style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: isDarkMode ? '#202124' : '#F1F5F9' }}
                   resizeMode="cover"
                 />
               ) : null}
@@ -337,7 +340,13 @@ export default function AdminPackageEditorModal({
   );
 }
 
-const editorStyles = StyleSheet.create({
+let _light_editorStyles = null;
+let _dark_editorStyles = null;
+function get_editorStyles(isDarkMode) {
+  if (isDarkMode && _dark_editorStyles) return _dark_editorStyles;
+  if (!isDarkMode && _light_editorStyles) return _light_editorStyles;
+  const created = StyleSheet.create({
+
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
@@ -350,7 +359,7 @@ const editorStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 540,
     maxHeight: '92%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000000',
@@ -373,7 +382,7 @@ const editorStyles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDarkMode ? '#292B2F' : '#F1F5F9',
   },
   adminBadge: {
     flexDirection: 'row',
@@ -393,7 +402,7 @@ const editorStyles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDarkMode ? '#F2F2F3' : '#0F172A',
   },
   closeBtn: {
     padding: 6,
@@ -407,29 +416,29 @@ const editorStyles = StyleSheet.create({
   label: {
     fontSize: 12.5,
     fontWeight: '600',
-    color: '#334155',
+    color: isDarkMode ? '#A1A1AA' : '#334155',
     marginBottom: 5,
   },
   subLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#64748B',
+    color: isDarkMode ? '#A1A1AA' : '#64748B',
     marginBottom: 4,
   },
   helperText: {
     fontSize: 11.5,
-    color: '#64748B',
+    color: isDarkMode ? '#A1A1AA' : '#64748B',
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDarkMode ? '#F2F2F3' : '#0F172A',
     marginBottom: 10,
   },
   textArea: {
@@ -446,18 +455,18 @@ const editorStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
+    backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
     alignItems: 'center',
   },
   categoryPillActive: {
     borderColor: '#EA580C',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
   },
   categoryPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: isDarkMode ? '#A1A1AA' : '#64748B',
   },
   categoryPillTextActive: {
     color: '#EA580C',
@@ -471,21 +480,21 @@ const editorStyles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    backgroundColor: '#FAFAFA',
+    borderTopColor: isDarkMode ? '#292B2F' : '#F1F5F9',
+    backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
   },
   cancelBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
+    color: isDarkMode ? '#A1A1AA' : '#64748B',
   },
   deleteBtn: {
     flexDirection: 'row',
@@ -496,7 +505,7 @@ const editorStyles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#FCA5A5',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDarkMode ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
     cursor: 'pointer',
   },
   deleteBtnText: {
@@ -518,5 +527,10 @@ const editorStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-});
+
+  });
+  if (isDarkMode) _dark_editorStyles = created;
+  else _light_editorStyles = created;
+  return created;
+}
 

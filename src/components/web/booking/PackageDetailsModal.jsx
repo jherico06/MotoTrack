@@ -3,10 +3,11 @@
 // Comprehensive package overview with inclusions and CC pricing tiers
 // =========================================================================
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Image, ScrollView, Modal } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 
 export default function PackageDetailsModal({
@@ -19,6 +20,8 @@ export default function PackageDetailsModal({
   isAdmin = false,
   onEditPackage,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const [modalImgError, setModalImgError] = React.useState(false);
 
   if (!visible || !pkg) return null;
@@ -54,7 +57,7 @@ export default function PackageDetailsModal({
             {modalImgError && !hasCustomImg ? (
               <View style={[styles.packageImage, { backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' }]}>
                 <BootstrapIcon name={isRepair ? 'wrench' : 'wrench-adjustable'} size={40} color="#FF5A0A" />
-                <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 6, fontWeight: '600' }}>MotoTrack Service</Text>
+                <Text style={{ color: isDarkMode ? '#71717A' : '#94A3B8', fontSize: 13, marginTop: 6, fontWeight: '600' }}>MotoTrack Service</Text>
               </View>
             ) : (
               <Image
@@ -96,11 +99,11 @@ export default function PackageDetailsModal({
 
             {/* ─── INCLUDED SERVICES BREAKDOWN ─── */}
             <Text style={styles.sectionTitle}>Included Services & Inspection Checklist</Text>
-            <View style={{ gap: 8, marginBottom: 24, backgroundColor: '#F8FAFC', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <View style={{ gap: 8, marginBottom: 24, backgroundColor: isDarkMode ? '#202124' : '#F8FAFC', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#303236' : '#E2E8F0' }}>
               {(pkg.inclusions || []).map((item, index) => (
                 <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
                   <BootstrapIcon name="check-circle-fill" size={15} color="#16A34A" />
-                  <Text style={{ fontSize: 13, color: '#334155', flex: 1, lineHeight: 18 }}>
+                  <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#334155', flex: 1, lineHeight: 18 }}>
                     {item}
                   </Text>
                 </View>
@@ -109,7 +112,7 @@ export default function PackageDetailsModal({
 
             {/* ─── CC-BASED PRICING INFORMATION ─── */}
             <Text style={styles.sectionTitle}>Applicable Engine Displacement (CC) Pricing</Text>
-            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', marginBottom: 8 }}>
               Labor and service rates are configured based on your motorcycle engine displacement category:
             </Text>
 
@@ -123,7 +126,7 @@ export default function PackageDetailsModal({
                     style={[
                       styles.ccPricingRow,
                       isLast && styles.ccPricingRowLast,
-                      isMatched && { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA', borderRadius: 6 },
+                      isMatched && { backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA', borderRadius: 6 },
                     ]}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -132,7 +135,7 @@ export default function PackageDetailsModal({
                         {tier.label} {isMatched && '(Your Bike Rate)'}
                       </Text>
                     </View>
-                    <Text style={[styles.ccPriceText, isMatched && { color: '#EA580C', fontWeight: '800' }, tier.price == null && { color: '#94A3B8', fontStyle: 'italic' }]}>
+                    <Text style={[styles.ccPriceText, isMatched && { color: '#EA580C', fontWeight: '800' }, tier.price == null && { color: isDarkMode ? '#71717A' : '#94A3B8', fontStyle: 'italic' }]}>
                       {tier.price != null ? formatPhp(tier.price) : 'Not Available for this category'}
                     </Text>
                   </View>
@@ -148,7 +151,7 @@ export default function PackageDetailsModal({
               onPress={onClose}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B' }}>Close</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#64748B' }}>Close</Text>
             </TouchableOpacity>
 
             {isAdmin && typeof onEditPackage === 'function' && (
@@ -162,7 +165,7 @@ export default function PackageDetailsModal({
                   borderRadius: 10,
                   borderWidth: 1,
                   borderColor: '#EA580C',
-                  backgroundColor: '#FFF7ED',
+                  backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                   cursor: 'pointer',
                 }}
                 onPress={() => {

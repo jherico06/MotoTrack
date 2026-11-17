@@ -116,21 +116,21 @@ export default function SalesAnalyticsPanel({
   const theme = useMemo(() => {
     if (isDarkMode) {
       return {
-        bg: '#181A1D',
-        cardBg: '#24272B',
-        cardBgSub: '#1E2124',
-        border: '#374151',
-        borderInput: '#374151',
-        textPrimary: '#F8FAFC',
-        textMuted: '#94A3B8',
-        brandGreen: '#EA580C',
-        brandGreenDark: '#EA580C',
-        brandGreenLight: '#FB923C',
-        cardShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
-        chipBg: '#1E2124',
-        progressTrack: '#374151',
-        statusGreenBg: 'rgba(16, 185, 129, 0.15)',
-        statusGreenText: '#34D399',
+        bg: '#111315',
+        cardBg: '#191A1D',
+        cardBgSub: '#202124',
+        border: '#303236',
+        borderInput: '#3A3B40',
+        textPrimary: '#F2F2F3',
+        textMuted: '#A1A1AA',
+        brandGreen: '#FF5A00',
+        brandGreenDark: '#E95000',
+        brandGreenLight: '#FF5A00',
+        cardShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+        chipBg: '#202124',
+        progressTrack: '#292B2F',
+        statusGreenBg: 'rgba(0, 201, 141, 0.15)',
+        statusGreenText: '#00C98D',
       };
     }
     return {
@@ -596,13 +596,12 @@ export default function SalesAnalyticsPanel({
             flex: 1,
             minWidth: isDesktop ? 220 : 150,
             backgroundColor: theme.cardBg,
-            borderRadius: 14,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.border,
-            padding: 18,
+            padding: 20,
             boxShadow: theme.cardShadow,
             justifyContent: 'space-between',
-            minHeight: 125,
           }}
         >
           <View
@@ -610,58 +609,74 @@ export default function SalesAnalyticsPanel({
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
+              gap: 8,
             }}
           >
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: 11,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-                textTransform: 'uppercase',
+                fontSize: 13,
+                fontWeight: '500',
                 color: theme.textMuted,
               }}
             >
-              GROSS SALES
+              Gross sales
             </Text>
             <View
               style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                backgroundColor: isDarkMode ? 'rgba(77, 184, 150, 0.15)' : '#ECFDF5',
-                alignItems: 'center',
-                justifyContent: 'center',
+                backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#8A3D19' : '#FED7AA',
               }}
             >
-              <BootstrapIcon
-                name="graph-up-arrow"
-                size={12}
-                color={isDarkMode ? '#EA580C' : '#EA580C'}
-              />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#FF5A00' : '#EA580C' }}>
+                Net revenue
+              </Text>
             </View>
           </View>
-          <View style={{ marginVertical: 4 }}>
+          <View style={{ marginVertical: 12 }}>
             <Text
               style={{
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: '600',
                 color: theme.textPrimary,
-                letterSpacing: -0.5,
+                letterSpacing: -0.6,
                 fontVariant: ['tabular-nums'],
               }}
             >
               ₱{analyticsData.totalRevenue.toLocaleString()}
             </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.textMuted,
+                marginTop: 3,
+              }}
+            >
+              Excludes cancelled and refunded
+            </Text>
           </View>
-          <Text
+          <View
             style={{
-              fontSize: 11.5,
-              fontWeight: '500',
-              color: theme.textMuted,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: isDarkMode ? '#292B2F' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 4,
             }}
           >
-            Excludes cancelled and refunded
-          </Text>
+            <View
+              style={{
+                height: '100%',
+                width: analyticsData.totalRevenue > 0 ? '82%' : '18%',
+                backgroundColor: isDarkMode ? '#FF5A00' : '#EA580C',
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </View>
 
         {/* Card 2: Average Order Value (AOV) */}
@@ -670,13 +685,12 @@ export default function SalesAnalyticsPanel({
             flex: 1,
             minWidth: isDesktop ? 220 : 150,
             backgroundColor: theme.cardBg,
-            borderRadius: 14,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.border,
-            padding: 18,
+            padding: 20,
             boxShadow: theme.cardShadow,
             justifyContent: 'space-between',
-            minHeight: 125,
           }}
         >
           <View
@@ -684,58 +698,74 @@ export default function SalesAnalyticsPanel({
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
+              gap: 8,
             }}
           >
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: 11,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-                textTransform: 'uppercase',
+                fontSize: 13,
+                fontWeight: '500',
                 color: theme.textMuted,
               }}
             >
-              AVERAGE ORDER VALUE
+              Avg. order value
             </Text>
             <View
               style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
-                alignItems: 'center',
-                justifyContent: 'center',
+                backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF',
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.28)' : '#BFDBFE',
               }}
             >
-              <BootstrapIcon
-                name="receipt"
-                size={12}
-                color={isDarkMode ? '#60A5FA' : '#2563EB'}
-              />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#3B82F6' : '#2563EB' }}>
+                AOV
+              </Text>
             </View>
           </View>
-          <View style={{ marginVertical: 4 }}>
+          <View style={{ marginVertical: 12 }}>
             <Text
               style={{
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: '600',
                 color: theme.textPrimary,
-                letterSpacing: -0.5,
+                letterSpacing: -0.6,
                 fontVariant: ['tabular-nums'],
               }}
             >
               ₱{Math.round(analyticsData.aov).toLocaleString()}
             </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.textMuted,
+                marginTop: 3,
+              }}
+            >
+              Per transaction average
+            </Text>
           </View>
-          <Text
+          <View
             style={{
-              fontSize: 11.5,
-              fontWeight: '500',
-              color: theme.textMuted,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: isDarkMode ? '#292B2F' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 4,
             }}
           >
-            Per transaction average
-          </Text>
+            <View
+              style={{
+                height: '100%',
+                width: analyticsData.aov > 0 ? '64%' : '15%',
+                backgroundColor: '#3B82F6',
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </View>
 
         {/* Card 3: Total Units Sold */}
@@ -744,13 +774,12 @@ export default function SalesAnalyticsPanel({
             flex: 1,
             minWidth: isDesktop ? 220 : 150,
             backgroundColor: theme.cardBg,
-            borderRadius: 14,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.border,
-            padding: 18,
+            padding: 20,
             boxShadow: theme.cardShadow,
             justifyContent: 'space-between',
-            minHeight: 125,
           }}
         >
           <View
@@ -758,58 +787,74 @@ export default function SalesAnalyticsPanel({
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
+              gap: 8,
             }}
           >
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: 11,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-                textTransform: 'uppercase',
+                fontSize: 13,
+                fontWeight: '500',
                 color: theme.textMuted,
               }}
             >
-              TOTAL UNITS SOLD
+              Total units sold
             </Text>
             <View
               style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                backgroundColor: isDarkMode ? 'rgba(77, 184, 150, 0.15)' : '#ECFDF5',
-                alignItems: 'center',
-                justifyContent: 'center',
+                backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
               }}
             >
-              <BootstrapIcon
-                name="box-seam"
-                size={12}
-                color={isDarkMode ? '#EA580C' : '#059669'}
-              />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#00C98D' : '#059669' }}>
+                {analyticsData.totalOrders} orders
+              </Text>
             </View>
           </View>
-          <View style={{ marginVertical: 4 }}>
+          <View style={{ marginVertical: 12 }}>
             <Text
               style={{
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: '600',
                 color: theme.textPrimary,
-                letterSpacing: -0.5,
+                letterSpacing: -0.6,
                 fontVariant: ['tabular-nums'],
               }}
             >
               {analyticsData.totalItemsSold} Items
             </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.textMuted,
+                marginTop: 3,
+              }}
+            >
+              Across {analyticsData.totalOrders} total orders
+            </Text>
           </View>
-          <Text
+          <View
             style={{
-              fontSize: 11.5,
-              fontWeight: '500',
-              color: theme.textMuted,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: isDarkMode ? '#292B2F' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 4,
             }}
           >
-            Across {analyticsData.totalOrders} total orders
-          </Text>
+            <View
+              style={{
+                height: '100%',
+                width: analyticsData.totalItemsSold > 0 ? '72%' : '15%',
+                backgroundColor: isDarkMode ? '#00C98D' : '#059669',
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </View>
 
         {/* Card 4: POS In-Store Sales Share */}
@@ -818,13 +863,12 @@ export default function SalesAnalyticsPanel({
             flex: 1,
             minWidth: isDesktop ? 220 : 150,
             backgroundColor: theme.cardBg,
-            borderRadius: 14,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.border,
-            padding: 18,
+            padding: 20,
             boxShadow: theme.cardShadow,
             justifyContent: 'space-between',
-            minHeight: 125,
           }}
         >
           <View
@@ -832,58 +876,74 @@ export default function SalesAnalyticsPanel({
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
+              gap: 8,
             }}
           >
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: 11,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-                textTransform: 'uppercase',
+                fontSize: 13,
+                fontWeight: '500',
                 color: theme.textMuted,
               }}
             >
-              POS SALES SHARE
+              POS sales share
             </Text>
             <View
               style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB',
-                alignItems: 'center',
-                justifyContent: 'center',
+                backgroundColor: isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FFFBEB',
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: isDarkMode ? 'rgba(245, 185, 66, 0.28)' : '#FDE68A',
               }}
             >
-              <BootstrapIcon
-                name="shop"
-                size={12}
-                color={isDarkMode ? '#FBBF24' : '#D97706'}
-              />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#F5B942' : '#D97706' }}>
+                In-store
+              </Text>
             </View>
           </View>
-          <View style={{ marginVertical: 4 }}>
+          <View style={{ marginVertical: 12 }}>
             <Text
               style={{
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: '600',
                 color: theme.textPrimary,
-                letterSpacing: -0.5,
+                letterSpacing: -0.6,
                 fontVariant: ['tabular-nums'],
               }}
             >
               {posSharePercent}%
             </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.textMuted,
+                marginTop: 3,
+              }}
+            >
+              ₱{analyticsData.posRevenue.toLocaleString()} in counter sales
+            </Text>
           </View>
-          <Text
+          <View
             style={{
-              fontSize: 11.5,
-              fontWeight: '500',
-              color: theme.textMuted,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: isDarkMode ? '#292B2F' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 4,
             }}
           >
-            ₱{analyticsData.posRevenue.toLocaleString()} in counter sales
-          </Text>
+            <View
+              style={{
+                height: '100%',
+                width: `${Math.min(100, Math.max(12, Number(posSharePercent) || 0))}%`,
+                backgroundColor: isDarkMode ? '#F5B942' : '#D97706',
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </View>
       </View>
 
@@ -913,7 +973,7 @@ export default function SalesAnalyticsPanel({
               backgroundColor: theme.cardBg,
               borderWidth: 1,
               borderColor: isPeriodDropdownOpen ? theme.brandGreen : theme.border,
-              borderRadius: 10,
+              borderRadius: 8,
               paddingHorizontal: 13,
               paddingVertical: 8,
               boxShadow: theme.cardShadow,
@@ -954,7 +1014,7 @@ export default function SalesAnalyticsPanel({
                 left: 0,
                 width: 210,
                 backgroundColor: theme.cardBg,
-                borderRadius: 12,
+                borderRadius: 8,
                 borderWidth: 1,
                 borderColor: theme.border,
                 padding: 6,
@@ -977,8 +1037,7 @@ export default function SalesAnalyticsPanel({
                       paddingVertical: 8,
                       borderRadius: 8,
                       backgroundColor: isActive
-                        ? isDarkMode
-                          ? '#1A2824'
+                        ? isDarkMode ? '#202124'
                           : '#E8F5EE'
                         : 'transparent',
                     }}
@@ -1083,8 +1142,8 @@ export default function SalesAnalyticsPanel({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-              borderRadius: 10,
+              backgroundColor: isDarkMode ? '#FF5A00' : '#EA580C',
+              borderRadius: 8,
               paddingHorizontal: 13,
               paddingVertical: 8,
               boxShadow: '0 2px 6px rgba(234, 88, 12, 0.25)',
@@ -1117,7 +1176,7 @@ export default function SalesAnalyticsPanel({
                 right: 0,
                 width: 220,
                 backgroundColor: theme.cardBg,
-                borderRadius: 12,
+                borderRadius: 8,
                 borderWidth: 1,
                 borderColor: theme.border,
                 padding: 6,
@@ -1284,7 +1343,7 @@ export default function SalesAnalyticsPanel({
                     style={{
                       fontSize: 11,
                       fontWeight: '700',
-                      color: isDarkMode ? '#EA580C' : '#EA580C',
+                      color: isDarkMode ? '#FF5A00' : '#EA580C',
                     }}
                   >
                     ({onlineSharePercent}%)
@@ -1303,7 +1362,7 @@ export default function SalesAnalyticsPanel({
                   style={{
                     height: '100%',
                     width: `${onlineSharePercent}%`,
-                    backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                    backgroundColor: isDarkMode ? '#FF5A00' : '#EA580C',
                     borderRadius: 4,
                     transition: 'width 0.6s ease',
                   }}
@@ -1529,7 +1588,7 @@ export default function SalesAnalyticsPanel({
                 style={{
                   fontSize: 11.5,
                   fontWeight: '700',
-                  color: isDarkMode ? '#EA580C' : '#EA580C',
+                  color: isDarkMode ? '#FF5A00' : '#EA580C',
                 }}
               >
                 View all →
@@ -1568,7 +1627,7 @@ export default function SalesAnalyticsPanel({
                             width: 20,
                             height: 20,
                             borderRadius: 10,
-                            backgroundColor: idx === 0 ? (isDarkMode ? '#EA580C' : '#EA580C') : theme.chipBg,
+                            backgroundColor: idx === 0 ? (isDarkMode ? '#FF5A00' : '#EA580C') : theme.chipBg,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
@@ -1649,7 +1708,7 @@ export default function SalesAnalyticsPanel({
                         style={{
                           height: '100%',
                           width: `${barWidth}%`,
-                          backgroundColor: isDarkMode ? '#EA580C' : '#107C41',
+                          backgroundColor: isDarkMode ? '#FF5A00' : '#107C41',
                           borderRadius: 2.5,
                           transition: 'width 0.6s ease',
                         }}
@@ -1715,7 +1774,7 @@ export default function SalesAnalyticsPanel({
                 backgroundColor: '#24272B',
                 borderRadius: 8,
                 borderBottomWidth: 1,
-                borderBottomColor: isDarkMode ? '#374151' : '#32373D',
+                borderBottomColor: isDarkMode ? '#303236' : '#32373D',
                 marginBottom: 8,
               }}
             >
@@ -1811,7 +1870,7 @@ export default function SalesAnalyticsPanel({
                           style={{
                             fontSize: 12,
                             fontWeight: '600',
-                            color: isDarkMode ? '#EA580C' : '#EA580C',
+                            color: isDarkMode ? '#FF5A00' : '#EA580C',
                             fontVariant: ['tabular-nums'],
                           }}
                         >
@@ -1890,7 +1949,7 @@ export default function SalesAnalyticsPanel({
                 style={{
                   fontSize: 10.5,
                   fontWeight: '700',
-                  color: isDarkMode ? '#EA580C' : '#EA580C',
+                  color: isDarkMode ? '#FF5A00' : '#EA580C',
                 }}
               >
                 Forecast →

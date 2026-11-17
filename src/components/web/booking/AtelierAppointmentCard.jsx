@@ -178,10 +178,10 @@ export default function AtelierAppointmentCard({
           isSelected
             ? isDarkMode
               ? 'bg-[#18181B] border-slate-300 ring-2 ring-slate-300/15'
-              : 'bg-white border-[#1E2227] ring-2 ring-[#1E2227]/10'
+              : 'bg-white dark:bg-[#191A1D] border-[#1E2227] ring-2 ring-[#1E2227]/10'
             : isDarkMode
             ? 'bg-[#18181B] border-[#27272A]'
-            : 'bg-white border-slate-200/90'
+            : 'bg-white dark:bg-[#191A1D] border-slate-200 dark:border-[#303236]/90'
         } ${className}`}
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -201,17 +201,17 @@ export default function AtelierAppointmentCard({
               </span>
             </div>
 
-            <h3 className={`text-xl font-bold tracking-tight truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+            <h3 className={`text-xl font-bold tracking-tight truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
               {serviceTitle}
             </h3>
 
             <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 mt-2 flex-wrap">
               <span className="bg-[#1E2227] text-white px-2.5 py-0.5 rounded-md text-xs font-bold inline-flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#191A1D]" />
                 {bikeDisplay}
               </span>
               {cleanPlate ? (
-                <span className="bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded-md text-xs font-medium inline-flex items-center gap-1">
+                <span className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-[#303236]/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded-md text-xs font-medium inline-flex items-center gap-1">
                   <BootstrapIcon name="person-badge" size={11} color="#64748B" />
                   Plate: {cleanPlate}
                 </span>
@@ -226,7 +226,7 @@ export default function AtelierAppointmentCard({
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                 SERVICE TOTAL ESTIMATE
               </span>
-              <span className={`text-2xl font-black font-mono tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <span className={`text-2xl font-black font-mono tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                 {formatPriceNumber(totalEstimate)}
               </span>
             </div>
@@ -251,7 +251,7 @@ export default function AtelierAppointmentCard({
                 className={`px-3.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
                   isDarkMode
                     ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                    : 'border-slate-200 text-slate-800 hover:bg-slate-50'
+                    : 'border-slate-200 dark:border-[#303236] text-slate-800 dark:text-[#F2F2F3] hover:bg-slate-50 dark:bg-[#202124]'
                 }`}
               >
                 Reschedule
@@ -290,10 +290,10 @@ export default function AtelierAppointmentCard({
         isSelected
           ? isDarkMode
             ? 'bg-[#18181B] border-slate-300 ring-2 ring-slate-300/15'
-            : 'bg-white border-[#1E2227] ring-2 ring-[#1E2227]/10'
+            : 'bg-white dark:bg-[#191A1D] border-[#1E2227] ring-2 ring-[#1E2227]/10'
           : isDarkMode
           ? 'bg-[#18181B] border-[#27272A]'
-          : 'bg-white border-slate-200/90'
+          : 'bg-white dark:bg-[#191A1D] border-slate-200 dark:border-[#303236]/90'
       } ${className}`}
     >
       <div className="flex-1 flex flex-col justify-between">
@@ -321,7 +321,7 @@ export default function AtelierAppointmentCard({
         <div>
           <h3
             className={`text-2xl sm:text-3xl font-black tracking-tight ${
-              isDarkMode ? 'text-slate-100' : 'text-slate-900'
+              isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'
             }`}
           >
             {serviceTitle}
@@ -329,11 +329,11 @@ export default function AtelierAppointmentCard({
 
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <span className="bg-[#1E2227] text-white px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-white" />
+              <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#191A1D]" />
               {bikeDisplay}
             </span>
 
-            <span className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5">
+            <span className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-[#303236]/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5">
               <BootstrapIcon name="person-badge" size={12} color="#64748B" />
               Plate: {cleanPlate || 'N/A'}
             </span>
@@ -346,7 +346,7 @@ export default function AtelierAppointmentCard({
           </span>
           <span
             className={`text-3xl sm:text-4xl font-black font-mono tracking-tight block ${
-              isDarkMode ? 'text-slate-100' : 'text-slate-900'
+              isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'
             }`}
           >
             {formatPriceNumber(totalEstimate)}
@@ -362,17 +362,17 @@ export default function AtelierAppointmentCard({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-5 gap-x-6">
           {/* Top-Left: Reserved Date & Pit Schedule */}
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
               <BootstrapIcon name="calendar-event" size={13} color="#475569" />
             </div>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 RESERVED DATE & PIT SCHEDULE
               </div>
-              <div className={`text-sm font-bold mt-0.5 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <div className={`text-sm font-bold mt-0.5 ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                 {formattedDate} • {formattedTime}
               </div>
-              <div className="bg-white dark:bg-[#18181B] border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5 mt-1.5 font-medium">
+              <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5 mt-1.5 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#1E2227] dark:bg-slate-200" />
                 {bayName}
               </div>
@@ -381,14 +381,14 @@ export default function AtelierAppointmentCard({
 
           {/* Top-Right: Service Location */}
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
               <BootstrapIcon name="geo-alt" size={13} color="#475569" />
             </div>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 SERVICE LOCATION
               </div>
-              <div className={`text-sm font-bold mt-0.5 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <div className={`text-sm font-bold mt-0.5 ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                 {shopName}
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -399,36 +399,85 @@ export default function AtelierAppointmentCard({
 
           {/* Bottom-Left: Deposit Status */}
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
               <BootstrapIcon name="credit-card" size={13} color="#475569" />
             </div>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 DEPOSIT STATUS
               </div>
-              <div className={`text-sm font-bold mt-0.5 flex items-center gap-1.5 flex-wrap ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                <span>{formatPriceNumber(depositAmount)} Downpayment Verified</span>
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/60 dark:text-emerald-300 border border-[#A7F3D0] inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                  {paymentMethod}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Balance: {formatPriceNumber(balanceAmount)} payable at counter upon completion
-              </div>
+              {(() => {
+                const isCancelled = normStatus === 'CANCELLED';
+                const refundAmt = Number(
+                  booking?.refund_amount || Math.round(Number(depositAmount || 0) * 0.5)
+                );
+                const refundRaw = String(booking?.refund_status || '').toLowerCase();
+                const isRefunded =
+                  isCancelled &&
+                  refundAmt > 0 &&
+                  refundRaw.includes('refunded') &&
+                  !refundRaw.includes('pending');
+                const isRefundPending = isCancelled && depositAmount > 0 && !isRefunded;
+
+                if (isRefunded || isRefundPending) {
+                  return (
+                    <>
+                      <div className={`text-sm font-bold mt-0.5 flex items-center gap-1.5 flex-wrap ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
+                        <span>{formatPriceNumber(depositAmount)} Downpayment Paid</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-1 border ${
+                            isRefunded
+                              ? 'bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/60 dark:text-emerald-300 border-[#A7F3D0]'
+                              : 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isRefunded ? 'bg-[#10B981]' : 'bg-amber-500'
+                            }`}
+                          />
+                          {isRefunded
+                            ? `50% Refunded (${formatPriceNumber(refundAmt)})`
+                            : `50% Refund Pending (${formatPriceNumber(refundAmt)})`}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {isRefunded
+                          ? `50% of your downpayment (${formatPriceNumber(refundAmt)}) has been refunded via GCash.`
+                          : `Booking cancelled · Admin will refund 50% (${formatPriceNumber(refundAmt)}) via GCash.`}
+                      </div>
+                    </>
+                  );
+                }
+
+                return (
+                  <>
+                    <div className={`text-sm font-bold mt-0.5 flex items-center gap-1.5 flex-wrap ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
+                      <span>{formatPriceNumber(depositAmount)} Downpayment Verified</span>
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/60 dark:text-emerald-300 border border-[#A7F3D0] inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                        {paymentMethod}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Balance: {formatPriceNumber(balanceAmount)} payable at counter upon completion
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
           {/* Bottom-Right: Mechanic Assignment */}
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/70 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 mt-0.5">
               <BootstrapIcon name="tools" size={13} color="#475569" />
             </div>
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 MECHANIC ASSIGNMENT
               </div>
-              <div className={`text-sm font-bold mt-0.5 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <div className={`text-sm font-bold mt-0.5 ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                 {mechanicName}
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -449,7 +498,7 @@ export default function AtelierAppointmentCard({
           </span>
           <button
             onClick={() => setReceiptVisible(true)}
-            className="flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold cursor-pointer bg-transparent border-none p-0 transition-colors"
+            className="flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-[#F2F2F3] dark:hover:text-white font-semibold cursor-pointer bg-transparent border-none p-0 transition-colors"
           >
             <BootstrapIcon name="download" size={12} color="#64748B" />
             <span>Download Deposit Slip</span>
@@ -476,7 +525,7 @@ export default function AtelierAppointmentCard({
             className={`px-3.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
               isDarkMode
                 ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                : 'border-slate-200 text-slate-800 hover:bg-slate-50'
+                : 'border-slate-200 dark:border-[#303236] text-slate-800 dark:text-[#F2F2F3] hover:bg-slate-50 dark:bg-[#202124]'
             }`}
           >
             Reschedule
@@ -486,7 +535,7 @@ export default function AtelierAppointmentCard({
             className={`px-3.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 ${
               isDarkMode
                 ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                : 'border-slate-200 text-slate-800 hover:bg-slate-50'
+                : 'border-slate-200 dark:border-[#303236] text-slate-800 dark:text-[#F2F2F3] hover:bg-slate-50 dark:bg-[#202124]'
             }`}
           >
             <BootstrapIcon name="chat-dots" size={12} color="#64748B" />

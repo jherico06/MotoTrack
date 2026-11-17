@@ -16,9 +16,12 @@ import { usdToPhp } from '../../../utils/currency.js';
 import { aiCustomizerService, BIKE_PRESETS, CUSTOM_THEMES } from '../../../services/ai/aiCustomizerService.js';
 import { productService } from '../../../services/products/productService.js';
 import { GARAGE_BRANCHES, TIME_SLOTS } from '../../../services/bookings/garageService.js';
+import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../../services/products/motorcycleService.js';
-import { BootstrapIcon, BottomNavBar, ToastNotification, BrandLogo } from '../../../components/common';
-import { RegisterMotorcycleModal, CheckoutModal, CartModal, BookInstallationModal } from '../../../components/modals';
+import MobileBottomNavBar from '../../../components/mobile/customer/MobileBottomNavBar.jsx';
+import MobileCartPage from './CartPage.jsx';
+import { BootstrapIcon, ToastNotification, BrandLogo } from '../../../components/common';
+import { RegisterMotorcycleModal, CheckoutModal, BookInstallationModal } from '../../../components/modals';
 import CustomizationWorkspace from '../../../components/customizer/CustomizationWorkspace.jsx';
 import AiMotorcycleInstallStudio from '../../../components/customizer/AiMotorcycleInstallStudio.jsx';
 import { useCustomizationBuilder } from '../../../hooks/useCustomizationBuilder.js';
@@ -37,6 +40,7 @@ export default function CustomizerPage({
   onNavigateToProfile,
   onNavigateToAdmin,
   onOpenCart,
+  onRequireLogin,
   initialSelectedProduct,
 }) {
   const { currentUser, setRedirectReason } = useAuth();
@@ -58,14 +62,12 @@ export default function CustomizerPage({
 
   // ─── 2. MOTORCYCLE STATE ───
   const [registeredBikes, setRegisteredBikes] = useState(() => {
-    const list = motorcycleService.getMotorcycles(currentUser?.id);
-    return Array.isArray(list) && list.length > 0 ? list : motorcycleService.getMotorcycles();
+    return motorcycleService.getMotorcycles(currentUser) || [];
   });
   const [bikeSourceMode, setBikeSourceMode] = useState('all'); // 'all' | 'registered' | 'presets' | 'upload'
   const [selectedRegisteredBike, setSelectedRegisteredBike] = useState(() => {
-    const list = motorcycleService.getMotorcycles(currentUser?.id);
-    const validList = Array.isArray(list) && list.length > 0 ? list : motorcycleService.getMotorcycles();
-    return validList.find((b) => b.is_primary) || validList[0] || null;
+    const list = motorcycleService.getMotorcycles(currentUser) || [];
+    return list.find((b) => b.is_primary) || list[0] || null;
   });
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [customPhotoUri, setCustomPhotoUri] = useState(null);
@@ -74,25 +76,27 @@ export default function CustomizerPage({
   const [isRegisterBikeModalOpen, setIsRegisterBikeModalOpen] = useState(false);
 
   useEffect(() => {
-    const unsub = motorcycleService.subscribe(() => {
-      const userBikes = motorcycleService.getMotorcycles(currentUser?.id);
-      const bikes =
-        Array.isArray(userBikes) && userBikes.length > 0 ? userBikes : motorcycleService.getMotorcycles();
-      setRegisteredBikes(bikes);
-      if (!selectedRegisteredBike && bikes.length > 0) {
-        setSelectedRegisteredBike(bikes.find((b) => b.is_primary) || bikes[0]);
-      }
-    });
-    return () => unsub?.();
-  }, [currentUser]);
-
-  useEffect(() => {
-    const list = motorcycleService.getMotorcycles(currentUser?.id);
-    const bikes = Array.isArray(list) && list.length > 0 ? list : motorcycleService.getMotorcycles();
-    setRegisteredBikes(bikes);
-    if (!selectedRegisteredBike && bikes.length > 0) {
-      setSelectedRegisteredBike(bikes.find((b) => b.is_primary) || bikes[0]);
+    if (currentUser) {
+      motorcycleService.syncFromSupabase?.(currentUser).catch(() => { });
     }
+    const syncBikes = () => {
+      if (!currentUser) {
+        setRegisteredBikes([]);
+        setSelectedRegisteredBike(null);
+        return;
+      }
+      const bikes = motorcycleService.getMotorcycles(currentUser) || [];
+      setRegisteredBikes(bikes);
+      setSelectedRegisteredBike((prev) => {
+        if (prev && bikes.some((b) => String(b.motorcycle_id) === String(prev.motorcycle_id))) {
+          return prev;
+        }
+        return bikes.find((b) => b.is_primary) || bikes[0] || null;
+      });
+    };
+    syncBikes();
+    const unsub = motorcycleService.subscribe(syncBikes);
+    return () => unsub?.();
   }, [currentUser]);
 
   const activeMotorcycle = useMemo(() => {
@@ -194,8 +198,8 @@ export default function CustomizerPage({
     return selectedParts.reduce((sum, p) => sum + Number(p.price || 0), 0);
   }, [selectedParts]);
   const partsTotalPhp = usdToPhp(partsTotalUsd);
-  const laborFeePhp = 1500;
-  const laborFeeUsd = 26.8;
+  const laborFeePhp = systemSettingsService.getCustomizationLaborFee?.() ?? 3250;
+  const laborFeeUsd = Math.round((laborFeePhp / 56) * 100) / 100;
   const grandTotalPhp = partsTotalPhp + (selectedParts.length > 0 ? laborFeePhp : 0);
   const grandTotalUsd = partsTotalUsd + (selectedParts.length > 0 ? laborFeeUsd : 0);
 
@@ -476,76 +480,163 @@ export default function CustomizerPage({
     generationResult && activeViewMode === 'generated' ? generationResult.generatedImage : currentBasePhoto;
 
   return (
-    <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: '#24272B' }]}>
-      <StatusBar style="light" translucent backgroundColor="transparent" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent backgroundColor="transparent" />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── 1. NATIVE MOBILE APP HEADER ─── */}
-      <View style={[styles.appHeaderRow, isDarkMode && { backgroundColor: '#24272B' }]}>
-        <View style={styles.headerToggleRow}>
-          <TouchableOpacity
-            style={[
-              styles.headerToggleBtn,
-              studioTab === 'selection' ? styles.headerToggleBtnActive : styles.headerToggleBtnInactive,
-            ]}
-            onPress={() => setStudioTab('selection')}
-            activeOpacity={0.85}
-            accessibilityLabel="Motorcycle & Part Selector"
+      {/* ─── 1. NATIVE MOBILE APP HEADER (MATCHES ORDERS PAGE HEADER) ─── */}
+      <View
+        style={[
+          styles.appHeaderRow,
+          {
+            backgroundColor: isDarkMode ? '#121518' : '#F7F5F0',
+            borderBottomWidth: 0,
+            paddingTop: 10,
+            paddingBottom: 8,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          },
+        ]}
+      >
+        <View>
+          <Text
+            style={{
+              fontSize: 10.5,
+              fontWeight: '700',
+              letterSpacing: 1.2,
+              color: '#EA580C',
+              textTransform: 'uppercase',
+              marginBottom: 2,
+            }}
           >
-            <BootstrapIcon
-              name="sliders"
-              size={14}
-              color={studioTab === 'selection' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)'}
-            />
-            <Text
-              style={[
-                styles.headerToggleBtnText,
-                studioTab === 'selection' ? styles.headerToggleBtnTextActive : styles.headerToggleBtnTextInactive,
-              ]}
-              numberOfLines={1}
-            >
-              Motorcycle & Part Selector
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.headerToggleBtn,
-              studioTab === 'preview' ? styles.headerToggleBtnActive : styles.headerToggleBtnInactive,
-            ]}
-            onPress={() => setStudioTab('preview')}
-            activeOpacity={0.85}
-            accessibilityLabel="AI Preview Canvas"
+            MOTO STUDIO
+          </Text>
+          <Text
+            style={{
+              fontSize: 26,
+              fontWeight: '700',
+              color: isDarkMode ? '#F9FAFB' : '#18181B',
+              letterSpacing: -0.6,
+            }}
           >
-            <BootstrapIcon
-              name="eye-fill"
-              size={14}
-              color={studioTab === 'preview' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)'}
-            />
-            <Text
-              style={[
-                styles.headerToggleBtnText,
-                studioTab === 'preview' ? styles.headerToggleBtnTextActive : styles.headerToggleBtnTextInactive,
-              ]}
-              numberOfLines={1}
-            >
-              AI Preview Canvas
-            </Text>
-          </TouchableOpacity>
+            Customizer
+          </Text>
         </View>
+
+        <TouchableOpacity
+          onPress={() => {
+            if (typeof onNavigateToWishlist === 'function') onNavigateToWishlist();
+            else onOpenCart?.();
+          }}
+          activeOpacity={0.8}
+          accessibilityLabel="Saved Items"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+            borderWidth: 1,
+            borderColor: isDarkMode ? '#2B3035' : '#EDE9E0',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 4,
+            elevation: 1,
+          }}
+        >
+          <BootstrapIcon name="bookmark" size={17} color={isDarkMode ? '#F9FAFB' : '#18181B'} />
+          {wishlistCount > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 9,
+                width: 7,
+                height: 7,
+                borderRadius: 3.5,
+                backgroundColor: '#EA580C',
+              }}
+            />
+          ) : null}
+        </TouchableOpacity>
       </View>
 
       {/* ─── MAIN SCROLL CONTENT ─── */}
       <ScrollView
-        style={[styles.container, isDarkMode && { backgroundColor: '#121518' }]}
-        contentContainerStyle={styles.scrollContent}
+        style={[styles.container, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 10 }]}
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.maxContainer}>
+          {/* Segmented Top Switcher Track (`Bike & parts` | `AI preview`) */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isDarkMode ? '#1E2025' : '#EFECE6',
+              borderRadius: 9999,
+              padding: 4,
+              marginBottom: 14,
+              width: '100%',
+            }}
+          >
+            {[
+              { id: 'selection', label: 'Bike & parts', icon: 'tools' },
+              { id: 'preview', label: 'AI preview', icon: 'magic' },
+            ].map((tab) => {
+              const isActive = studioTab === tab.id;
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  onPress={() => setStudioTab(tab.id)}
+                  activeOpacity={0.85}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    borderRadius: 9999,
+                    backgroundColor: isActive
+                      ? isDarkMode
+                        ? '#EA580C'
+                        : '#141D2E'
+                      : 'transparent',
+                  }}
+                >
+                  <BootstrapIcon
+                    name={tab.icon}
+                    size={13}
+                    color={isActive ? '#FFFFFF' : isDarkMode ? '#9CA3AF' : '#64748B'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isActive ? '600' : '500',
+                      color: isActive ? '#FFFFFF' : isDarkMode ? '#9CA3AF' : '#64748B',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <AiMotorcycleInstallStudio
             currentUser={currentUser}
-            onRequireLogin={() => {
-              setRedirectReason?.('ai-install');
+            initialSelectedProduct={initialSelectedProduct}
+            onRequireLogin={(promptPayload) => {
+              if (typeof onRequireLogin === 'function') {
+                onRequireLogin(promptPayload);
+                return;
+              }
+              setRedirectReason?.(promptPayload?.message || 'ai-install');
               onNavigateToLogin?.();
             }}
             onNavigateToGarage={onNavigateToGarage}
@@ -684,13 +775,21 @@ export default function CustomizerPage({
         }}
       />
 
-      {/* ─── CART MODAL ─── */}
-      <CartModal
+      {/* ─── FULL CART PAGE ─── */}
+      <MobileCartPage
         visible={isCartModalOpen}
         onClose={() => setIsCartModalOpen(false)}
         onProceedToCheckout={() => {
           setIsCartModalOpen(false);
           setIsCheckoutModalOpen(true);
+        }}
+        onNavigateToWishlist={() => {
+          setIsCartModalOpen(false);
+          onNavigateToWishlist?.();
+        }}
+        onNavigateToStore={() => {
+          setIsCartModalOpen(false);
+          onNavigateToStore?.();
         }}
       />
 
@@ -706,7 +805,7 @@ export default function CustomizerPage({
             ? `${selectedParts.length} Custom Parts Installation`
             : 'Custom Parts Installation'
         }
-        laborFeePhp={3250}
+        laborFeePhp={laborFeePhp}
         branches={GARAGE_BRANCHES}
         selectedBranch={bookingBranch}
         onSelectBranch={setBookingBranch}
@@ -729,7 +828,7 @@ export default function CustomizerPage({
       />
 
       {/* Persistent Bottom Nav Bar */}
-      <BottomNavBar
+      <MobileBottomNavBar
         activeTab="Customize"
         onTabChange={(tab) => {
           if (tab === 'Home') onNavigateToStore?.();
@@ -774,6 +873,7 @@ export default function CustomizerPage({
             onNavigateToAdmin?.();
           }
         }}
+        ordersCount={0}
         currentUser={currentUser}
       />
     </SafeAreaView>

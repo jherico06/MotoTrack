@@ -11,9 +11,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  Platform,
 } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import { compatibilityService } from '../../services/products/compatibilityService.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 export default function MyMotorcyclePanel({
   currentUser,
@@ -22,6 +24,8 @@ export default function MyMotorcyclePanel({
   style,
   compact = false,
 }) {
+  const { isDarkMode } = useTheme();
+  const isDark = Platform.OS === 'web' && isDarkMode;
   const userId = currentUser?.id || currentUser?.user_id || currentUser?.customer_id;
   const [bikes, setBikes] = useState([]);
   const [models, setModels] = useState([]);
@@ -117,32 +121,32 @@ export default function MyMotorcyclePanel({
 
   if (!userId) {
     return (
-      <View style={[styles.wrap, style]}>
-        <Text style={styles.title}>My Motorcycle</Text>
-        <Text style={styles.sub}>Sign in to save your motorcycle and check part compatibility.</Text>
+      <View style={[styles.wrap, isDark && styles.wrapDark, style]}>
+        <Text style={[styles.title, isDark && styles.titleDark]}>My Motorcycle</Text>
+        <Text style={[styles.sub, isDark && styles.subDark]}>Sign in to save your motorcycle and check part compatibility.</Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.wrap, compact && styles.wrapCompact, style]}>
+    <View style={[styles.wrap, isDark && styles.wrapDark, compact && styles.wrapCompact, style]}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>My Motorcycle</Text>
-          <Text style={styles.sub}>
+          <Text style={[styles.title, isDark && styles.titleDark]}>My Motorcycle</Text>
+          <Text style={[styles.sub, isDark && styles.subDark]}>
             {active
               ? `Active: ${active.brand} ${active.model}`
               : 'Select your motorcycle to check part compatibility.'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setModalOpen(true)}>
+        <TouchableOpacity style={[styles.addBtn, isDark && styles.addBtnDark]} onPress={() => setModalOpen(true)}>
           <BootstrapIcon name="plus-lg" size={14} color="#FFF" />
           <Text style={styles.addText}>Add</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#0C6258" />
+        <ActivityIndicator color={isDark ? '#FF5A00' : '#0C6258'} />
       ) : (
         <View style={styles.list}>
           {bikes.map((b) => {
@@ -150,27 +154,31 @@ export default function MyMotorcyclePanel({
             return (
               <TouchableOpacity
                 key={b.motorcycle_id}
-                style={[styles.bikeRow, isActive && styles.bikeRowActive]}
+                style={[
+                  styles.bikeRow,
+                  isDark && styles.bikeRowDark,
+                  isActive && (isDark ? styles.bikeRowActiveDark : styles.bikeRowActive),
+                ]}
                 onPress={() => setActive(b)}
                 disabled={busy}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.bikeTitle}>
+                  <Text style={[styles.bikeTitle, isDark && styles.bikeTitleDark]}>
                     {b.brand} {b.model}
                     {isActive ? ' — Default' : ''}
                   </Text>
-                  {b.nickname ? <Text style={styles.bikeNick}>{b.nickname}</Text> : null}
+                  {b.nickname ? <Text style={[styles.bikeNick, isDark && styles.bikeNickDark]}>{b.nickname}</Text> : null}
                 </View>
                 {isActive ? (
-                  <BootstrapIcon name="check-circle-fill" size={16} color="#0C6258" />
+                  <BootstrapIcon name="check-circle-fill" size={16} color={isDark ? '#FF5A00' : '#0C6258'} />
                 ) : (
-                  <Text style={styles.setActive}>Set active</Text>
+                  <Text style={[styles.setActive, isDark && styles.setActiveDark]}>Set active</Text>
                 )}
               </TouchableOpacity>
             );
           })}
           {bikes.length === 0 && (
-            <TouchableOpacity style={styles.emptyCta} onPress={() => setModalOpen(true)}>
+            <TouchableOpacity style={[styles.emptyCta, isDark && styles.emptyCtaDark]} onPress={() => setModalOpen(true)}>
               <Text style={styles.emptyCtaText}>Add My Motorcycle</Text>
             </TouchableOpacity>
           )}
@@ -178,60 +186,81 @@ export default function MyMotorcyclePanel({
       )}
 
       <Modal visible={modalOpen} transparent animationType="fade" onRequestClose={() => setModalOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add My Motorcycle</Text>
-            <Text style={styles.sub}>Brand and model only — no year, VIN, or engine details needed.</Text>
+        <View style={[styles.modalBackdrop, isDark && styles.modalBackdropDark]}>
+          <View style={[styles.modalCard, isDark && styles.modalCardDark]}>
+            <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>Add My Motorcycle</Text>
+            <Text style={[styles.sub, isDark && styles.subDark]}>Brand and model only — no year, VIN, or engine details needed.</Text>
 
-            <Text style={styles.label}>Brand</Text>
+            <Text style={[styles.label, isDark && styles.labelDark]}>Brand</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
               {brands.map((b) => (
                 <TouchableOpacity
                   key={b}
-                  style={[styles.chip, brand === b && styles.chipOn]}
+                  style={[
+                    styles.chip,
+                    isDark && styles.chipDark,
+                    brand === b && (isDark ? styles.chipOnDark : styles.chipOn),
+                  ]}
                   onPress={() => {
                     setBrand(b);
                     setModel('');
                   }}
                 >
-                  <Text style={[styles.chipText, brand === b && styles.chipTextOn]}>{b}</Text>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      isDark && styles.chipTextDark,
+                      brand === b && styles.chipTextOn,
+                    ]}
+                  >
+                    {b}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            <Text style={styles.label}>Model</Text>
+            <Text style={[styles.label, isDark && styles.labelDark]}>Model</Text>
             <ScrollView style={{ maxHeight: 160, marginBottom: 10 }}>
               {modelsForBrand.map((m) => (
                 <TouchableOpacity
                   key={m.model_id}
-                  style={[styles.modelRow, model === m.model && styles.modelRowOn]}
+                  style={[
+                    styles.modelRow,
+                    model === m.model && (isDark ? styles.modelRowOnDark : styles.modelRowOn),
+                  ]}
                   onPress={() => setModel(m.model)}
                 >
-                  <Text style={[styles.modelText, model === m.model && styles.modelTextOn]}>
+                  <Text
+                    style={[
+                      styles.modelText,
+                      isDark && styles.modelTextDark,
+                      model === m.model && (isDark ? styles.modelTextOnDark : styles.modelTextOn),
+                    ]}
+                  >
                     {m.model}
                   </Text>
                 </TouchableOpacity>
               ))}
               {brand && modelsForBrand.length === 0 && (
-                <Text style={styles.sub}>No models for this brand yet.</Text>
+                <Text style={[styles.sub, isDark && styles.subDark]}>No models for this brand yet.</Text>
               )}
             </ScrollView>
 
-            <Text style={styles.label}>Nickname (optional)</Text>
+            <Text style={[styles.label, isDark && styles.labelDark]}>Nickname (optional)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isDark && styles.inputDark]}
               value={nickname}
               onChangeText={setNickname}
               placeholder="e.g. My Click"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
             />
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalOpen(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+              <TouchableOpacity style={[styles.cancelBtn, isDark && styles.cancelBtnDark]} onPress={() => setModalOpen(false)}>
+                <Text style={[styles.cancelText, isDark && styles.cancelTextDark]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.saveBtn, (!brand || !model) && { opacity: 0.5 }]}
+                style={[styles.saveBtn, isDark && styles.saveBtnDark, (!brand || !model) && { opacity: 0.5 }]}
                 onPress={save}
                 disabled={busy || !brand || !model}
               >
@@ -353,4 +382,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveText: { color: '#FFF', fontWeight: '700' },
+  wrapDark: {
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
+  },
+  titleDark: { color: '#F5F5F5' },
+  subDark: { color: '#A1A1AA' },
+  addBtnDark: { backgroundColor: '#FF5A00' },
+  bikeRowDark: {
+    backgroundColor: '#202124',
+    borderColor: '#303236',
+  },
+  bikeRowActiveDark: {
+    backgroundColor: '#3A241B',
+    borderColor: '#8A3D19',
+  },
+  bikeTitleDark: { color: '#F2F2F3' },
+  bikeNickDark: { color: '#A1A1AA' },
+  setActiveDark: { color: '#FF5A00' },
+  emptyCtaDark: { backgroundColor: '#FF5A00' },
+  modalBackdropDark: { backgroundColor: 'rgba(0, 0, 0, 0.72)' },
+  modalCardDark: {
+    backgroundColor: '#191A1D',
+    borderWidth: 1,
+    borderColor: '#303236',
+  },
+  modalTitleDark: { color: '#F5F5F5' },
+  labelDark: { color: '#A1A1AA' },
+  chipDark: {
+    backgroundColor: '#202124',
+    borderWidth: 1,
+    borderColor: '#303236',
+  },
+  chipOnDark: {
+    backgroundColor: '#FF5A00',
+    borderColor: '#FF5A00',
+  },
+  chipTextDark: { color: '#A1A1AA' },
+  modelRowOnDark: {
+    backgroundColor: '#3A241B',
+    borderWidth: 1,
+    borderColor: '#8A3D19',
+  },
+  modelTextDark: { color: '#F2F2F3' },
+  modelTextOnDark: { color: '#FF5A00' },
+  inputDark: {
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
+    color: '#F2F2F3',
+  },
+  cancelBtnDark: {
+    backgroundColor: '#202124',
+    borderColor: '#303236',
+  },
+  cancelTextDark: { color: '#F2F2F3' },
+  saveBtnDark: { backgroundColor: '#FF5A00' },
 });

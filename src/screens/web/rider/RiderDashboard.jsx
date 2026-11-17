@@ -16,10 +16,10 @@ export default function RiderDashboardWeb({ onLogout }) {
 
   const surface = {
     canvas: isDarkMode ? '#111315' : '#F3F4F6',
-    card: isDarkMode ? '#18181B' : '#FFFFFF',
-    strip: isDarkMode ? '#202225' : '#F8F9FA',
+    card: isDarkMode ? '#191A1D' : '#FFFFFF',
+    strip: isDarkMode ? '#202124' : '#F8F9FA',
     border: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E4E4E7',
-    text: isDarkMode ? '#F4F4F5' : '#18181B',
+    text: isDarkMode ? '#F2F2F3' : '#18181B',
     muted: isDarkMode ? '#A1A1AA' : '#64748B',
     badgeBg: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
     badgeBorder: isDarkMode ? 'rgba(234, 88, 12, 0.35)' : '#FED7AA',

@@ -5,6 +5,7 @@
 // =========================================================================
 
 import React from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
 import { BootstrapIcon } from '../../common';
 import { getPackageStartingPrice } from './bookingPackagesData.js';
@@ -26,6 +27,8 @@ export default function PackageCard({
   isAdmin = false,
   onEditPackage,
 }) {
+  const { isDarkMode } = useTheme();
+  const cardStyles = get_cardStyles(isDarkMode);
   const rawCc =
     selectedMotorcycle?.engine_displacement ??
     selectedMotorcycle?.engine_cc ??
@@ -71,7 +74,7 @@ export default function PackageCard({
         {imgLoadError && !hasCustomImg ? (
           <View style={[cardStyles.cardImage, { backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' }]}>
             <BootstrapIcon name={isRepair ? 'wrench' : 'wrench-adjustable'} size={32} color="#FF5A0A" />
-            <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 4, fontWeight: '600' }}>MotoTrack Service</Text>
+            <Text style={{ color: isDarkMode ? '#71717A' : '#94A3B8', fontSize: 11, marginTop: 4, fontWeight: '600' }}>MotoTrack Service</Text>
           </View>
         ) : (
           <Image
@@ -208,12 +211,18 @@ export default function PackageCard({
   );
 }
 
-const cardStyles = StyleSheet.create({
+let _light_cardStyles = null;
+let _dark_cardStyles = null;
+function get_cardStyles(isDarkMode) {
+  if (isDarkMode && _dark_cardStyles) return _dark_cardStyles;
+  if (!isDarkMode && _light_cardStyles) return _light_cardStyles;
+  const created = StyleSheet.create({
+
   cardWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOpacity: 0.04,
@@ -291,17 +300,17 @@ const cardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
   },
   durationPillText: {
     fontSize: 10.5,
     fontWeight: '600',
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
   },
   cardBody: {
     padding: 18,
@@ -310,14 +319,14 @@ const cardStyles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
     letterSpacing: -0.3,
     marginBottom: 6,
   },
   cardDesc: {
     fontSize: 13,
     lineHeight: 19,
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
     marginBottom: 16,
   },
   inclusionsBox: {
@@ -346,7 +355,7 @@ const cardStyles = StyleSheet.create({
     flex: 1,
   },
   tierLineActive: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
     marginHorizontal: -8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -357,12 +366,12 @@ const cardStyles = StyleSheet.create({
   },
   tierTextActive: {
     fontWeight: '600',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   tierPrice: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
     fontVariant: ['tabular-nums'],
   },
   tierPriceActive: {
@@ -397,7 +406,7 @@ const cardStyles = StyleSheet.create({
   priceValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
     letterSpacing: -0.4,
     fontVariant: ['tabular-nums'],
   },
@@ -415,7 +424,7 @@ const cardStyles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#EA580C',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
     cursor: 'pointer',
   },
   adminEditBtnText: {
@@ -428,14 +437,14 @@ const cardStyles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     cursor: 'pointer',
   },
   detailsBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
   },
   selectBtn: {
     flexDirection: 'row',
@@ -466,4 +475,9 @@ const cardStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-});
+
+  });
+  if (isDarkMode) _dark_cardStyles = created;
+  else _light_cardStyles = created;
+  return created;
+}

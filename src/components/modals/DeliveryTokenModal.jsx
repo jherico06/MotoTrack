@@ -246,11 +246,11 @@ export default function DeliveryTokenModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#191A1D', borderWidth: 1, borderColor: '#303236' }]}>
           <View style={styles.header}>
-            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>Print delivery QR label</Text>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]}>
-              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
+            <Text style={[styles.title, isDark && { color: '#F5F5F5' }]}>Print delivery QR label</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#202124' }]}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#A1A1AA' : '#64748b'} />
             </TouchableOpacity>
           </View>
 
@@ -274,7 +274,7 @@ export default function DeliveryTokenModal({
               ) : null}
 
               {statusNote ? (
-                <Text style={[styles.meta, { color: isDark ? '#FBBF24' : '#B45309', marginBottom: 8 }]}>
+                <Text style={[styles.meta, { color: isDark ? '#F5B942' : '#B45309', marginBottom: 8 }]}>
                   {statusNote}
                 </Text>
               ) : null}
@@ -425,8 +425,8 @@ export default function DeliveryTokenModal({
               </TouchableOpacity>
             ) : null}
             {orderStatus === 'delivered' ||
-            orderStatus === 'completed' ||
-            orderStatus === 'cancelled' ? null : (
+              orderStatus === 'completed' ||
+              orderStatus === 'cancelled' ? null : (
               <TouchableOpacity
                 style={[styles.secondaryBtn, busy && { opacity: 0.7 }]}
                 onPress={handleRegenerate}

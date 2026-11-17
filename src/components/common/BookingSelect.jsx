@@ -35,13 +35,13 @@ export default function BookingSelect({
 
   const selectStyle = {
     width: '100%',
-    backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
-    border: `1.5px solid ${isDark ? '#374151' : '#94A3B8'}`,
+    backgroundColor: isDark ? '#202124' : '#FFFFFF',
+    border: `1.5px solid ${isDark ? '#303236' : '#94A3B8'}`,
     borderRadius: 12,
     padding: '11px 14px',
     fontSize: 13,
     fontWeight: 700,
-    color: selected ? (isDark ? '#F8FAFC' : '#0F172A') : (isDark ? '#94A3B8' : '#64748B'),
+    color: selected ? (isDark ? '#F2F2F3' : '#0F172A') : (isDark ? '#A1A1AA' : '#64748B'),
     fontFamily: 'inherit',
     outline: 'none',
     cursor: 'pointer',
@@ -53,11 +53,11 @@ export default function BookingSelect({
     return (
       <View style={{ marginBottom: 12 }}>
         {label ? (
-          <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDark ? '#F2F2F3' : '#334155', marginBottom: 6 }}>
             {label}
           </Text>
         ) : null}
-        <Text style={{ fontSize: 12.5, color: isDark ? '#94A3B8' : '#64748B' }}>{emptyText}</Text>
+        <Text style={{ fontSize: 12.5, color: isDark ? '#A1A1AA' : '#64748B' }}>{emptyText}</Text>
       </View>
     );
   }
@@ -65,7 +65,7 @@ export default function BookingSelect({
   return (
     <View style={{ marginBottom: 12, zIndex: isOpen ? 20 : 1 }}>
       {label ? (
-        <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDark ? '#F2F2F3' : '#334155', marginBottom: 6 }}>
           {label}
         </Text>
       ) : null}
@@ -77,7 +77,7 @@ export default function BookingSelect({
           style={selectStyle}
         >
           {!selected ? (
-            <option value="" disabled style={{ backgroundColor: isDark ? '#1E2124' : '#FFFFFF', color: isDark ? '#94A3B8' : '#64748B' }}>
+            <option value="" disabled style={{ backgroundColor: isDark ? '#202124' : '#FFFFFF', color: isDark ? '#A1A1AA' : '#64748B' }}>
               {placeholder}
             </option>
           ) : null}
@@ -87,8 +87,8 @@ export default function BookingSelect({
               value={String(opt.value)}
               disabled={opt.disabled}
               style={{
-                backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
-                color: opt.disabled ? (isDark ? '#64748B' : '#94A3B8') : (isDark ? '#F8FAFC' : '#0F172A'),
+                backgroundColor: isDark ? '#202124' : '#FFFFFF',
+                color: opt.disabled ? (isDark ? '#71717A' : '#94A3B8') : (isDark ? '#F2F2F3' : '#0F172A'),
               }}
             >
               {opt.label}
@@ -104,9 +104,9 @@ export default function BookingSelect({
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
+              backgroundColor: isDark ? '#202124' : '#FFFFFF',
               borderWidth: 1.5,
-              borderColor: isOpen ? accentColor : (isDark ? '#374151' : '#94A3B8'),
+              borderColor: isOpen ? accentColor : (isDark ? '#303236' : '#94A3B8'),
               borderRadius: 12,
               paddingHorizontal: 14,
               paddingVertical: 10,
@@ -118,22 +118,22 @@ export default function BookingSelect({
                 flex: 1,
                 fontSize: 13,
                 fontWeight: '700',
-                color: selected ? (isDark ? '#F8FAFC' : '#0F172A') : (isDark ? '#94A3B8' : '#94A3B8'),
+                color: selected ? (isDark ? '#F2F2F3' : '#0F172A') : (isDark ? '#A1A1AA' : '#94A3B8'),
               }}
               numberOfLines={1}
             >
               {selected?.label || placeholder}
             </Text>
-            <BootstrapIcon name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={isDark ? '#94A3B8' : '#64748B'} />
+            <BootstrapIcon name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={isDark ? '#A1A1AA' : '#64748B'} />
           </TouchableOpacity>
 
           {isOpen ? (
             <View
               style={{
                 marginTop: 6,
-                backgroundColor: isDark ? '#24272B' : '#FFFFFF',
+                backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
                 borderWidth: 1.5,
-                borderColor: isDark ? '#374151' : '#94A3B8',
+                borderColor: isDark ? '#303236' : '#94A3B8',
                 borderRadius: 12,
                 overflow: 'hidden',
               }}
@@ -155,9 +155,9 @@ export default function BookingSelect({
                         paddingVertical: 11,
                         backgroundColor: active
                           ? (isDark ? '#382215' : '#FFF7ED')
-                          : (isDark ? '#24272B' : '#FFFFFF'),
+                          : (isDark ? '#191A1D' : '#FFFFFF'),
                         borderBottomWidth: 1,
-                        borderBottomColor: isDark ? '#2D3136' : '#F1F5F9',
+                        borderBottomColor: isDark ? '#292B2F' : '#F1F5F9',
                         opacity: opt.disabled ? 0.5 : 1,
                       }}
                     >
@@ -165,7 +165,7 @@ export default function BookingSelect({
                         style={{
                           fontSize: 13,
                           fontWeight: active ? '600' : '500',
-                          color: active ? accentColor : (isDark ? '#F8FAFC' : '#0F172A'),
+                          color: active ? accentColor : (isDark ? '#F2F2F3' : '#0F172A'),
                         }}
                       >
                         {opt.label}

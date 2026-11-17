@@ -36,6 +36,7 @@ export default function RiderOrderDetailsSheet({
   onClose,
   onStartRoute,
   onScanConfirm,
+  onViewMap,
   onPickPodPhoto,
   onSavePodPhoto,
   onClearPodPhoto,
@@ -291,10 +292,14 @@ export default function RiderOrderDetailsSheet({
                 >
                   Complete delivery address
                 </Text>
-                <ExternalLink href={navUrl}>
-                  <View style={styles.inlineNavLink}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => onViewMap?.(delivery)}
+                    activeOpacity={0.75}
+                    style={styles.inlineNavLink}
+                  >
                     <BootstrapIcon
-                      name="geo-alt"
+                      name="map"
                       size={13}
                       color={palette.orange}
                     />
@@ -304,10 +309,28 @@ export default function RiderOrderDetailsSheet({
                         { color: palette.orange },
                       ]}
                     >
-                      Open map
+                      View map
                     </Text>
-                  </View>
-                </ExternalLink>
+                  </TouchableOpacity>
+
+                  <ExternalLink href={navUrl}>
+                    <View style={styles.inlineNavLink}>
+                      <BootstrapIcon
+                        name="cursor-fill"
+                        size={12}
+                        color={palette.orange}
+                      />
+                      <Text
+                        style={[
+                          styles.inlineNavText,
+                          { color: palette.orange },
+                        ]}
+                      >
+                        Navigate
+                      </Text>
+                    </View>
+                  </ExternalLink>
+                </View>
               </View>
 
               <View style={styles.addressBlock}>

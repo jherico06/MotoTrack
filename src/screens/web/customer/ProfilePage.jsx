@@ -380,7 +380,7 @@ export default function ProfilePage({
   const styles = useMemo(() => createProfileWebStyles(isDarkMode), [isDarkMode]);
   const shopWebStyles = useMemo(() => createShopWebStyles(isDarkMode), [isDarkMode]);
   const customerHeaderBg = isDarkMode ? '#1E2226' : '#24272B';
-  const customerHeaderBorder = isDarkMode ? '#374151' : '#24272B';
+  const customerHeaderBorder = isDarkMode ? '#303236' : '#24272B';
 
   // ─── ACTIVE NAVIGATION TAB ───
   // 'overview' | 'garage' | 'orders' | 'bookings' | 'profile' | 'notifications' | 'settings'
@@ -1888,7 +1888,7 @@ export default function ProfilePage({
           <View
             style={[
               styles.mainScroll,
-              { maxWidth: 1360, width: '100%', alignSelf: 'center' },
+              { maxWidth: '100%', width: '100%', alignSelf: 'center' },
               isDesktop && { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 60 },
               isTablet && { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 60 },
               isMobile && (windowWidth < 400 ? { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 32 } : { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 40 }),
@@ -1935,7 +1935,7 @@ export default function ProfilePage({
                     <TouchableOpacity
                       className="garage-register-btn"
                       style={{
-                        backgroundColor: isDarkMode ? '#334155' : '#24272B',
+                        backgroundColor: isDarkMode ? '#3A3B40' : '#24272B',
                         paddingHorizontal: 18,
                         paddingVertical: 10,
                         borderRadius: 8,
@@ -1981,7 +1981,7 @@ export default function ProfilePage({
                             justifyContent: 'center',
                           }}
                         >
-                          <BootstrapIcon name="bicycle" size={18} color={isDarkMode ? '#F8FAFC' : '#24272B'} />
+                          <BootstrapIcon name="bicycle" size={18} color={isDarkMode ? '#F2F2F3' : '#24272B'} />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1997,9 +1997,9 @@ export default function ProfilePage({
                             </Text>
                             <View
                               style={{
-                                backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                                backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                                 borderWidth: 1,
-                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                borderColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                                 paddingHorizontal: 8,
                                 paddingVertical: 2,
                                 borderRadius: 9999,
@@ -2020,7 +2020,7 @@ export default function ProfilePage({
                       <TouchableOpacity
                         className="garage-register-btn"
                         style={{
-                          backgroundColor: isDarkMode ? '#334155' : '#24272B',
+                          backgroundColor: isDarkMode ? '#3A3B40' : '#24272B',
                           paddingHorizontal: 15,
                           paddingVertical: 8,
                           borderRadius: 8,
@@ -2196,7 +2196,7 @@ export default function ProfilePage({
                                       style={{
                                         fontSize: 10.5,
                                         fontWeight: '700',
-                                        color: isDarkMode ? '#FBBF24' : '#B45309',
+                                        color: isDarkMode ? '#F5B942' : '#B45309',
                                         letterSpacing: 0.2,
                                       }}
                                     >
@@ -2330,7 +2330,7 @@ export default function ProfilePage({
                                   <Text
                                     style={{
                                       fontSize: 12,
-                                      color: isDarkMode ? '#34D399' : '#059669',
+                                      color: isDarkMode ? '#00C98D' : '#059669',
                                       fontWeight: '500',
                                       lineHeight: 16,
                                     }}
@@ -2448,7 +2448,7 @@ export default function ProfilePage({
                                 <TouchableOpacity
                                   className="garage-book-btn"
                                   style={{
-                                    backgroundColor: isDarkMode ? '#334155' : '#24272B',
+                                    backgroundColor: isDarkMode ? '#3A3B40' : '#24272B',
                                     borderRadius: 9,
                                     width: '100%',
                                     paddingVertical: 11,
@@ -2500,12 +2500,12 @@ export default function ProfilePage({
                         </Text>
                         <View
                           style={{
-                            backgroundColor: isDarkMode ? '#27272A' : '#F1F5F9',
+                            backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                             paddingHorizontal: 8,
                             paddingVertical: 2,
                             borderRadius: 12,
                             borderWidth: 1,
-                            borderColor: isDarkMode ? '#3F3F46' : '#E2E8F0',
+                            borderColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                           }}
                         >
                           <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#D4D4D8' : '#475569' }}>
@@ -2552,7 +2552,7 @@ export default function ProfilePage({
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 8,
-                            backgroundColor: orderFilter !== 'All' ? (isDarkMode ? '#27272A' : '#FFF7ED') : (isDarkMode ? '#202024' : '#FFFFFF'),
+                            backgroundColor: orderFilter !== 'All' ? (isDarkMode ? '#202124' : '#FFF7ED') : (isDarkMode ? '#202024' : '#FFFFFF'),
                             borderWidth: 1,
                             borderColor: orderFilter !== 'All' ? '#EA580C' : tokens.border,
                             borderRadius: 8,
@@ -2685,8 +2685,7 @@ export default function ProfilePage({
                                       style={{
                                         backgroundColor: isActive
                                           ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#FFEDD5')
-                                          : isDarkMode
-                                          ? '#334155'
+                                          : isDarkMode ? '#3A3B40'
                                           : '#F1F5F9',
                                         paddingHorizontal: 7,
                                         paddingVertical: 2,
@@ -2754,9 +2753,9 @@ export default function ProfilePage({
                           width: 52,
                           height: 52,
                           borderRadius: 16,
-                          backgroundColor: isDarkMode ? '#27272A' : '#F1F5F9',
+                          backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                           borderWidth: 1,
-                          borderColor: isDarkMode ? '#3F3F46' : '#E2E8F0',
+                          borderColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                           justifyContent: 'center',
                           alignItems: 'center',
                           marginBottom: 12,
@@ -2782,7 +2781,7 @@ export default function ProfilePage({
                             paddingVertical: 7,
                             paddingHorizontal: 16,
                             borderRadius: 8,
-                            backgroundColor: isDarkMode ? '#27272A' : '#F8FAFC',
+                            backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
                             borderWidth: 1,
                             borderColor: tokens.border,
                             flexDirection: 'row',
@@ -2951,7 +2950,7 @@ export default function ProfilePage({
                                   <BootstrapIcon
                                     name={isFav ? 'bookmark-fill' : 'bookmark'}
                                     size={13}
-                                    color={isFav ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B'}
+                                    color={isFav ? '#EA580C' : isDarkMode ? '#A1A1AA' : '#64748B'}
                                   />
                                 </TouchableOpacity>
                               </View>
@@ -3013,7 +3012,7 @@ export default function ProfilePage({
                                     </View>
                                   ) : (
                                     <View style={shopWebStyles.ratingMinimal}>
-                                      <BootstrapIcon name="star" size={9.5} color={isDarkMode ? '#64748B' : '#94A3B8'} />
+                                      <BootstrapIcon name="star" size={9.5} color={isDarkMode ? '#71717A' : '#94A3B8'} />
                                       <Text style={[shopWebStyles.unratedMinimalText, isDarkMode && { color: '#94A3B8' }]}>
                                         No ratings yet
                                       </Text>
@@ -3102,10 +3101,10 @@ export default function ProfilePage({
                                     fontSize: 12,
                                     fontWeight: '600',
                                     color: isDelivered
-                                      ? (isDarkMode ? '#34D399' : '#047857')
+                                      ? (isDarkMode ? '#00C98D' : '#047857')
                                       : isCancelled
                                       ? (isDarkMode ? '#FB7185' : '#BE123C')
-                                      : (isDarkMode ? '#FBBF24' : '#D97706'),
+                                      : (isDarkMode ? '#F5B942' : '#D97706'),
                                   }}
                                 >
                                   {o.status || 'Processing'}
@@ -3119,12 +3118,12 @@ export default function ProfilePage({
                                     paddingVertical: 6,
                                     paddingHorizontal: 13,
                                     backgroundColor: isPendingApproval
-                                      ? (isDarkMode ? '#27272A' : '#FEF3C7')
+                                      ? (isDarkMode ? '#202124' : '#FEF3C7')
                                       : '#1E2227',
                                     borderRadius: 8,
                                     borderWidth: 1,
                                     borderColor: isPendingApproval
-                                      ? (isDarkMode ? '#3F3F46' : '#FDE68A')
+                                      ? (isDarkMode ? '#3A3B40' : '#FDE68A')
                                       : '#373C42',
                                     flexDirection: 'row',
                                     alignItems: 'center',
@@ -3140,14 +3139,14 @@ export default function ProfilePage({
                                   <BootstrapIcon
                                     name={isPendingApproval ? 'hourglass-split' : 'geo-alt-fill'}
                                     size={12}
-                                    color={isPendingApproval ? (isDarkMode ? '#FBBF24' : '#D97706') : '#FFFFFF'}
+                                    color={isPendingApproval ? (isDarkMode ? '#F5B942' : '#D97706') : '#FFFFFF'}
                                   />
                                   <Text
                                     style={{
                                       fontSize: 12,
                                       fontWeight: '600',
                                       color: isPendingApproval
-                                        ? (isDarkMode ? '#FBBF24' : '#92400E')
+                                        ? (isDarkMode ? '#F5B942' : '#92400E')
                                         : '#FFFFFF',
                                     }}
                                   >
@@ -3164,10 +3163,10 @@ export default function ProfilePage({
                                       paddingVertical: 6,
                                       paddingHorizontal: 13,
                                       backgroundColor: o.is_rated
-                                        ? (isDarkMode ? '#27272A' : '#FEF3C7')
+                                        ? (isDarkMode ? '#202124' : '#FEF3C7')
                                         : '#EA580C',
                                       borderColor: o.is_rated
-                                        ? (isDarkMode ? '#3F3F46' : '#FDE68A')
+                                        ? (isDarkMode ? '#3A3B40' : '#FDE68A')
                                         : '#EA580C',
                                       borderWidth: 1,
                                       borderRadius: 8,
@@ -3191,7 +3190,7 @@ export default function ProfilePage({
                                       style={{
                                         fontSize: 12,
                                         fontWeight: '600',
-                                        color: o.is_rated ? (isDarkMode ? '#FBBF24' : '#92400E') : '#FFFFFF',
+                                        color: o.is_rated ? (isDarkMode ? '#F5B942' : '#92400E') : '#FFFFFF',
                                       }}
                                     >
                                       {o.is_rated ? 'Rated ★' : 'Rate Order'}
@@ -3270,11 +3269,11 @@ export default function ProfilePage({
                                         width: 40,
                                         height: 40,
                                         borderRadius: 8,
-                                        backgroundColor: isDarkMode ? '#27272A' : '#E2E8F0',
+                                        backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
                                         justifyContent: 'center',
                                         alignItems: 'center',
                                         borderWidth: 1,
-                                        borderColor: isDarkMode ? '#3F3F46' : '#CBD5E1',
+                                        borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                                       }}
                                     >
                                       <BootstrapIcon name="box-seam" size={16} color="#64748B" />
@@ -3389,7 +3388,7 @@ export default function ProfilePage({
                           width: 72,
                           height: 72,
                           borderRadius: 36,
-                          backgroundColor: isDarkMode ? '#24272B' : '#EA580C',
+                          backgroundColor: isDarkMode ? '#191A1D' : '#EA580C',
                           overflow: 'hidden',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -3419,7 +3418,7 @@ export default function ProfilePage({
                           width: 26,
                           height: 26,
                           borderRadius: 13,
-                          backgroundColor: isDarkMode ? '#1A2320' : '#FFFFFF',
+                          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderWidth: 1.5,
@@ -4038,7 +4037,7 @@ export default function ProfilePage({
                                   width: 60,
                                   height: 52,
                                   borderRadius: 8,
-                                  backgroundColor: isDarkMode ? '#1E2824' : '#FFF7ED',
+                                  backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   borderWidth: 1,
@@ -4943,7 +4942,7 @@ export default function ProfilePage({
                                   style={{
                                     backgroundColor: isUnread
                                       ? (isDarkMode ? 'rgba(0, 0, 0, 0.14)' : '#FAF9F6')
-                                      : (isDarkMode ? '#141A18' : '#FFFFFF'),
+                                      : (isDarkMode ? '#191A1D' : '#FFFFFF'),
                                     borderWidth: 1,
                                     borderColor: isUnread ? '#D4D4D8' : tokens.border,
                                     borderRadius: 16,

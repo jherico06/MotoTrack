@@ -24,7 +24,7 @@ export default function AndroidCustomizerPage(props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: androidTokens.colors.background,
+    backgroundColor: '#F7F5F0',
   },
 });
 

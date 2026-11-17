@@ -74,16 +74,49 @@ export default function CustomizationsAdminPanel({ isDarkMode }) {
 
       <View style={styles.statsRow}>
         <View style={styles.stat}>
-          <Text style={styles.statVal}>{totals.count}</Text>
-          <Text style={styles.statLabel}>Builds</Text>
+          <View style={styles.statHeader}>
+            <Text style={styles.statLabel}>Builds</Text>
+            <View style={[styles.statPill, { backgroundColor: isDark ? '#3A241B' : '#FFF7ED', borderColor: isDark ? '#8A3D19' : '#FED7AA' }]}>
+              <Text style={[styles.statPillText, { color: isDark ? '#FF5A00' : '#EA580C' }]}>Saved</Text>
+            </View>
+          </View>
+          <View style={styles.statValueBlock}>
+            <Text style={styles.statVal}>{totals.count}</Text>
+            <Text style={styles.statSub}>Custom builds</Text>
+          </View>
+          <View style={styles.statTrack}>
+            <View style={[styles.statTrackFill, { width: totals.count > 0 ? '72%' : '16%', backgroundColor: isDark ? '#FF5A00' : '#EA580C' }]} />
+          </View>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.statVal}>{customizationService.formatMoney(totals.value)}</Text>
-          <Text style={styles.statLabel}>Total Value</Text>
+          <View style={styles.statHeader}>
+            <Text style={styles.statLabel}>Total value</Text>
+            <View style={[styles.statPill, { backgroundColor: isDark ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5', borderColor: isDark ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0' }]}>
+              <Text style={[styles.statPillText, { color: isDark ? '#00C98D' : '#059669' }]}>Catalog</Text>
+            </View>
+          </View>
+          <View style={styles.statValueBlock}>
+            <Text style={styles.statVal}>{customizationService.formatMoney(totals.value)}</Text>
+            <Text style={styles.statSub}>Configured total</Text>
+          </View>
+          <View style={styles.statTrack}>
+            <View style={[styles.statTrackFill, { width: totals.value > 0 ? '80%' : '16%', backgroundColor: isDark ? '#00C98D' : '#10B981' }]} />
+          </View>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.statVal}>{totals.previewed}</Text>
-          <Text style={styles.statLabel}>With Preview</Text>
+          <View style={styles.statHeader}>
+            <Text style={styles.statLabel}>With preview</Text>
+            <View style={[styles.statPill, { backgroundColor: isDark ? '#202124' : '#F4F4F5', borderColor: isDark ? '#303236' : '#E4E4E7' }]}>
+              <Text style={[styles.statPillText, { color: isDark ? '#A1A1AA' : '#71717A' }]}>Rendered</Text>
+            </View>
+          </View>
+          <View style={styles.statValueBlock}>
+            <Text style={styles.statVal}>{totals.previewed}</Text>
+            <Text style={styles.statSub}>Studio previews</Text>
+          </View>
+          <View style={styles.statTrack}>
+            <View style={[styles.statTrackFill, { width: totals.previewed > 0 ? '64%' : '16%', backgroundColor: isDark ? '#3B82F6' : '#2563EB' }]} />
+          </View>
         </View>
       </View>
 
@@ -191,23 +224,48 @@ function createStyles(t, isDark) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      backgroundColor: isDark ? '#EA580C' : TEAL,
+      backgroundColor: isDark ? '#FF5A00' : TEAL,
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 8,
     },
     refreshText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
-    statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+    statsRow: { flexDirection: 'row', gap: 14, marginBottom: 14, flexWrap: 'wrap' },
     stat: {
       flex: 1,
-      backgroundColor: isDark ? t.bgCard : '#F8FAFC',
-      borderRadius: 10,
-      padding: 12,
+      minWidth: 180,
+      backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
+      borderRadius: 16,
+      padding: 20,
       borderWidth: 1,
-      borderColor: isDark ? t.border : '#E2E8F0',
+      borderColor: isDark ? '#303236' : '#E5E7EB',
+      justifyContent: 'space-between',
     },
-    statVal: { fontSize: 16, fontWeight: '600', color: isDark ? t.money : TEAL },
-    statLabel: { fontSize: 11, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
+    statHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    statLabel: { fontSize: 13, fontWeight: '500', color: isDark ? '#A1A1AA' : '#71717A' },
+    statPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    statPillText: { fontSize: 11, fontWeight: '600' },
+    statValueBlock: { marginVertical: 12 },
+    statVal: { fontSize: 28, fontWeight: '600', color: isDark ? '#F5F5F5' : '#18181B', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+    statSub: { fontSize: 12, color: isDark ? '#71717A' : '#6B7280', marginTop: 3 },
+    statTrack: {
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: isDark ? '#292B2F' : '#F4F4F5',
+      overflow: 'hidden',
+      marginTop: 4,
+    },
+    statTrackFill: { height: '100%', borderRadius: 2 },
     search: {
       borderWidth: 1,
       borderColor: isDark ? t.borderInput : '#E2E8F0',
@@ -224,10 +282,10 @@ function createStyles(t, isDark) {
       alignItems: 'center',
       paddingHorizontal: 12,
       paddingVertical: 10,
-      backgroundColor: '#24272B',
+      backgroundColor: isDark ? '#202124' : '#24272B',
       borderRadius: 8,
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? '#374151' : '#32373D',
+      borderBottomColor: isDark ? '#303236' : '#32373D',
       marginBottom: 6,
     },
     th: { fontSize: 11, fontWeight: '700', color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 0.5 },

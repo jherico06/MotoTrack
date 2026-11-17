@@ -21,10 +21,10 @@ export default function ForecastChart({
   periodType = 'month',
 }) {
   const t = getForecastTokens(isDark);
-  const actualColor = '#2563EB';
-  const forecastColor = '#EA580C';
-  const regressionColor = '#94A3B8';
-  const gridColor = isDark ? '#2E3236' : '#F1F5F9';
+  const actualColor = '#3B82F6';
+  const forecastColor = '#FF5A00';
+  const regressionColor = '#71717A';
+  const gridColor = isDark ? (Platform.OS === 'web' ? '#292B2F' : '#2E3236') : '#F1F5F9';
 
   const [hover, setHover] = useState(null);
 
@@ -429,13 +429,13 @@ export default function ForecastChart({
             left: Math.min(Math.max((hover.x || 0) + 14, 10), Math.max(width - 220, 10)),
             top: Math.max((hover.y || 0) - 85, 6),
             zIndex: 40,
-            backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
+            backgroundColor: t.card,
             borderRadius: 8,
             paddingHorizontal: 12,
             paddingVertical: 9,
             minWidth: 160,
             borderWidth: 1,
-            borderColor: isDark ? '#2E3236' : '#E2E8F0',
+            borderColor: t.cardBorder,
             boxShadow: '0 6px 18px rgba(15, 23, 42, 0.14)',
           }}
         >

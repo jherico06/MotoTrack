@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import ExternalLink from '../../common/ExternalLink.jsx';
@@ -21,7 +21,9 @@ export default function RiderOrderCard({
   palette,
   onViewDetails,
   onScanConfirm,
+  onViewMap,
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const delivered = isDeliveredOrder(delivery);
   const badge = getOrderStatusBadge(delivery, palette);
   const cod = isCodOrder(delivery);
@@ -33,14 +35,35 @@ export default function RiderOrderCard({
     delivery?.customerAddress
   );
 
+  const itemsList =
+    Array.isArray(delivery?.items) && delivery.items.length > 0
+      ? delivery.items
+      : [
+          {
+            name:
+              delivery?.itemsSummary ||
+              delivery?.customerName ||
+              'MotoTrack Delivery',
+            quantity: Number(delivery?.itemCount) || 1,
+            price: Number(delivery?.totalAmount) || 0,
+          },
+        ];
+
+  const cardBg = palette.isDark ? '#1C1F23' : '#FFFFFF';
+  const cardBorder = palette.isDark ? '#2B3035' : '#EDE9E0';
+  const nestedBg = palette.isDark ? '#23272B' : '#FBF9F5';
+  const nestedBorder = palette.isDark ? '#2B3035' : '#F3EFE6';
+  const dividerColor = palette.isDark ? '#2E343B' : '#EFEBE0';
+  const primaryBtnBg = palette.isDark ? '#EA580C' : '#141414';
+
   return (
     <View
       style={[
         styles.card,
         !palette.isDark && cardShadowStyle,
         {
-          backgroundColor: palette.bgCard,
-          borderColor: palette.border,
+          backgroundColor: cardBg,
+          borderColor: cardBorder,
         },
       ]}
     >
@@ -50,222 +73,365 @@ export default function RiderOrderCard({
         accessibilityRole="button"
         accessibilityLabel={`Order ${formatOrderCode(delivery?.orderId)} for ${delivery?.customerName || 'Customer'}`}
       >
-        {/* Top Row: Order Number & Status Pill */}
-        <View style={styles.topRow}>
-          <View style={styles.orderCustomerCol}>
-            <Text style={[styles.orderCode, { color: palette.textMuted }]}>
-              {formatOrderCode(delivery?.orderId)}
-            </Text>
-            <Text
-              style={[styles.customerName, { color: palette.textPrimary }]}
-              numberOfLines={1}
-            >
-              {delivery?.customerName || 'Customer'}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.statusPill,
-              {
-                backgroundColor: badge.bg,
-              },
-            ]}
-          >
-            <Text style={[styles.statusPillText, { color: badge.text }]}>
-              {badge.label}
-            </Text>
-          </View>
-        </View>
-
-        {/* Address Row */}
-        <View style={styles.addressRow}>
-          <BootstrapIcon
-            name="geo-alt"
-            size={14}
-            color={palette.textMuted}
-            style={styles.addressIcon}
-          />
-          <Text
-            style={[styles.addressText, { color: palette.textMuted }]}
-            numberOfLines={2}
-          >
-            {delivery?.customerAddress || 'No delivery address provided'}
-          </Text>
-        </View>
-
-        {/* Tonal Deadline / Completion & COD / Earnings Strip */}
-        <View
-          style={[
-            styles.infoStrip,
-            {
-              backgroundColor: palette.bgMuted,
-            },
-          ]}
-        >
-          <View style={styles.infoLeft}>
-            <BootstrapIcon
-              name={delivered ? 'check' : 'clock'}
-              size={14}
-              color={delivered ? palette.textPrimary : palette.textMuted}
-            />
-            <Text
-              style={[styles.infoTimeText, { color: palette.textSecondary }]}
-              numberOfLines={1}
-            >
+        {/* Top Header: Date & Order ID on left, Soft Status Pill + ••• Menu on right */}
+        <View style={styles.metaTopRow}>
+          <View style={styles.orderIdCol}>
+            <Text style={[styles.dateSubText, { color: palette.textMuted }]}>
               {delivered
                 ? formatCompletedTimeLabel(delivery)
                 : formatActiveDeadlineLabel(delivery)}
             </Text>
+            <Text
+              style={[styles.orderCode, { color: palette.textPrimary }]}
+              numberOfLines={1}
+            >
+              {formatOrderCode(delivery?.orderId)}
+            </Text>
           </View>
 
-          {delivered ? (
-            <Text style={[styles.earnedText, { color: palette.orange }]}>
-              {formatPhp(earningAmount)} earned
+          <View style={styles.headerRightGroup}>
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: badge.bg,
+                },
+              ]}
+            >
+              <Text style={[styles.statusPillText, { color: badge.text }]}>
+                {badge.label}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setMenuOpen((prev) => !prev)}
+              activeOpacity={0.7}
+              accessibilityLabel="Order actions"
+              style={styles.dotsMenuBtn}
+            >
+              <BootstrapIcon
+                name="three-dots"
+                size={14}
+                color={palette.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Nested Sand-White Items & Recipient Box (Matching Customer Orders Card) */}
+        <View
+          style={[
+            styles.nestedBox,
+            {
+              backgroundColor: nestedBg,
+              borderColor: nestedBorder,
+            },
+          ]}
+        >
+          {itemsList.slice(0, 2).map((it, idx) => {
+            const itemName =
+              it?.name || it?.product_name || 'Motorcycle Part';
+            const itemQty = Number(it?.quantity) || 1;
+            const unitPrice = Number(it?.price || it?.cost || 0);
+            const lineTotal =
+              unitPrice > 0
+                ? unitPrice * itemQty
+                : itemsList.length === 1
+                  ? Number(delivery?.totalAmount) || 0
+                  : 0;
+
+            return (
+              <View
+                key={idx}
+                style={[
+                  styles.itemRow,
+                  idx > 0 && {
+                    paddingTop: 10,
+                    marginTop: 10,
+                    borderTopWidth: 1,
+                    borderTopColor: dividerColor,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.itemIconBox,
+                    {
+                      backgroundColor: palette.isDark
+                        ? 'rgba(234, 88, 12, 0.16)'
+                        : '#FFF0E6',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="box" size={18} color="#EA580C" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.itemName, { color: palette.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {itemName}
+                  </Text>
+                  <Text
+                    style={[styles.itemSub, { color: palette.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    Qty: {itemQty} · {delivery?.customerName || 'Customer'}
+                  </Text>
+                </View>
+                {lineTotal > 0 ? (
+                  <Text
+                    style={[styles.itemPrice, { color: palette.textPrimary }]}
+                  >
+                    {formatPhp(lineTotal)}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+
+          {itemsList.length > 2 ? (
+            <Text style={[styles.moreItemsText, { color: palette.textMuted }]}>
+              +{itemsList.length - 2} more item{itemsList.length - 2 === 1 ? '' : 's'}
             </Text>
-          ) : (
-            <Text style={[styles.codText, { color: palette.textPrimary }]}>
-              {formatPhpExact(delivery?.totalAmount)} · {cod ? 'COD' : 'Paid'}
+          ) : null}
+
+          <View
+            style={[
+              styles.addressStrip,
+              {
+                borderTopColor: dividerColor,
+              },
+            ]}
+          >
+            <BootstrapIcon
+              name="geo-alt"
+              size={12}
+              color={palette.textMuted}
+            />
+            <Text
+              style={[styles.addressLineText, { color: palette.textSecondary }]}
+              numberOfLines={1}
+            >
+              {delivery?.customerAddress || 'No delivery address provided'}
             </Text>
-          )}
+          </View>
+
+          {!delivered ? (
+            <View style={styles.mapActionsRow}>
+              <TouchableOpacity
+                onPress={() => onViewMap?.(delivery)}
+                activeOpacity={0.8}
+                style={[
+                  styles.inlineActionChip,
+                  {
+                    backgroundColor: palette.bgCard,
+                    borderColor: cardBorder,
+                  },
+                ]}
+              >
+                <BootstrapIcon name="map" size={12} color="#EA580C" />
+                <Text style={[styles.inlineActionChipText, { color: palette.textPrimary }]}>
+                  View map
+                </Text>
+              </TouchableOpacity>
+
+              <ExternalLink href={navUrl}>
+                <View
+                  style={[
+                    styles.inlineActionChip,
+                    {
+                      backgroundColor: palette.bgCard,
+                      borderColor: cardBorder,
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="cursor-fill" size={11} color="#EA580C" />
+                  <Text style={[styles.inlineActionChipText, { color: palette.textPrimary }]}>
+                    Navigate
+                  </Text>
+                </View>
+              </ExternalLink>
+            </View>
+          ) : null}
         </View>
       </TouchableOpacity>
 
-      {/* Action Buttons */}
-      {delivered ? (
-        <View style={styles.deliveredActionWrap}>
+      {/* Hairline Divider & Footer Row (Total on left, Charcoal Pill CTA on right) */}
+      <View
+        style={[
+          styles.footerRow,
+          {
+            borderTopColor: nestedBorder,
+          },
+        ]}
+      >
+        <View>
+          <Text style={[styles.totalLabel, { color: palette.textMuted }]}>
+            {delivered
+              ? 'Earned fee'
+              : cod
+                ? 'COD to collect'
+                : 'Total amount (Paid)'}
+          </Text>
+          <Text style={[styles.totalAmount, { color: '#EA580C' }]}>
+            {delivered
+              ? `+${formatPhp(earningAmount)}`
+              : formatPhpExact(delivery?.totalAmount)}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.primaryFooterBtn,
+            { backgroundColor: primaryBtnBg },
+          ]}
+          onPress={() =>
+            delivered ? onViewDetails?.(delivery) : onScanConfirm?.(delivery)
+          }
+          activeOpacity={0.82}
+          accessibilityRole="button"
+          accessibilityLabel={
+            delivered
+              ? `View order ${formatOrderCode(delivery?.orderId)}`
+              : `Scan and confirm order ${formatOrderCode(delivery?.orderId)}`
+          }
+        >
+          <Text style={styles.primaryFooterBtnText}>
+            {delivered ? 'View details' : 'Scan & confirm'}
+          </Text>
+          <BootstrapIcon name="arrow-right" size={13} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Optional Secondary Actions Drawer (toggled via ••• button) */}
+      {menuOpen ? (
+        <View
+          style={[
+            styles.drawerRow,
+            {
+              borderTopColor: nestedBorder,
+            },
+          ]}
+        >
           <TouchableOpacity
+            onPress={() => {
+              setMenuOpen(false);
+              onViewMap?.(delivery);
+            }}
+            activeOpacity={0.8}
             style={[
-              styles.outlinedBtn,
-              styles.deliveredDetailsBtn,
+              styles.drawerChip,
               {
-                borderColor: palette.borderStrong,
-                backgroundColor: palette.bgCard,
+                backgroundColor: nestedBg,
+                borderColor: cardBorder,
               },
             ]}
-            onPress={() => onViewDetails?.(delivery)}
-            activeOpacity={0.78}
-            accessibilityRole="button"
-            accessibilityLabel="View order details"
           >
+            <BootstrapIcon name="map" size={12} color="#EA580C" />
             <Text
-              style={[styles.outlinedBtnText, { color: palette.textPrimary }]}
+              style={[styles.drawerChipText, { color: palette.textPrimary }]}
             >
-              View details
+              View map
             </Text>
           </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.activeActionsWrap}>
-          <View style={styles.secondaryButtonsRow}>
-            <ExternalLink href={navUrl} style={styles.halfBtnSlot}>
+
+          {!delivered ? (
+            <ExternalLink href={navUrl}>
               <View
                 style={[
-                  styles.outlinedBtn,
+                  styles.drawerChip,
                   {
-                    borderColor: palette.borderStrong,
-                    backgroundColor: palette.bgCard,
+                    backgroundColor: nestedBg,
+                    borderColor: cardBorder,
                   },
                 ]}
               >
                 <BootstrapIcon
                   name="geo-alt"
-                  size={14}
+                  size={12}
                   color={palette.textPrimary}
                 />
                 <Text
-                  style={[
-                    styles.outlinedBtnText,
-                    { color: palette.textPrimary },
-                  ]}
+                  style={[styles.drawerChipText, { color: palette.textPrimary }]}
                 >
                   Navigate
                 </Text>
               </View>
             </ExternalLink>
-
-            <TouchableOpacity
-              style={[
-                styles.outlinedBtn,
-                styles.halfBtnSlot,
-                {
-                  borderColor: palette.borderStrong,
-                  backgroundColor: palette.bgCard,
-                },
-              ]}
-              onPress={() => onViewDetails?.(delivery)}
-              activeOpacity={0.78}
-              accessibilityRole="button"
-              accessibilityLabel="View order details"
-            >
-              <Text
-                style={[
-                  styles.outlinedBtnText,
-                  { color: palette.textPrimary },
-                ]}
-              >
-                View details
-              </Text>
-            </TouchableOpacity>
-          </View>
+          ) : null}
 
           <TouchableOpacity
+            onPress={() => {
+              setMenuOpen(false);
+              onViewDetails?.(delivery);
+            }}
+            activeOpacity={0.8}
             style={[
-              styles.scanPrimaryBtn,
-              { backgroundColor: palette.orange },
+              styles.drawerChip,
+              {
+                backgroundColor: nestedBg,
+                borderColor: cardBorder,
+              },
             ]}
-            onPress={() => onScanConfirm?.(delivery)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={`Scan and confirm order ${formatOrderCode(delivery?.orderId)}`}
           >
-            <BootstrapIcon name="qr-code-scan" size={16} color="#FFFFFF" />
-            <Text style={styles.scanPrimaryBtnText}>Scan & confirm</Text>
+            <BootstrapIcon
+              name="receipt"
+              size={12}
+              color={palette.textPrimary}
+            />
+            <Text
+              style={[styles.drawerChipText, { color: palette.textPrimary }]}
+            >
+              Order details
+            </Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 15,
-    marginBottom: 12,
+    padding: 16,
+    marginBottom: 14,
   },
-  topRow: {
+  metaTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
   },
-  orderCustomerCol: {
+  orderIdCol: {
     flex: 1,
+    paddingRight: 8,
+  },
+  dateSubText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '500',
   },
   orderCode: {
     fontFamily: RIDER_FONT,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '600',
-    letterSpacing: 0.35,
-    textTransform: 'uppercase',
+    marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
-  customerName: {
-    fontFamily: RIDER_FONT,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-    marginTop: 2,
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statusPill: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    borderRadius: 9999,
   },
   statusPillText: {
     fontFamily: RIDER_FONT,
@@ -273,110 +439,151 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: '600',
   },
-  addressRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    marginTop: 7,
-  },
-  addressIcon: {
-    marginTop: 2,
-  },
-  addressText: {
-    flex: 1,
-    fontFamily: RIDER_FONT,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '400',
-  },
-  infoStrip: {
-    flexDirection: 'row',
+  dotsMenuBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 10,
-    paddingHorizontal: 11,
-    paddingVertical: 10,
-    marginTop: 11,
-    gap: 8,
+    justifyContent: 'center',
   },
-  infoLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    flex: 1,
-  },
-  infoTimeText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 16,
-    fontWeight: '500',
-    fontVariant: ['tabular-nums'],
-    flexShrink: 1,
-  },
-  codText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 16,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  earnedText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 16,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  activeActionsWrap: {
-    marginTop: 12,
-    gap: 9,
-  },
-  secondaryButtonsRow: {
-    flexDirection: 'row',
-    gap: 9,
-  },
-  halfBtnSlot: {
-    flex: 1,
-  },
-  outlinedBtn: {
-    minHeight: 44,
-    borderRadius: 11,
+  nestedBox: {
+    borderRadius: 14,
     borderWidth: 1,
+    padding: 12,
+    marginTop: 14,
+    marginBottom: 14,
+  },
+  itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
+    gap: 12,
   },
-  outlinedBtnText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  scanPrimaryBtn: {
-    minHeight: 46,
+  itemIconBox: {
+    width: 40,
+    height: 40,
     borderRadius: 11,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
   },
-  scanPrimaryBtnText: {
+  itemName: {
     fontFamily: RIDER_FONT,
     fontSize: 13.5,
     lineHeight: 18,
     fontWeight: '600',
+  },
+  itemSub: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  itemPrice: {
+    fontFamily: RIDER_FONT,
+    fontSize: 13.5,
+    lineHeight: 18,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  moreItemsText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  addressStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 9,
+    borderTopWidth: 1,
+  },
+  addressLineText: {
+    flex: 1,
+    fontFamily: RIDER_FONT,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+  mapActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 9,
+  },
+  inlineActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  inlineActionChipText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  totalLabel: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  totalAmount: {
+    fontFamily: RIDER_FONT,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  primaryFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  primaryFooterBtnText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12.5,
+    lineHeight: 16,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
-  deliveredActionWrap: {
-    marginTop: 11,
+  drawerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
   },
-  deliveredDetailsBtn: {
-    minWidth: 148,
-    minHeight: 42,
+  drawerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  drawerChipText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    fontWeight: '600',
   },
 });
 

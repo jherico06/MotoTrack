@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 function toDraftRows(sizes, basePrice = 0) {
   if (!Array.isArray(sizes)) return [];
@@ -27,6 +28,7 @@ export default function ProductSizesEditor({
   formLabelStyle,
   productKey = 'new',
 }) {
+  const { isDarkMode } = useTheme();
   const [rows, setRows] = useState(() => toDraftRows(sizes, basePrice));
   const syncedKey = useRef(null);
   const basePriceRef = useRef(basePrice);
@@ -109,7 +111,7 @@ export default function ProductSizesEditor({
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={formLabelStyle}>Sizes, Prices & Stock</Text>
-      <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>
+      <Text style={{ fontSize: 11, color: isDarkMode ? '#A1A1AA' : '#64748B', marginBottom: 8 }}>
         Add each size with its price. Set stock to 0 to mark Sold Out. Leave stock blank to use
         product stock. Every size needs a name before saving.
       </Text>
@@ -128,7 +130,7 @@ export default function ProductSizesEditor({
               value={row.label}
               onChangeText={(val) => updateRow(index, { label: val })}
               placeholder="e.g. 120/70ZR17"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
             />
           </View>
           <View style={{ flex: 0.9 }}>
@@ -143,7 +145,7 @@ export default function ProductSizesEditor({
                 updateRow(index, { price: parseFloat(String(val).replace(/,/g, '')) || 0 })
               }
               placeholder={String(basePrice || '0')}
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
             />
           </View>
           <View style={{ flex: 0.7 }}>
@@ -156,7 +158,7 @@ export default function ProductSizesEditor({
               value={row.stock === 0 || row.stock ? String(row.stock) : ''}
               onChangeText={(val) => updateRow(index, { stock: val })}
               placeholder="—"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
             />
           </View>
           <TouchableOpacity
@@ -165,14 +167,16 @@ export default function ProductSizesEditor({
               width: 34,
               height: 34,
               borderRadius: 10,
-              backgroundColor: '#FEF2F2',
+              backgroundColor: isDarkMode ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
+              borderWidth: isDarkMode ? 1 : 0,
+              borderColor: 'rgba(240, 68, 68, 0.28)',
               alignItems: 'center',
               justifyContent: 'center',
               marginTop: index === 0 ? 18 : 0,
             }}
             accessibilityLabel="Remove size"
           >
-            <BootstrapIcon name="trash" size={14} color="#DC2626" />
+            <BootstrapIcon name="trash" size={14} color={isDarkMode ? '#F04444' : '#DC2626'} />
           </TouchableOpacity>
         </View>
       ))}
@@ -188,14 +192,14 @@ export default function ProductSizesEditor({
           paddingHorizontal: 12,
           borderRadius: 10,
           borderWidth: 1.5,
-          borderColor: '#EA580C',
-          backgroundColor: '#FFF7ED',
+          borderColor: isDarkMode ? '#8A3D19' : '#EA580C',
+          backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
           marginTop: 2,
         }}
         activeOpacity={0.85}
       >
-        <BootstrapIcon name="plus-lg" size={12} color="#EA580C" />
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>Add Size</Text>
+        <BootstrapIcon name="plus-lg" size={12} color="#FF5A00" />
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#FF5A00' }}>Add Size</Text>
       </TouchableOpacity>
     </View>
   );

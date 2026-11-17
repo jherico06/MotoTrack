@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 
 /**
  * MotoTrack Inventory Forecasting Dashboard Tokens
@@ -6,6 +6,42 @@ import { StyleSheet } from 'react-native';
  */
 export function getForecastTokens(isDark = false) {
   if (isDark) {
+    if (Platform.OS === 'web') {
+      return {
+        isDark: true,
+        background: '#111315',
+        foreground: '#F2F2F3',
+        card: '#191A1D',
+        cardBorder: '#303236',
+        cardForeground: '#F2F2F3',
+        primary: '#FF5A00',
+        primarySoft: '#3A241B',
+        secondary: '#202124',
+        muted: '#202124',
+        mutedForeground: '#A1A1AA',
+        border: '#303236',
+        borderSubtle: '#292B2F',
+        navActive: '#FF5A00',
+        navActiveText: '#FFFFFF',
+        sky: '#3B82F6',
+        blue: '#3B82F6',
+        blueSoft: 'rgba(59, 130, 246, 0.16)',
+        actualLine: '#3B82F6',
+        trendLineColor: '#71717A',
+        forecast: '#FF5A00',
+        forecastSoft: '#3A241B',
+        success: '#00C98D',
+        successSoft: 'rgba(0, 201, 141, 0.14)',
+        danger: '#F04444',
+        warning: '#F5B942',
+        warningSoft: 'rgba(245, 185, 66, 0.14)',
+        headerBg: '#202124',
+        calloutBg: 'rgba(0, 201, 141, 0.10)',
+        calloutBorder: 'rgba(0, 201, 141, 0.28)',
+        darkBtnBg: '#202124',
+        darkBtnText: '#F2F2F3',
+      };
+    }
     return {
       isDark: true,
       background: '#121417',
@@ -230,25 +266,24 @@ export function createForecastStyles(isDark = false) {
     kpiRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 12,
+      gap: 14,
       position: 'relative',
       zIndex: 1,
     },
     kpiCard: {
       flex: 1,
-      minWidth: 180,
+      minWidth: 185,
       backgroundColor: t.card,
-      borderRadius: 12,
-      padding: 16,
+      borderRadius: 16,
+      padding: 20,
       borderWidth: 1,
       borderColor: t.cardBorder,
       shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.04,
-      shadowRadius: 4,
+      shadowOpacity: isDark ? 0.2 : 0.02,
+      shadowRadius: 3,
       elevation: 1,
       justifyContent: 'space-between',
-      minHeight: 110,
     },
     kpiCardMobile: {
       flexBasis: '100%',
@@ -258,8 +293,8 @@ export function createForecastStyles(isDark = false) {
     kpiTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      marginBottom: 8,
+      justifyContent: 'space-between',
+      gap: 8,
     },
     kpiIconSquare: {
       width: 32,
@@ -268,11 +303,27 @@ export function createForecastStyles(isDark = false) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    kpiHeaderPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+    },
+    kpiHeaderPillText: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
     kpiLabel: {
-      fontSize: 11.5,
+      fontSize: 13,
       fontWeight: '500',
       color: t.mutedForeground,
       flex: 1,
+    },
+    kpiValueBlock: {
+      marginVertical: 12,
     },
     kpiValueRow: {
       flexDirection: 'row',
@@ -280,11 +331,11 @@ export function createForecastStyles(isDark = false) {
       gap: 6,
     },
     kpiValue: {
-      fontSize: 26,
-      lineHeight: 30,
-      fontWeight: '700',
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: '600',
       color: t.foreground,
-      letterSpacing: -0.4,
+      letterSpacing: -0.6,
       fontVariant: ['tabular-nums'],
     },
     kpiUnit: {
@@ -307,10 +358,21 @@ export function createForecastStyles(isDark = false) {
       fontWeight: '600',
     },
     kpiSubText: {
-      fontSize: 11,
-      color: t.mutedForeground,
+      fontSize: 12,
+      color: isDark ? '#71717A' : '#6B7280',
       fontWeight: '400',
+      marginTop: 3,
+    },
+    kpiTrack: {
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: isDark ? '#292B2F' : '#F4F4F5',
+      overflow: 'hidden',
       marginTop: 4,
+    },
+    kpiTrackFill: {
+      height: '100%',
+      borderRadius: 2,
     },
 
     /* ── Cards General ── */

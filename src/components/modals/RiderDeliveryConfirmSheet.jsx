@@ -4,10 +4,12 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  Image,
   StyleSheet,
   Modal,
   ActivityIndicator,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import {
@@ -16,6 +18,7 @@ import {
   formatExpectedDateRangeLabel,
   formatExpectedDateLabel,
 } from '../../utils/deliveryDate.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 function formatPhpExact(amount) {
   const n = Number(amount) || 0;
@@ -68,11 +71,11 @@ function getDeliveryDateDisplay(delivery) {
   return `${startLabel} – ${endLabel}`;
 }
 
-function Row({ label, value, isLast }) {
+function Row({ label, value, isLast, isDark }) {
   return (
-    <View style={[styles.row, isLast && styles.rowLast]}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value || '—'}</Text>
+    <View style={[styles.row, isDark && styles.rowDark, isLast && styles.rowLast]}>
+      <Text style={[styles.rowLabel, isDark && styles.rowLabelDark]}>{label}</Text>
+      <Text style={[styles.rowValue, isDark && styles.rowValueDark]}>{value || '—'}</Text>
     </View>
   );
 }
@@ -84,10 +87,15 @@ export default function RiderDeliveryConfirmSheet({
   confirming,
   error,
   success,
+  proofPhoto,
+  onPickProofPhoto,
+  onClearProofPhoto,
   onCancel,
   onConfirm,
   onDone,
 }) {
+  const { isDarkMode } = useTheme();
+  const isDark = Platform.OS === 'web' && isDarkMode;
   const cleanOrderId = String(
     delivery?.orderId || delivery?.order_id || success?.orderId || success?.order_id || '—'
   ).replace(/^#+/, '');
@@ -95,6 +103,9 @@ export default function RiderDeliveryConfirmSheet({
   const deliveryStatusText = String(
     delivery?.deliveryStatus || delivery?.status || 'Out for Delivery'
   ).trim();
+  const effectiveProofPhoto =
+    proofPhoto || delivery?.deliveryPhoto || delivery?.delivery_photo || null;
+  const hasProofPhoto = Boolean(effectiveProofPhoto);
 
   return (
     <Modal
@@ -103,49 +114,50 @@ export default function RiderDeliveryConfirmSheet({
       presentationStyle="pageSheet"
       onRequestClose={success ? onDone : onCancel}
     >
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={[styles.safe, isDark && styles.safeDark]}>
         {success ? (
           <View style={styles.successWrap}>
-            <View style={styles.successIcon}>
-              <BootstrapIcon name="check-circle-fill" size={40} color="#10B981" />
+            <View style={[styles.successIcon, isDark && styles.successIconDark]}>
+              <BootstrapIcon name="check-circle-fill" size={40} color={isDark ? '#00C98D' : '#10B981'} />
             </View>
-            <Text style={styles.successTitle}>Delivery Confirmed</Text>
-            <Text style={styles.orderLine}>Order #{cleanOrderId}</Text>
-            <View style={styles.card}>
-              <Row label="CUSTOMER" value={success.customerName || success.customer_name} />
-              <Row label="DELIVERED" value={deliveredLabel} />
-              <Row label="TOTAL" value={formatPhpExact(success.totalAmount ?? success.total_amount)} />
-              <Row label="PAYMENT" value={shortPayment(success)} isLast />
+            <Text style={[styles.successTitle, isDark && styles.successTitleDark]}>Delivery Confirmed</Text>
+            <Text style={[styles.orderLine, isDark && styles.orderLineDark]}>Order #{cleanOrderId}</Text>
+            <View style={[styles.card, isDark && styles.cardDark]}>
+              <Row label="CUSTOMER" value={success.customerName || success.customer_name} isDark={isDark} />
+              <Row label="DELIVERED" value={deliveredLabel} isDark={isDark} />
+              <Row label="TOTAL" value={formatPhpExact(success.totalAmount ?? success.total_amount)} isDark={isDark} />
+              <Row label="PAYMENT" value={shortPayment(success)} isLast isDark={isDark} />
             </View>
-            <TouchableOpacity style={styles.doneBtn} onPress={onDone} activeOpacity={0.85}>
+            <TouchableOpacity style={[styles.doneBtn, isDark && styles.doneBtnDark]} onPress={onDone} activeOpacity={0.85}>
               <Text style={styles.doneBtnText}>Back to Active Route</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-            <Text style={styles.kicker}>CONFIRM DROP-OFF</Text>
-            <Text style={styles.title}>Order #{cleanOrderId}</Text>
-            <Text style={styles.sub}>Review this delivery, then confirm only after the customer receives it.</Text>
+            <Text style={[styles.kicker, isDark && styles.kickerDark]}>CONFIRM DROP-OFF</Text>
+            <Text style={[styles.title, isDark && styles.titleDark]}>Order #{cleanOrderId}</Text>
+            <Text style={[styles.sub, isDark && styles.subDark]}>Review this delivery, then confirm only after the customer receives it.</Text>
 
             {hintMismatch ? (
-              <View style={styles.note}>
-                <BootstrapIcon name="info-circle" size={14} color="#0284C7" />
-                <Text style={styles.noteText}>
+              <View style={[styles.note, isDark && styles.noteDark]}>
+                <BootstrapIcon name="info-circle" size={14} color={isDark ? '#60A5FA' : '#0284C7'} />
+                <Text style={[styles.noteText, isDark && styles.noteTextDark]}>
                   This QR belongs to this order. Confirm only if this is the parcel you just delivered.
                 </Text>
               </View>
             ) : null}
 
             {error ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
+              <View style={[styles.errorBox, isDark && styles.errorBoxDark]}>
+                <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{error}</Text>
               </View>
             ) : null}
 
-            <View style={styles.card}>
+            <View style={[styles.card, isDark && styles.cardDark]}>
               <Row
                 label="CUSTOMER"
                 value={delivery?.customerName || delivery?.customer_name}
+                isDark={isDark}
               />
               <Row
                 label="DELIVERY ADDRESS"
@@ -155,39 +167,132 @@ export default function RiderDeliveryConfirmSheet({
                   delivery?.shipping_address ||
                   'No address on file'
                 }
+                isDark={isDark}
               />
               <Row
                 label="TOTAL"
                 value={formatPhpExact(delivery?.totalAmount ?? delivery?.total_amount ?? delivery?.total)}
+                isDark={isDark}
               />
               <Row
                 label="PAYMENT"
                 value={paymentLabel(delivery)}
+                isDark={isDark}
               />
               <Row
                 label="DELIVERY DATE"
                 value={getDeliveryDateDisplay(delivery)}
+                isDark={isDark}
               />
               <Row
                 label="STATUS"
                 value={deliveryStatusText}
                 isLast
+                isDark={isDark}
               />
             </View>
 
+            {/* Proof of Delivery Photo Card (Required before confirmation) */}
+            <View style={[styles.proofCard, isDark && styles.cardDark]}>
+              <View style={styles.proofHeaderRow}>
+                <Text style={[styles.rowLabel, isDark && styles.rowLabelDark]}>
+                  PROOF OF DELIVERY PHOTO *
+                </Text>
+                <View
+                  style={[
+                    styles.proofBadge,
+                    hasProofPhoto ? styles.proofBadgeReady : styles.proofBadgeRequired,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.proofBadgeText,
+                      { color: hasProofPhoto ? '#059669' : '#EA580C' },
+                    ]}
+                  >
+                    {hasProofPhoto ? 'Attached' : 'Required'}
+                  </Text>
+                </View>
+              </View>
+
+              {effectiveProofPhoto ? (
+                <View style={styles.proofPreviewWrap}>
+                  <Image
+                    source={{ uri: effectiveProofPhoto }}
+                    style={styles.proofImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.proofActionRow}>
+                    <TouchableOpacity
+                      style={[styles.proofChangeBtn, isDark && styles.cancelBtnDark]}
+                      onPress={onPickProofPhoto}
+                      disabled={confirming}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="camera" size={14} color={isDark ? '#F2F2F3' : '#0F172A'} />
+                      <Text style={[styles.proofChangeText, isDark && styles.cancelBtnTextDark]}>
+                        Change photo
+                      </Text>
+                    </TouchableOpacity>
+                    {proofPhoto && typeof onClearProofPhoto === 'function' ? (
+                      <TouchableOpacity
+                        style={styles.proofRemoveBtn}
+                        onPress={onClearProofPhoto}
+                        disabled={confirming}
+                        activeOpacity={0.8}
+                      >
+                        <BootstrapIcon name="trash" size={14} color="#DC2626" />
+                        <Text style={styles.proofRemoveText}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.proofDropzone, isDark && styles.proofDropzoneDark]}
+                  onPress={onPickProofPhoto}
+                  disabled={confirming}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.proofCamCircle}>
+                    <BootstrapIcon name="camera-fill" size={20} color="#EA580C" />
+                  </View>
+                  <Text style={[styles.proofDropTitle, isDark && styles.rowValueDark]}>
+                    Attach proof of delivery photo
+                  </Text>
+                  <Text style={[styles.proofDropSub, isDark && styles.subDark]}>
+                    Required before you can confirm this drop-off
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {!hasProofPhoto ? (
+              <View style={styles.proofHintRow}>
+                <BootstrapIcon name="exclamation-circle" size={13} color="#EA580C" />
+                <Text style={styles.proofHintText}>
+                  Please attach a proof of delivery photo to confirm delivery.
+                </Text>
+              </View>
+            ) : null}
+
             <View style={styles.actions}>
               <TouchableOpacity
-                style={styles.cancelBtn}
+                style={[styles.cancelBtn, isDark && styles.cancelBtnDark]}
                 onPress={onCancel}
                 disabled={confirming}
                 activeOpacity={0.7}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, isDark && styles.cancelBtnTextDark]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmBtn, confirming && styles.btnDisabled]}
+                style={[
+                  styles.confirmBtn,
+                  isDark && styles.confirmBtnDark,
+                  (confirming || !hasProofPhoto) && styles.btnDisabled,
+                ]}
                 onPress={onConfirm}
-                disabled={confirming}
+                disabled={confirming || !hasProofPhoto}
                 activeOpacity={0.85}
               >
                 {confirming ? (
@@ -343,7 +448,137 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   btnDisabled: {
-    opacity: 0.7,
+    opacity: 0.45,
+  },
+  proofCard: {
+    marginTop: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    padding: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  proofHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  proofBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  proofBadgeRequired: {
+    backgroundColor: '#FFF7ED',
+  },
+  proofBadgeReady: {
+    backgroundColor: '#ECFDF5',
+  },
+  proofBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  proofDropzone: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 20,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  proofDropzoneDark: {
+    borderColor: '#334155',
+    backgroundColor: '#202124',
+  },
+  proofCamCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  proofDropTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  proofDropSub: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  proofPreviewWrap: {
+    gap: 10,
+  },
+  proofImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    backgroundColor: '#E2E8F0',
+  },
+  proofActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  proofChangeBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  proofChangeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  proofRemoveBtn: {
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  proofRemoveText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  proofHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
+  proofHintText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#EA580C',
   },
   successWrap: {
     flex: 1,
@@ -388,5 +623,67 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 15,
+  },
+  safeDark: {
+    backgroundColor: '#111315',
+  },
+  kickerDark: {
+    color: '#A1A1AA',
+  },
+  titleDark: {
+    color: '#F5F5F5',
+  },
+  subDark: {
+    color: '#A1A1AA',
+  },
+  cardDark: {
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
+  },
+  rowDark: {
+    borderBottomColor: '#292B2F',
+  },
+  rowLabelDark: {
+    color: '#71717A',
+  },
+  rowValueDark: {
+    color: '#F2F2F3',
+  },
+  noteDark: {
+    backgroundColor: 'rgba(59, 130, 246, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  noteTextDark: {
+    color: '#60A5FA',
+  },
+  errorBoxDark: {
+    backgroundColor: 'rgba(240, 68, 68, 0.14)',
+    borderColor: 'rgba(240, 68, 68, 0.35)',
+  },
+  errorTextDark: {
+    color: '#F87171',
+  },
+  cancelBtnDark: {
+    backgroundColor: '#202124',
+    borderColor: '#303236',
+  },
+  cancelBtnTextDark: {
+    color: '#F2F2F3',
+  },
+  confirmBtnDark: {
+    backgroundColor: '#FF5A00',
+  },
+  successIconDark: {
+    backgroundColor: 'rgba(0, 201, 141, 0.14)',
+  },
+  successTitleDark: {
+    color: '#F5F5F5',
+  },
+  orderLineDark: {
+    color: '#FF5A00',
+  },
+  doneBtnDark: {
+    backgroundColor: '#FF5A00',
   },
 });

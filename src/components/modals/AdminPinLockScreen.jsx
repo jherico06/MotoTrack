@@ -15,6 +15,7 @@ import {
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { adminSecurityService } from '../../services/auth/adminSecurityService.js';
 import { appStorage } from '../../services/system/storageAdapter.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 const LOCKOUT_STORAGE_KEYS = {
   LOCKOUT_UNTIL: 'mototrack_admin_pin_lockout_until',
@@ -46,7 +47,7 @@ export default function AdminPinLockScreen({
         const remaining = Math.max(0, Math.ceil((parseInt(savedUntil, 10) - Date.now()) / 1000));
         return remaining;
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return 0;
   });
 
@@ -61,7 +62,7 @@ export default function AdminPinLockScreen({
       if (saved !== null && !isNaN(parseInt(saved, 10))) {
         return Math.max(0, parseInt(saved, 10));
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return MAX_ATTEMPTS;
   });
 
@@ -92,6 +93,9 @@ export default function AdminPinLockScreen({
 
   // Shake animation for error
   const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  const { isDarkMode } = useTheme();
+  const isDark = Platform.OS === 'web' && isDarkMode;
 
   // Pulsing animation for shield glow
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -151,7 +155,7 @@ export default function AdminPinLockScreen({
           setAttemptsLeft(MAX_ATTEMPTS);
         }
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     // Refresh PIN from Supabase on popup open
     setPinMeta(adminSecurityService.getPinMetadata(adminUser));
@@ -160,7 +164,7 @@ export default function AdminPinLockScreen({
       .then((meta) => {
         if (meta) setPinMeta(meta);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Set default email for forgot PIN modal
     if (adminUser?.email) {
@@ -219,7 +223,7 @@ export default function AdminPinLockScreen({
       setAttemptsLeft(nextLeft);
       try {
         appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, String(nextLeft));
-      } catch (_e) {}
+      } catch (_e) { }
       setErrorMessage(
         serverError || `Incorrect Security PIN. ${nextLeft} attempt${nextLeft === 1 ? '' : 's'} remaining.`
       );
@@ -230,7 +234,7 @@ export default function AdminPinLockScreen({
       try {
         appStorage.setItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL, String(lockoutUntil));
         appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, '0');
-      } catch (_e) {}
+      } catch (_e) { }
       setAttemptsLeft(0);
       setLockoutSecondsLeft(LOCKOUT_SECONDS);
       setErrorMessage(
@@ -257,7 +261,7 @@ export default function AdminPinLockScreen({
         try {
           appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
           appStorage.removeItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
-        } catch (_e) {}
+        } catch (_e) { }
         setAttemptsLeft(MAX_ATTEMPTS);
         setLockoutSecondsLeft(0);
         onUnlockSuccess?.();
@@ -268,7 +272,7 @@ export default function AdminPinLockScreen({
           try {
             appStorage.setItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL, String(lockoutUntil));
             appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, '0');
-          } catch (_e) {}
+          } catch (_e) { }
           setAttemptsLeft(0);
           setLockoutSecondsLeft(lockSec);
           setErrorMessage(
@@ -378,7 +382,7 @@ export default function AdminPinLockScreen({
       try {
         appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
         appStorage.removeItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
-      } catch (_e) {}
+      } catch (_e) { }
       setAttemptsLeft(MAX_ATTEMPTS);
       setLockoutSecondsLeft(0);
       setErrorMessage('');
@@ -397,7 +401,7 @@ export default function AdminPinLockScreen({
         try {
           appStorage.setItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL, String(lockoutUntil));
           appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, '0');
-        } catch (_e) {}
+        } catch (_e) { }
         setAttemptsLeft(0);
         setLockoutSecondsLeft(lockSec);
       } else {
@@ -417,7 +421,7 @@ export default function AdminPinLockScreen({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onNavigateToStore}>
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, isDark && styles.modalOverlayDark]}>
         {/* Hidden TextInput capturing real keystrokes & mobile keyboards */}
         <TextInput
           ref={inputRef}
@@ -440,24 +444,24 @@ export default function AdminPinLockScreen({
         />
 
         {/* Centered Modal Card */}
-        <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
+        <Animated.View style={[styles.card, isDark && styles.cardDark, { transform: [{ translateX: shakeAnim }] }]}>
           {/* Top Header Row with Return to Store Button & Supabase Badge */}
           <View style={styles.cardHeaderRow}>
             <TouchableOpacity
-              style={styles.backToStoreBtn}
+              style={[styles.backToStoreBtn, isDark && styles.backToStoreBtnDark]}
               onPress={() => {
                 adminSecurityService.lockSession(adminUser);
                 onNavigateToStore?.();
               }}
               activeOpacity={0.8}
             >
-              <BootstrapIcon name="arrow-left" size={13} color="#475569" />
-              <Text style={styles.backToStoreText}>Return to Store</Text>
+              <BootstrapIcon name="arrow-left" size={13} color={isDark ? '#A1A1AA' : '#475569'} />
+              <Text style={[styles.backToStoreText, isDark && styles.backToStoreTextDark]}>Return to Store</Text>
             </TouchableOpacity>
 
-            <View style={styles.supabaseBadge}>
-              <View style={styles.liveGreenDot} />
-              <Text style={styles.supabaseBadgeText}>Supabase Synced</Text>
+            <View style={[styles.supabaseBadge, isDark && styles.supabaseBadgeDark]}>
+              <View style={[styles.liveGreenDot, isDark && styles.liveGreenDotDark]} />
+              <Text style={[styles.supabaseBadgeText, isDark && styles.supabaseBadgeTextDark]}>Supabase Synced</Text>
             </View>
           </View>
 
@@ -465,24 +469,31 @@ export default function AdminPinLockScreen({
           <Animated.View
             style={[
               styles.shieldCircle,
-              isLockedOut && styles.shieldCircleLocked,
+              isDark && styles.shieldCircleDark,
+              isLockedOut && (isDark ? styles.shieldCircleLockedDark : styles.shieldCircleLocked),
               {
                 transform: [{ scale: pulseAnim }],
               },
             ]}
           >
-            <View style={[styles.shieldInner, isLockedOut && styles.shieldInnerLocked]}>
+            <View
+              style={[
+                styles.shieldInner,
+                isDark && styles.shieldInnerDark,
+                isLockedOut && (isDark ? styles.shieldInnerLockedDark : styles.shieldInnerLocked),
+              ]}
+            >
               <BootstrapIcon
                 name={isLockedOut ? 'lock-fill' : 'shield-lock-fill'}
                 size={32}
-                color={isLockedOut ? '#DC2626' : '#EA580C'}
+                color={isLockedOut ? (isDark ? '#F04444' : '#DC2626') : (isDark ? '#FF5A00' : '#EA580C')}
               />
             </View>
           </Animated.View>
 
           {/* Title & Subtitle */}
-          <Text style={styles.title}>Admin PIN Verification</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, isDark && styles.titleDark]}>Admin PIN Verification</Text>
+          <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>
             {isLockedOut
               ? `Security lockout active due to 3 incorrect attempts. Please wait ${lockoutSecondsLeft}s to try again.`
               : `Enter your authorized ${expectedPinLength}-digit PIN to access the Store Administrator Dashboard.`}
@@ -490,13 +501,13 @@ export default function AdminPinLockScreen({
 
           {/* Error Alert Box */}
           {errorMessage.length > 0 && (
-            <View style={[styles.errorBox, isLockedOut && styles.errorBoxLocked]}>
+            <View style={[styles.errorBox, isDark && styles.errorBoxDark, isLockedOut && (isDark ? styles.errorBoxLockedDark : styles.errorBoxLocked)]}>
               <BootstrapIcon
                 name={isLockedOut ? 'clock-history' : 'exclamation-circle-fill'}
                 size={14}
-                color="#DC2626"
+                color={isDark ? '#F87171' : '#DC2626'}
               />
-              <Text style={styles.errorText}>
+              <Text style={[styles.errorText, isDark && styles.errorTextDark]}>
                 {isLockedOut
                   ? `⛔ 3 incorrect attempts reached. Cooldown active: ${lockoutSecondsLeft}s remaining.`
                   : errorMessage}
@@ -522,21 +533,22 @@ export default function AdminPinLockScreen({
                   key={index}
                   style={[
                     styles.pinSlot,
-                    hasDigit && styles.pinSlotFilled,
-                    isCurrent && styles.pinSlotActive,
-                    isLockedOut && { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+                    isDark && styles.pinSlotDark,
+                    hasDigit && (isDark ? styles.pinSlotFilledDark : styles.pinSlotFilled),
+                    isCurrent && (isDark ? styles.pinSlotActiveDark : styles.pinSlotActive),
+                    isLockedOut && (isDark ? { borderColor: 'rgba(240, 68, 68, 0.45)', backgroundColor: 'rgba(240, 68, 68, 0.12)' } : { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }),
                   ]}
                 >
                   {hasDigit ? (
                     showDigits ? (
-                      <Text style={[styles.pinDigitText, isLockedOut && { color: '#DC2626' }]}>
+                      <Text style={[styles.pinDigitText, isDark && styles.pinDigitTextDark, isLockedOut && { color: isDark ? '#F87171' : '#DC2626' }]}>
                         {digitValue}
                       </Text>
                     ) : (
-                      <View style={[styles.pinDot, isLockedOut && { backgroundColor: '#DC2626' }]} />
+                      <View style={[styles.pinDot, isDark && styles.pinDotDark, isLockedOut && { backgroundColor: isDark ? '#F87171' : '#DC2626' }]} />
                     )
                   ) : (
-                    <View style={styles.pinDotEmpty} />
+                    <View style={[styles.pinDotEmpty, isDark && styles.pinDotEmptyDark]} />
                   )}
                 </View>
               );
@@ -549,16 +561,16 @@ export default function AdminPinLockScreen({
                 onPress={() => setShowDigits((prev) => !prev)}
                 activeOpacity={0.7}
               >
-                <BootstrapIcon name={showDigits ? 'eye-slash-fill' : 'eye-fill'} size={18} color="#64748B" />
+                <BootstrapIcon name={showDigits ? 'eye-slash-fill' : 'eye-fill'} size={18} color={isDark ? '#A1A1AA' : '#64748B'} />
               </TouchableOpacity>
             )}
           </TouchableOpacity>
 
           {/* Attempts Remaining Badge */}
           {!isLockedOut && attemptsLeft < MAX_ATTEMPTS && (
-            <View style={styles.attemptsIndicatorRow}>
-              <BootstrapIcon name="shield-exclamation" size={13} color="#D97706" />
-              <Text style={[styles.attemptsIndicatorText, { color: '#B45309' }]}>
+            <View style={[styles.attemptsIndicatorRow, isDark && styles.attemptsIndicatorRowDark]}>
+              <BootstrapIcon name="shield-exclamation" size={13} color={isDark ? '#F5B942' : '#D97706'} />
+              <Text style={[styles.attemptsIndicatorText, { color: isDark ? '#F5B942' : '#B45309' }]}>
                 {attemptsLeft} attempt{attemptsLeft === 1 ? '' : 's'} remaining before 30-second lockout
               </Text>
             </View>
@@ -592,9 +604,9 @@ export default function AdminPinLockScreen({
                   paddingVertical: 9,
                   paddingHorizontal: 12,
                   borderRadius: 12,
-                  backgroundColor: '#FEF2F2',
+                  backgroundColor: isDark ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
                   borderWidth: 1,
-                  borderColor: '#FECACA',
+                  borderColor: isDark ? 'rgba(240, 68, 68, 0.35)' : '#FECACA',
                 }}
                 onPress={() => {
                   setForgotError('');
@@ -603,15 +615,15 @@ export default function AdminPinLockScreen({
                 }}
                 activeOpacity={0.8}
               >
-                <BootstrapIcon name="key-fill" size={13} color="#DC2626" />
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#DC2626' }}>
+                <BootstrapIcon name="key-fill" size={13} color={isDark ? '#F87171' : '#DC2626'} />
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDark ? '#F87171' : '#DC2626' }}>
                   Can't wait? Reset PIN with Password
                 </Text>
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
-              style={[styles.unlockBtn, isVerifying && { opacity: 0.85 }]}
+              style={[styles.unlockBtn, isDark && styles.unlockBtnDark, isVerifying && { opacity: 0.85 }]}
               onPress={handleVerify}
               activeOpacity={0.85}
               disabled={isVerifying}
@@ -628,7 +640,7 @@ export default function AdminPinLockScreen({
           )}
 
           {/* Footer Actions & Settings */}
-          <View style={styles.cardFooter}>
+          <View style={[styles.cardFooter, isDark && styles.cardFooterDark]}>
             <TouchableOpacity
               style={styles.changePinLink}
               onPress={() => {
@@ -638,8 +650,8 @@ export default function AdminPinLockScreen({
               }}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="question-circle-fill" size={13} color="#EA580C" />
-              <Text style={styles.changePinLinkText}>Forgot PIN?</Text>
+              <BootstrapIcon name="question-circle-fill" size={13} color={isDark ? '#FF5A00' : '#EA580C'} />
+              <Text style={[styles.changePinLinkText, isDark && styles.changePinLinkTextDark]}>Forgot PIN?</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -651,8 +663,8 @@ export default function AdminPinLockScreen({
               }}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="key-fill" size={13} color="#64748B" />
-              <Text style={[styles.changePinLinkText, { color: '#64748B' }]}>Change PIN</Text>
+              <BootstrapIcon name="key-fill" size={13} color={isDark ? '#A1A1AA' : '#64748B'} />
+              <Text style={[styles.changePinLinkText, { color: isDark ? '#A1A1AA' : '#64748B' }]}>Change PIN</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -664,61 +676,75 @@ export default function AdminPinLockScreen({
           animationType="fade"
           onRequestClose={() => setIsForgotPinOpen(false)}
         >
-          <View style={styles.nestedModalBackdrop}>
-            <View style={styles.changePinModalBox}>
+          <View style={[styles.nestedModalBackdrop, isDark && styles.nestedModalBackdropDark]}>
+            <View style={[styles.changePinModalBox, isDark && styles.changePinModalBoxDark]}>
               <View style={styles.changePinModalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View
-                    style={[styles.changePinIconWrap, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}
+                    style={[
+                      styles.changePinIconWrap,
+                      {
+                        backgroundColor: isDark ? 'rgba(240, 68, 68, 0.14)' : '#FEE2E2',
+                        borderColor: isDark ? 'rgba(240, 68, 68, 0.35)' : '#FECACA',
+                      },
+                    ]}
                   >
-                    <BootstrapIcon name="shield-lock-fill" size={18} color="#DC2626" />
+                    <BootstrapIcon name="shield-lock-fill" size={18} color={isDark ? '#F04444' : '#DC2626'} />
                   </View>
                   <View>
-                    <Text style={styles.changePinModalTitle}>Forgot Security PIN?</Text>
-                    <Text style={styles.changePinModalSub}>Verify admin password to reset PIN</Text>
+                    <Text style={[styles.changePinModalTitle, isDark && styles.changePinModalTitleDark]}>Forgot Security PIN?</Text>
+                    <Text style={[styles.changePinModalSub, isDark && styles.changePinModalSubDark]}>Verify admin password to reset PIN</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsForgotPinOpen(false)}>
-                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+                  <BootstrapIcon name="x-lg" size={14} color={isDark ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
               {forgotError.length > 0 && (
-                <View style={styles.errorBox}>
-                  <BootstrapIcon name="exclamation-circle-fill" size={13} color="#DC2626" />
-                  <Text style={styles.errorText}>{forgotError}</Text>
+                <View style={[styles.errorBox, isDark && styles.errorBoxDark]}>
+                  <BootstrapIcon name="exclamation-circle-fill" size={13} color={isDark ? '#F87171' : '#DC2626'} />
+                  <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{forgotError}</Text>
                 </View>
               )}
 
               {forgotSuccess.length > 0 && (
-                <View style={[styles.errorBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                  <BootstrapIcon name="check-circle-fill" size={13} color="#10B981" />
-                  <Text style={[styles.errorText, { color: '#047857' }]}>{forgotSuccess}</Text>
+                <View
+                  style={[
+                    styles.errorBox,
+                    {
+                      backgroundColor: isDark ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                      borderColor: isDark ? 'rgba(0, 201, 141, 0.35)' : '#A7F3D0',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={13} color={isDark ? '#00C98D' : '#10B981'} />
+                  <Text style={[styles.errorText, { color: isDark ? '#00C98D' : '#047857' }]}>{forgotSuccess}</Text>
                 </View>
               )}
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Admin Email Address</Text>
+                <Text style={[styles.inputLabel, isDark && styles.inputLabelDark]}>Admin Email Address</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, isDark && styles.formInputDark]}
                   value={forgotEmail}
                   onChangeText={setForgotEmail}
                   placeholder="admin@mototrack.com"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Admin Account Password</Text>
+                <Text style={[styles.inputLabel, isDark && styles.inputLabelDark]}>Admin Account Password</Text>
                 <View style={{ position: 'relative', justifyContent: 'center' }}>
                   <TextInput
-                    style={[styles.formInput, { paddingRight: 40 }]}
+                    style={[styles.formInput, isDark && styles.formInputDark, { paddingRight: 40 }]}
                     value={forgotPassword}
                     onChangeText={setForgotPassword}
                     placeholder="Enter your admin account password"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                     secureTextEntry={!showForgotPassword}
                   />
                   <TouchableOpacity
@@ -728,20 +754,20 @@ export default function AdminPinLockScreen({
                     <BootstrapIcon
                       name={showForgotPassword ? 'eye-slash' : 'eye'}
                       size={16}
-                      color="#64748B"
+                      color={isDark ? '#A1A1AA' : '#64748B'}
                     />
                   </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Set New 4 to 6-Digit PIN</Text>
+                <Text style={[styles.inputLabel, isDark && styles.inputLabelDark]}>Set New 4 to 6-Digit PIN</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, isDark && styles.formInputDark]}
                   value={forgotNewPin}
                   onChangeText={(v) => setForgotNewPin(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder="Enter new 4–6 digit PIN"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                   keyboardType="numeric"
                   secureTextEntry
                   maxLength={6}
@@ -749,13 +775,13 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Confirm New PIN</Text>
+                <Text style={[styles.inputLabel, isDark && styles.inputLabelDark]}>Confirm New PIN</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, isDark && styles.formInputDark]}
                   value={forgotConfirmPin}
                   onChangeText={(v) => setForgotConfirmPin(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder="Re-enter new 4–6 digit PIN"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                   keyboardType="numeric"
                   secureTextEntry
                   maxLength={6}
@@ -763,11 +789,11 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.modalActionsRow}>
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsForgotPinOpen(false)}>
-                  <Text style={styles.modalCancelText}>Cancel</Text>
+                <TouchableOpacity style={[styles.modalCancelBtn, isDark && styles.modalCancelBtnDark]} onPress={() => setIsForgotPinOpen(false)}>
+                  <Text style={[styles.modalCancelText, isDark && styles.modalCancelTextDark]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalSaveBtn, isForgotSubmitting && { opacity: 0.8 }]}
+                  style={[styles.modalSaveBtn, isDark && styles.modalSaveBtnDark, isForgotSubmitting && { opacity: 0.8 }]}
                   onPress={handleForgotPinSubmit}
                   activeOpacity={0.85}
                   disabled={isForgotSubmitting}
@@ -790,20 +816,20 @@ export default function AdminPinLockScreen({
           animationType="fade"
           onRequestClose={() => setIsChangePinOpen(false)}
         >
-          <View style={styles.nestedModalBackdrop}>
-            <View style={styles.changePinModalBox}>
+          <View style={[styles.nestedModalBackdrop, isDark && styles.nestedModalBackdropDark]}>
+            <View style={[styles.changePinModalBox, isDark && styles.changePinModalBoxDark]}>
               <View style={styles.changePinModalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={styles.changePinIconWrap}>
-                    <BootstrapIcon name="shield-lock" size={18} color="#EA580C" />
+                  <View style={[styles.changePinIconWrap, isDark && styles.changePinIconWrapDark]}>
+                    <BootstrapIcon name="shield-lock" size={18} color={isDark ? '#FF5A00' : '#EA580C'} />
                   </View>
                   <View>
-                    <Text style={styles.changePinModalTitle}>Change Security PIN</Text>
-                    <Text style={styles.changePinModalSub}>Replace given PIN & sync to Supabase</Text>
+                    <Text style={[styles.changePinModalTitle, isDark && styles.changePinModalTitleDark]}>Change Security PIN</Text>
+                    <Text style={[styles.changePinModalSub, isDark && styles.changePinModalSubDark]}>Replace given PIN & sync to Supabase</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsChangePinOpen(false)}>
-                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+                  <BootstrapIcon name="x-lg" size={14} color={isDark ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -818,21 +844,25 @@ export default function AdminPinLockScreen({
                   borderRadius: 10,
                   borderWidth: 1,
                   marginBottom: 14,
-                  backgroundColor: pinMeta?.isDefaultPin ? '#FFFBEB' : '#ECFDF5',
-                  borderColor: pinMeta?.isDefaultPin ? '#FDE68A' : '#A7F3D0',
+                  backgroundColor: pinMeta?.isDefaultPin
+                    ? (isDark ? 'rgba(245, 185, 66, 0.12)' : '#FFFBEB')
+                    : (isDark ? 'rgba(0, 201, 141, 0.12)' : '#ECFDF5'),
+                  borderColor: pinMeta?.isDefaultPin
+                    ? (isDark ? 'rgba(245, 185, 66, 0.3)' : '#FDE68A')
+                    : (isDark ? 'rgba(0, 201, 141, 0.3)' : '#A7F3D0'),
                 }}
               >
                 <BootstrapIcon
                   name={pinMeta?.isDefaultPin ? 'shield-exclamation' : 'shield-check'}
                   size={14}
-                  color={pinMeta?.isDefaultPin ? '#B45309' : '#059669'}
+                  color={pinMeta?.isDefaultPin ? (isDark ? '#F5B942' : '#B45309') : (isDark ? '#00C98D' : '#059669')}
                 />
                 <Text
                   style={{
                     flex: 1,
                     fontSize: 11.5,
                     fontWeight: '600',
-                    color: pinMeta?.isDefaultPin ? '#92400E' : '#065F46',
+                    color: pinMeta?.isDefaultPin ? (isDark ? '#F5B942' : '#92400E') : (isDark ? '#00C98D' : '#065F46'),
                   }}
                 >
                   {pinMeta?.isDefaultPin
@@ -845,28 +875,36 @@ export default function AdminPinLockScreen({
                       paddingHorizontal: 8,
                       paddingVertical: 4,
                       borderRadius: 6,
-                      backgroundColor: '#FEF3C7',
+                      backgroundColor: isDark ? 'rgba(245, 185, 66, 0.18)' : '#FEF3C7',
                       borderWidth: 1,
-                      borderColor: '#F59E0B',
+                      borderColor: isDark ? '#F5B942' : '#F59E0B',
                     }}
                     onPress={() => setCurrentPinInput(pinMeta?.defaultPin || '2026')}
                   >
-                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#92400E' }}>Use 2026</Text>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? '#F5B942' : '#92400E' }}>Use 2026</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
 
               {changePinError.length > 0 && (
-                <View style={styles.errorBox}>
-                  <BootstrapIcon name="exclamation-circle-fill" size={13} color="#DC2626" />
-                  <Text style={styles.errorText}>{changePinError}</Text>
+                <View style={[styles.errorBox, isDark && styles.errorBoxDark]}>
+                  <BootstrapIcon name="exclamation-circle-fill" size={13} color={isDark ? '#F87171' : '#DC2626'} />
+                  <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{changePinError}</Text>
                 </View>
               )}
 
               {changePinSuccess.length > 0 && (
-                <View style={[styles.errorBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                  <BootstrapIcon name="check-circle-fill" size={13} color="#10B981" />
-                  <Text style={[styles.errorText, { color: '#047857' }]}>{changePinSuccess}</Text>
+                <View
+                  style={[
+                    styles.errorBox,
+                    {
+                      backgroundColor: isDark ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                      borderColor: isDark ? 'rgba(0, 201, 141, 0.35)' : '#A7F3D0',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={13} color={isDark ? '#00C98D' : '#10B981'} />
+                  <Text style={[styles.errorText, { color: isDark ? '#00C98D' : '#047857' }]}>{changePinSuccess}</Text>
                 </View>
               )}
 
@@ -879,7 +917,7 @@ export default function AdminPinLockScreen({
                     marginBottom: 6,
                   }}
                 >
-                  <Text style={[styles.inputLabel, { marginBottom: 0 }]}>
+                  <Text style={[styles.inputLabel, isDark && styles.inputLabelDark, { marginBottom: 0 }]}>
                     {pinMeta?.isDefaultPin ? 'Current Given PIN (2026)' : 'Current Admin PIN'}
                   </Text>
                   <TouchableOpacity
@@ -889,19 +927,19 @@ export default function AdminPinLockScreen({
                     <BootstrapIcon
                       name={showChangePinDigits ? 'eye-slash' : 'eye'}
                       size={13}
-                      color="#EA580C"
+                      color={isDark ? '#FF5A00' : '#EA580C'}
                     />
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#EA580C' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#FF5A00' : '#EA580C' }}>
                       {showChangePinDigits ? 'Hide' : 'Show'}
                     </Text>
                   </TouchableOpacity>
                 </View>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, isDark && styles.formInputDark]}
                   value={currentPinInput}
                   onChangeText={(v) => setCurrentPinInput(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder={pinMeta?.isDefaultPin ? 'Enter given PIN (2026)' : 'Enter current PIN'}
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                   keyboardType="numeric"
                   secureTextEntry={!showChangePinDigits}
                   maxLength={6}
@@ -909,13 +947,13 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>New 4 to 6-Digit PIN</Text>
+                <Text style={[styles.inputLabel, isDark && styles.inputLabelDark]}>New 4 to 6-Digit PIN</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, isDark && styles.formInputDark]}
                   value={newPinInput}
                   onChangeText={(v) => setNewPinInput(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder="Enter new numeric PIN"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                   keyboardType="numeric"
                   secureTextEntry={!showChangePinDigits}
                   maxLength={6}
@@ -923,13 +961,13 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Confirm New PIN</Text>
+                <Text style={[styles.inputLabel, isDark && styles.inputLabelDark]}>Confirm New PIN</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, isDark && styles.formInputDark]}
                   value={confirmPinInput}
                   onChangeText={(v) => setConfirmPinInput(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder="Re-enter new numeric PIN"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
                   keyboardType="numeric"
                   secureTextEntry={!showChangePinDigits}
                   maxLength={6}
@@ -937,11 +975,11 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.modalActionsRow}>
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsChangePinOpen(false)}>
-                  <Text style={styles.modalCancelText}>Cancel</Text>
+                <TouchableOpacity style={[styles.modalCancelBtn, isDark && styles.modalCancelBtnDark]} onPress={() => setIsChangePinOpen(false)}>
+                  <Text style={[styles.modalCancelText, isDark && styles.modalCancelTextDark]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalSaveBtn, isSavingPin && { opacity: 0.8 }]}
+                  style={[styles.modalSaveBtn, isDark && styles.modalSaveBtnDark, isSavingPin && { opacity: 0.8 }]}
                   onPress={handleChangePinSubmit}
                   activeOpacity={0.85}
                   disabled={isSavingPin}
@@ -1320,5 +1358,130 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+  },
+  modalOverlayDark: {
+    backgroundColor: 'rgba(11, 13, 15, 0.78)',
+  },
+  cardDark: {
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
+  },
+  backToStoreBtnDark: {
+    backgroundColor: '#202124',
+    borderColor: '#303236',
+  },
+  backToStoreTextDark: {
+    color: '#A1A1AA',
+  },
+  supabaseBadgeDark: {
+    backgroundColor: '#3A241B',
+    borderColor: '#8A3D19',
+  },
+  liveGreenDotDark: {
+    backgroundColor: '#00C98D',
+  },
+  supabaseBadgeTextDark: {
+    color: '#FF5A00',
+  },
+  shieldCircleDark: {
+    backgroundColor: '#3A241B',
+    borderColor: '#8A3D19',
+  },
+  shieldCircleLockedDark: {
+    backgroundColor: 'rgba(240, 68, 68, 0.14)',
+    borderColor: 'rgba(240, 68, 68, 0.35)',
+  },
+  shieldInnerDark: {
+    backgroundColor: '#202124',
+  },
+  shieldInnerLockedDark: {
+    backgroundColor: 'rgba(240, 68, 68, 0.22)',
+  },
+  titleDark: {
+    color: '#F5F5F5',
+  },
+  subtitleDark: {
+    color: '#A1A1AA',
+  },
+  errorBoxDark: {
+    backgroundColor: 'rgba(240, 68, 68, 0.14)',
+    borderColor: 'rgba(240, 68, 68, 0.35)',
+  },
+  errorBoxLockedDark: {
+    backgroundColor: 'rgba(240, 68, 68, 0.18)',
+    borderColor: 'rgba(240, 68, 68, 0.45)',
+  },
+  errorTextDark: {
+    color: '#F87171',
+  },
+  pinSlotDark: {
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
+  },
+  pinSlotFilledDark: {
+    borderColor: '#FF5A00',
+    backgroundColor: '#3A241B',
+  },
+  pinSlotActiveDark: {
+    borderColor: '#FF5A00',
+    backgroundColor: '#3A241B',
+  },
+  pinDotDark: {
+    backgroundColor: '#FF5A00',
+  },
+  pinDotEmptyDark: {
+    backgroundColor: '#52525B',
+  },
+  pinDigitTextDark: {
+    color: '#FF5A00',
+  },
+  attemptsIndicatorRowDark: {
+    backgroundColor: 'rgba(245, 185, 66, 0.12)',
+    borderColor: 'rgba(245, 185, 66, 0.3)',
+  },
+  unlockBtnDark: {
+    backgroundColor: '#FF5A00',
+  },
+  cardFooterDark: {
+    borderTopColor: '#292B2F',
+  },
+  changePinLinkTextDark: {
+    color: '#FF5A00',
+  },
+  nestedModalBackdropDark: {
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  },
+  changePinModalBoxDark: {
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
+  },
+  changePinIconWrapDark: {
+    backgroundColor: '#3A241B',
+    borderColor: '#8A3D19',
+  },
+  changePinModalTitleDark: {
+    color: '#F5F5F5',
+  },
+  changePinModalSubDark: {
+    color: '#A1A1AA',
+  },
+  inputLabelDark: {
+    color: '#F2F2F3',
+  },
+  formInputDark: {
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
+    color: '#F2F2F3',
+  },
+  modalCancelBtnDark: {
+    backgroundColor: '#202124',
+    borderWidth: 1,
+    borderColor: '#303236',
+  },
+  modalCancelTextDark: {
+    color: '#F2F2F3',
+  },
+  modalSaveBtnDark: {
+    backgroundColor: '#FF5A00',
   },
 });

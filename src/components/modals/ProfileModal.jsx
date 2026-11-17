@@ -306,7 +306,7 @@ export default function ProfileModal({
     if (act.includes('LOGIN')) {
       return {
         icon: 'shield-lock-fill',
-        color: isDarkMode ? '#4ADE80' : '#16A34A',
+        color: isDarkMode ? '#00C98D' : '#16A34A',
         bg: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#DCFCE7',
         label: 'Sign In Event',
       };
@@ -355,8 +355,8 @@ export default function ProfileModal({
               borderBottomLeftRadius: isDesktop ? 24 : 0,
               borderBottomRightRadius: isDesktop ? 24 : 0,
               paddingHorizontal: windowWidth < 380 ? 12 : 20,
-              backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
-              borderColor: isDarkMode ? '#282D34' : 'transparent',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+              borderColor: isDarkMode ? '#303236' : 'transparent',
               borderWidth: isDarkMode ? 1 : 0,
             },
           ]}
@@ -390,16 +390,16 @@ export default function ProfileModal({
                 width: 34,
                 height: 34,
                 borderRadius: 17,
-                backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+                backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                 borderWidth: isDarkMode ? 1 : 0,
-                borderColor: isDarkMode ? '#282D34' : 'transparent',
+                borderColor: isDarkMode ? '#303236' : 'transparent',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
               onPress={onClose}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
@@ -412,7 +412,7 @@ export default function ProfileModal({
                   width: 52,
                   height: 52,
                   borderRadius: 26,
-                  backgroundColor: isDarkMode ? '#252A30' : '#DDE2E8',
+                  backgroundColor: isDarkMode ? '#202124' : '#DDE2E8',
                   alignItems: 'center',
                   justifyContent: 'center',
                 },
@@ -427,11 +427,11 @@ export default function ProfileModal({
                   style={styles.avatarImg}
                 />
               ) : (
-                <BootstrapIcon name="person-fill" size={30} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                <BootstrapIcon name="person-fill" size={30} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                 {currentUser.name || currentUser.fullName}
               </Text>
               <Text style={{ fontSize: 12, color: '#94A3B8' }}>{currentUser.email}</Text>
@@ -443,8 +443,7 @@ export default function ProfileModal({
                       ? isDarkMode
                         ? 'rgba(234, 88, 12, 0.16)'
                         : '#FFF7ED'
-                      : isDarkMode
-                        ? '#252A30'
+                      : isDarkMode ? '#202124'
                         : '#F1F5F9',
                   borderWidth: currentUser.role === 'admin' ? 1 : 0,
                   borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#C8DDD3',
@@ -465,8 +464,7 @@ export default function ProfileModal({
                       ? isDarkMode
                         ? '#FB923C'
                         : '#EA580C'
-                      : isDarkMode
-                        ? '#CBD5E1'
+                      : isDarkMode ? '#A1A1AA'
                         : '#475569'
                   }
                 />
@@ -479,8 +477,7 @@ export default function ProfileModal({
                         ? isDarkMode
                           ? '#FB923C'
                           : '#EA580C'
-                        : isDarkMode
-                          ? '#CBD5E1'
+                        : isDarkMode ? '#A1A1AA'
                           : '#475569',
                   }}
                 >
@@ -505,8 +502,7 @@ export default function ProfileModal({
                     ? isDarkMode
                       ? '#FB923C'
                       : '#EA580C'
-                    : isDarkMode
-                      ? '#94A3B8'
+                    : isDarkMode ? '#A1A1AA'
                       : '#64748B'
                 }
               />
@@ -530,8 +526,7 @@ export default function ProfileModal({
                     ? isDarkMode
                       ? '#FB923C'
                       : '#EA580C'
-                    : isDarkMode
-                      ? '#94A3B8'
+                    : isDarkMode ? '#A1A1AA'
                       : '#64748B'
                 }
               />
@@ -555,8 +550,7 @@ export default function ProfileModal({
                     ? isDarkMode
                       ? '#FB923C'
                       : '#EA580C'
-                    : isDarkMode
-                      ? '#94A3B8'
+                    : isDarkMode ? '#A1A1AA'
                       : '#64748B'
                 }
               />
@@ -578,8 +572,7 @@ export default function ProfileModal({
                     ? isDarkMode
                       ? '#FB923C'
                       : '#EA580C'
-                    : isDarkMode
-                      ? '#94A3B8'
+                    : isDarkMode ? '#A1A1AA'
                       : '#64748B'
                 }
               />
@@ -686,7 +679,7 @@ export default function ProfileModal({
                     style={{
                       fontSize: 11,
                       fontWeight: '600',
-                      color: isDarkMode ? '#94A3B8' : '#64748B',
+                      color: isDarkMode ? '#A1A1AA' : '#64748B',
                       textTransform: 'uppercase',
                     }}
                   >
@@ -782,7 +775,7 @@ export default function ProfileModal({
                       <Text style={customStyles.cardTitle}>Change Primary Email</Text>
                       <Text style={customStyles.cardSub}>
                         Current:{' '}
-                        <Text style={{ fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                        <Text style={{ fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                           {currentUser.email}
                         </Text>
                       </Text>
@@ -831,7 +824,7 @@ export default function ProfileModal({
                         <BootstrapIcon
                           name={showEmailCurrentPwd ? 'eye-slash' : 'eye'}
                           size={15}
-                          color={isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isDarkMode ? '#A1A1AA' : '#64748B'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -908,7 +901,7 @@ export default function ProfileModal({
                         <BootstrapIcon
                           name={showPwdCurrent ? 'eye-slash' : 'eye'}
                           size={15}
-                          color={isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isDarkMode ? '#A1A1AA' : '#64748B'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -935,7 +928,7 @@ export default function ProfileModal({
                         <BootstrapIcon
                           name={showNewPwd ? 'eye-slash' : 'eye'}
                           size={15}
-                          color={isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isDarkMode ? '#A1A1AA' : '#64748B'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -956,7 +949,7 @@ export default function ProfileModal({
                           style={{
                             fontSize: 11,
                             fontWeight: '700',
-                            color: isDarkMode ? '#CBD5E1' : '#475569',
+                            color: isDarkMode ? '#A1A1AA' : '#475569',
                           }}
                         >
                           Password Strength:{' '}
@@ -967,7 +960,7 @@ export default function ProfileModal({
                         <Text
                           style={{
                             fontSize: 11,
-                            color: isDarkMode ? '#94A3B8' : '#64748B',
+                            color: isDarkMode ? '#A1A1AA' : '#64748B',
                             fontWeight: '500',
                           }}
                         >
@@ -1048,7 +1041,7 @@ export default function ProfileModal({
                         <BootstrapIcon
                           name={showConfirmPwd ? 'eye-slash' : 'eye'}
                           size={15}
-                          color={isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isDarkMode ? '#A1A1AA' : '#64748B'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -1056,7 +1049,7 @@ export default function ProfileModal({
                       <Text
                         style={{
                           fontSize: 11,
-                          color: isDarkMode ? '#F87171' : '#DC2626',
+                          color: isDarkMode ? '#F04444' : '#DC2626',
                           marginTop: 3,
                           fontWeight: '600',
                         }}
@@ -1106,11 +1099,11 @@ export default function ProfileModal({
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View>
                     <Text
-                      style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                      style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}
                     >
                       Security & Activity Audit Logs
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                    <Text style={{ fontSize: 11.5, color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
                       Real-time records of security changes, sign-ins, and profile updates
                     </Text>
                   </View>
@@ -1159,7 +1152,7 @@ export default function ProfileModal({
                   <View style={{ padding: 24, alignItems: 'center' }}>
                     <ActivityIndicator size="small" color="#EA580C" />
                     <Text
-                      style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 8 }}
+                      style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', marginTop: 8 }}
                     >
                       Loading security audit logs...
                     </Text>
@@ -1178,13 +1171,13 @@ export default function ProfileModal({
                     <BootstrapIcon
                       name="clock-history"
                       size={28}
-                      color={isDarkMode ? '#64748B' : '#94A3B8'}
+                      color={isDarkMode ? '#71717A' : '#94A3B8'}
                     />
                     <Text
                       style={{
                         fontSize: 13,
                         fontWeight: '700',
-                        color: isDarkMode ? '#CBD5E1' : '#475569',
+                        color: isDarkMode ? '#A1A1AA' : '#475569',
                         marginTop: 6,
                       }}
                     >
@@ -1193,7 +1186,7 @@ export default function ProfileModal({
                     <Text
                       style={{
                         fontSize: 11.5,
-                        color: isDarkMode ? '#64748B' : '#94A3B8',
+                        color: isDarkMode ? '#71717A' : '#94A3B8',
                         textAlign: 'center',
                         marginTop: 2,
                       }}
@@ -1241,13 +1234,13 @@ export default function ProfileModal({
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <BootstrapIcon name="geo-alt-fill" size={14} color={isDarkMode ? '#FB923C' : '#EA580C'} />
                     <Text
-                      style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                      style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}
                     >
                       Current Saved Address
                     </Text>
                   </View>
                   <Text
-                    style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#475569', lineHeight: 17 }}
+                    style={{ fontSize: 12.5, color: isDarkMode ? '#A1A1AA' : '#475569', lineHeight: 17 }}
                   >
                     {currentUser.address || 'No address set in profile yet.'}
                   </Text>
@@ -1255,9 +1248,9 @@ export default function ProfileModal({
                     <BootstrapIcon
                       name="telephone"
                       size={12}
-                      color={isDarkMode ? '#94A3B8' : '#64748B'}
+                      color={isDarkMode ? '#A1A1AA' : '#64748B'}
                     />
-                    <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
                       {currentUser.phone || 'No phone number set'}
                     </Text>
                   </View>
@@ -1318,10 +1311,10 @@ export default function ProfileModal({
                   <BootstrapIcon
                     name="heart-fill"
                     size={15}
-                    color={isDarkMode ? '#F87171' : '#DC2626'}
+                    color={isDarkMode ? '#F04444' : '#DC2626'}
                   />
                   <Text
-                    style={{ color: isDarkMode ? '#F87171' : '#DC2626', fontWeight: '600', fontSize: 13.5 }}
+                    style={{ color: isDarkMode ? '#F04444' : '#DC2626', fontWeight: '600', fontSize: 13.5 }}
                   >
                     View Saved Favorites ({wishlistCount})
                   </Text>
@@ -1358,7 +1351,7 @@ export default function ProfileModal({
                   style={[
                     styles.checkoutBtn,
                     {
-                      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+                      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                       marginTop: 4,
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1390,17 +1383,17 @@ const createCustomStyles = (isDarkMode) =>
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+    backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
     padding: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     marginBottom: 10,
   },
   tabSwitchRow: {
     flexDirection: 'row',
     gap: 6,
-    backgroundColor: isDarkMode ? '#181B1F' : '#F1F5F9',
+    backgroundColor: isDarkMode ? '#18181B' : '#F1F5F9',
     padding: 3,
     borderRadius: 12,
     marginBottom: 12,
@@ -1415,7 +1408,7 @@ const createCustomStyles = (isDarkMode) =>
     borderRadius: 9,
   },
   tabBtnActive: {
-    backgroundColor: isDarkMode ? '#252A30' : '#FFFFFF',
+    backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: isDarkMode ? 0.35 : 0.1,
@@ -1454,12 +1447,12 @@ const createCustomStyles = (isDarkMode) =>
     gap: 6,
   },
   presetChip: {
-    backgroundColor: isDarkMode ? '#181B1F' : '#F1F5F9',
+    backgroundColor: isDarkMode ? '#18181B' : '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 4.5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
   },
   presetChipActive: {
     backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
@@ -1468,7 +1461,7 @@ const createCustomStyles = (isDarkMode) =>
   presetChipText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: isDarkMode ? '#CBD5E1' : '#475569',
+    color: isDarkMode ? '#A1A1AA' : '#475569',
   },
   presetChipTextActive: {
     color: isDarkMode ? '#FB923C' : '#EA580C',
@@ -1487,7 +1480,7 @@ const createCustomStyles = (isDarkMode) =>
   successBannerText: {
     fontSize: 12,
     fontWeight: '700',
-    color: isDarkMode ? '#4ADE80' : '#166534',
+    color: isDarkMode ? '#00C98D' : '#166534',
     flex: 1,
   },
   errorBanner: {
@@ -1507,18 +1500,18 @@ const createCustomStyles = (isDarkMode) =>
     flex: 1,
   },
   addressPreviewCard: {
-    backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+    backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
   },
   securityCard: {
-    backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+    backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     gap: 10,
   },
   securityCardHeader: {
@@ -1537,7 +1530,7 @@ const createCustomStyles = (isDarkMode) =>
   cardTitle: {
     fontSize: 13.5,
     fontWeight: '600',
-    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    color: isDarkMode ? '#F2F2F3' : '#0F172A',
   },
   cardSub: {
     fontSize: 11.5,
@@ -1556,7 +1549,7 @@ const createCustomStyles = (isDarkMode) =>
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 13,
-    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    color: isDarkMode ? '#F2F2F3' : '#0F172A',
   },
   eyeBtn: {
     paddingHorizontal: 12,
@@ -1581,11 +1574,11 @@ const createCustomStyles = (isDarkMode) =>
     padding: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
   },
   strengthBarTrack: {
     height: 4,
-    backgroundColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    backgroundColor: isDarkMode ? '#303236' : '#E2E8F0',
     borderRadius: 2,
     overflow: 'hidden',
     marginBottom: 6,
@@ -1602,13 +1595,13 @@ const createCustomStyles = (isDarkMode) =>
   criteriaBadge: {
     fontSize: 10,
     color: '#94A3B8',
-    backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+    backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
   criteriaBadgeActive: {
-    color: isDarkMode ? '#4ADE80' : '#166534',
+    color: isDarkMode ? '#00C98D' : '#166534',
     backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.2)' : '#DCFCE7',
     fontWeight: '700',
   },
@@ -1626,7 +1619,7 @@ const createCustomStyles = (isDarkMode) =>
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+    backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
   },
   filterPillActive: {
     backgroundColor: '#EA580C',
@@ -1642,11 +1635,11 @@ const createCustomStyles = (isDarkMode) =>
   logCard: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+    backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    borderColor: isDarkMode ? '#303236' : '#E2E8F0',
   },
   logIconWrap: {
     width: 30,
@@ -1658,7 +1651,7 @@ const createCustomStyles = (isDarkMode) =>
   logTitle: {
     fontSize: 12.5,
     fontWeight: '600',
-    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    color: isDarkMode ? '#F2F2F3' : '#0F172A',
   },
   logTime: {
     fontSize: 10.5,
@@ -1666,14 +1659,14 @@ const createCustomStyles = (isDarkMode) =>
   },
   logDesc: {
     fontSize: 11.5,
-    color: isDarkMode ? '#CBD5E1' : '#475569',
+    color: isDarkMode ? '#A1A1AA' : '#475569',
     marginTop: 2,
   },
   logBadge: {
     fontSize: 9.5,
     fontWeight: '600',
     color: '#94A3B8',
-    backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+    backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
     paddingHorizontal: 5,
     paddingVertical: 1.5,
     borderRadius: 4,

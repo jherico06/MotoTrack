@@ -232,9 +232,9 @@ export default function AdminMarketingBannerSettings({
 
   const textColor = isDarkMode ? tokens.textPrimary || '#F1F5F9' : '#0F172A';
   const textMuted = isDarkMode ? tokens.textMuted || '#94A3B8' : '#64748B';
-  const cardBg = isDarkMode ? tokens.bgCard || '#171C22' : '#FFFFFF';
+  const cardBg = isDarkMode ? tokens.bgCard || '#191A1D' : '#FFFFFF';
   const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0';
-  const inputBg = isDarkMode ? '#11151A' : '#F8FAFC';
+  const inputBg = isDarkMode ? '#111315' : '#F8FAFC';
   const inputBorder = isDarkMode ? '#2D3748' : '#CBD5E1';
 
   return (
@@ -324,9 +324,9 @@ export default function AdminMarketingBannerSettings({
                   paddingHorizontal: 14,
                   paddingVertical: 9,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#222933' : '#F1F5F9',
+                  backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                   borderWidth: 1,
-                  borderColor: isDarkMode ? '#333D4B' : '#E2E8F0',
+                  borderColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                   cursor: 'pointer',
                 }}
               >
@@ -429,7 +429,7 @@ export default function AdminMarketingBannerSettings({
           <View
             style={{
               flexDirection: 'row',
-              backgroundColor: isDarkMode ? '#11151A' : '#F1F5F9',
+              backgroundColor: isDarkMode ? '#111315' : '#F1F5F9',
               borderRadius: 8,
               padding: 3,
               gap: 4,
@@ -791,7 +791,7 @@ export default function AdminMarketingBannerSettings({
             value={form.title}
             onChangeText={(val) => handleChange('title', val)}
             placeholder="e.g. Everything Your Ride Needs"
-            placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+            placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
             maxLength={250}
             style={{
               backgroundColor: inputBg,
@@ -824,7 +824,7 @@ export default function AdminMarketingBannerSettings({
             value={form.subtitle}
             onChangeText={(val) => handleChange('subtitle', val)}
             placeholder="e.g. Ride More Worry Less"
-            placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+            placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
             maxLength={250}
             style={{
               backgroundColor: inputBg,
@@ -857,7 +857,7 @@ export default function AdminMarketingBannerSettings({
             value={form.description}
             onChangeText={(val) => handleChange('description', val)}
             placeholder="e.g. Quality motorcycle parts, accessories, and professional service — all in one place."
-            placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+            placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
             maxLength={1500}
             multiline
             numberOfLines={3}
@@ -936,7 +936,7 @@ export default function AdminMarketingBannerSettings({
               gap: 16,
               padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#11151A' : '#F8FAFC',
+              backgroundColor: isDarkMode ? '#111315' : '#F8FAFC',
               borderWidth: 1,
               borderColor: inputBorder,
             }}
@@ -948,9 +948,9 @@ export default function AdminMarketingBannerSettings({
                 height: 100,
                 borderRadius: 10,
                 overflow: 'hidden',
-                backgroundColor: '#1E252D',
+                backgroundColor: isDarkMode ? '#202124' : '#1E252D',
                 borderWidth: 1,
-                borderColor: '#334155',
+                borderColor: isDarkMode ? '#303236' : '#334155',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -1010,7 +1010,7 @@ export default function AdminMarketingBannerSettings({
                           paddingHorizontal: 12,
                           paddingVertical: 10,
                           borderRadius: 8,
-                          backgroundColor: isDarkMode ? '#222933' : '#F1F5F9',
+                          backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                           cursor: 'pointer',
                         }}
                       >
@@ -1031,7 +1031,7 @@ export default function AdminMarketingBannerSettings({
                     value={form.image}
                     onChangeText={(val) => handleChange('image', val)}
                     placeholder="https://images.unsplash.com/photo-..."
-                    placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+                    placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
                     style={{
                       backgroundColor: cardBg,
                       borderWidth: 1,

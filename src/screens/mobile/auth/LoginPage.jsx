@@ -105,9 +105,9 @@ export default function LoginPage({
         });
       } else if (res?.redirectConfigNeeded || res?.cancelled) {
         setGoogleAdvisory({
-          title: 'Supabase Redirect URL Required',
+          title: 'Expo Go Redirect Blocked (Use Tunnel or Dev Build)',
           message:
-            'Google sign-in completed, but Supabase blocked the redirect back into Expo Go. To fix: add "exp://**" and "exps://**" to your Supabase Redirect URLs in Authentication → URL Configuration.',
+            'Hosted Supabase rejects private LAN IP redirects like exp://192.168.x.x even when exp://** is allowlisted, falling back to Site URL. Start Expo with "npm run mobile" (Tunnel: exps://) or use a development build ("mototrack://auth-callback").',
           showInstantTest: true,
         });
         if (res?.error) {

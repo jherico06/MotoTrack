@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Image,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
@@ -11,8 +12,7 @@ import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import ExternalLink from '../../common/ExternalLink.jsx';
 import { RIDER_STATUSES } from '../../../services/staff/riderService.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
-import { RiderAvatar } from './RiderHeaderAndMenus.jsx';
-import { RIDER_FONT, cardShadowStyle } from './riderTheme.js';
+import { RIDER_FONT, cardShadowStyle, getInitials } from './riderTheme.js';
 
 const HELP_TOPICS = [
   {
@@ -133,6 +133,7 @@ export default function RiderAccountView({
   const [emailConfirmPassword, setEmailConfirmPassword] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileBanner, setProfileBanner] = useState(null); // { type: 'success' | 'error', text }
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -245,6 +246,7 @@ export default function RiderAccountView({
       }
 
       setEmailConfirmPassword('');
+      setIsEditingProfile(false);
       const msg = 'Profile and personal details saved.';
       setProfileBanner({ type: 'success', text: msg });
       onShowFeedback?.(msg);
@@ -311,197 +313,76 @@ export default function RiderAccountView({
     }
   };
 
-  const availabilityOptions = [
-    RIDER_STATUSES.AVAILABLE,
-    RIDER_STATUSES.ON_DELIVERY,
-    RIDER_STATUSES.OFF_DUTY,
+  const heroDisplayName = fullName || resolvedName || 'MotoTrack Rider';
+  const heroInitials = getInitials(heroDisplayName);
+  const heroOverline = `VERIFIED RIDER · ${riderId ? String(riderId).toUpperCase() : 'RDR-MOTO'}`;
+  const heroSubtitleParts = [
+    riderProfile?.vehicleInfo
+      ? `${riderProfile.vehicleInfo}${riderProfile.plateNumber ? ` · ${riderProfile.plateNumber}` : ''}`
+      : 'MotoTrack Delivery Rider',
+    availabilityStatus || RIDER_STATUSES.AVAILABLE,
+  ].filter(Boolean);
+
+  const infoRows = [
+    { label: 'Full name', value: heroDisplayName },
+    { label: 'Phone', value: mobileNumber || 'Not set' },
+    { label: 'Email', value: emailAddress || 'Not set' },
+    { label: 'Address', value: homeAddress || 'Not set' },
   ];
 
   return (
     <View style={styles.container}>
-      {/* Rider Identity & Availability Hero Card */}
-      <View
-        style={[
-          styles.identityCard,
-          !palette.isDark && cardShadowStyle,
-          {
-            backgroundColor: palette.bgCard,
-            borderColor: palette.border,
-          },
-        ]}
-      >
-        <View style={styles.identityTopRow}>
-          <View style={styles.avatarEditWrap}>
-            <RiderAvatar
-              uri={avatarUri || resolvedAvatar}
-              name={fullName || resolvedName}
-              size={62}
-              palette={palette}
-            />
-            <TouchableOpacity
-              style={[
-                styles.cameraBadgeBtn,
-                {
-                  backgroundColor: palette.orange,
-                  borderColor: palette.bgCard,
-                },
-              ]}
-              onPress={handlePickAvatar}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Update rider avatar"
-            >
-              <BootstrapIcon name="camera" size={12} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <View style={styles.nameBadgeRow}>
-              <Text
-                style={[styles.riderFullName, { color: palette.textPrimary }]}
-                numberOfLines={1}
-              >
-                {fullName || resolvedName}
-              </Text>
-            </View>
-
-            <View style={styles.badgesWrap}>
-              <View
-                style={[
-                  styles.verifiedBadge,
-                  {
-                    backgroundColor: palette.orangeSoft,
-                    borderColor: palette.orangeBorder,
-                  },
-                ]}
-              >
-                <BootstrapIcon
-                  name="patch-check-fill"
-                  size={12}
-                  color={palette.orange}
-                />
-                <Text
-                  style={[
-                    styles.verifiedBadgeText,
-                    { color: palette.orangeText },
-                  ]}
-                >
-                  Verified Rider
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.riderIdPill,
-                  { backgroundColor: palette.bgMuted },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.riderIdPillText,
-                    { color: palette.textSecondary },
-                  ]}
-                >
-                  ID: {riderId ? String(riderId).toUpperCase() : 'RDR-MOTO'}
-                </Text>
-              </View>
-            </View>
-
-            {riderProfile?.vehicleInfo ? (
-              <View style={styles.vehicleRow}>
-                <BootstrapIcon
-                  name="motorcycle"
-                  size={13}
-                  color={palette.textMuted}
-                />
-                <Text
-                  style={[styles.vehicleText, { color: palette.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {riderProfile.vehicleInfo}
-                  {riderProfile.plateNumber
-                    ? ` · ${riderProfile.plateNumber}`
-                    : ''}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Availability Status Control */}
-        <View
-          style={[
-            styles.availabilityBlock,
-            {
-              backgroundColor: palette.bgMuted,
-              borderColor: palette.border,
-            },
-          ]}
+      {/* 1. Customer-Style Dark Forest Hero Profile Card */}
+      <View style={styles.heroProfileCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={handlePickAvatar}
+          accessibilityRole="button"
+          accessibilityLabel="Update rider profile photo"
+          style={styles.heroAvatarCircle}
         >
-          <Text
-            style={[styles.availabilityCaption, { color: palette.textMuted }]}
-          >
-            Availability status
-          </Text>
-          <View style={styles.availabilityPillsRow}>
-            {availabilityOptions.map((opt) => {
-              const selected =
-                String(availabilityStatus || RIDER_STATUSES.AVAILABLE).toLowerCase() ===
-                opt.toLowerCase();
-              const dotColor =
-                opt === RIDER_STATUSES.AVAILABLE
-                  ? '#16A34A'
-                  : opt === RIDER_STATUSES.ON_DELIVERY
-                    ? palette.orange
-                    : palette.textSubtle;
+          {avatarUri || resolvedAvatar ? (
+            <Image
+              source={{ uri: avatarUri || resolvedAvatar }}
+              style={styles.heroAvatarImg}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.heroAvatarInitials}>{heroInitials}</Text>
+          )}
+        </TouchableOpacity>
 
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[
-                    styles.availPill,
-                    {
-                      backgroundColor: selected
-                        ? palette.charcoal
-                        : palette.bgCard,
-                      borderColor: selected
-                        ? palette.charcoal
-                        : palette.borderStrong,
-                    },
-                  ]}
-                  onPress={() => onSelectAvailability?.(opt)}
-                  activeOpacity={0.8}
-                >
-                  <View
-                    style={[
-                      styles.availDot,
-                      {
-                        backgroundColor: selected ? '#FF4D00' : dotColor,
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.availPillText,
-                      {
-                        color: selected ? '#FFFFFF' : palette.textSecondary,
-                      },
-                    ]}
-                  >
-                    {opt}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+        <Text style={styles.heroOverline} numberOfLines={1}>
+          {heroOverline}
+        </Text>
+
+        <Text style={styles.heroName} numberOfLines={1}>
+          {heroDisplayName}
+        </Text>
+
+        <Text style={styles.heroSubtitle} numberOfLines={1}>
+          {heroSubtitleParts.join(' · ')}
+        </Text>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => {
+            onChangeAccountTab?.('profile');
+            setIsEditingProfile((prev) => !prev);
+          }}
+          style={styles.heroEditBtn}
+        >
+          <Text style={styles.heroEditBtnText}>
+            {isEditingProfile ? 'Done editing' : 'Edit profile'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Account Tabs Segmented Control */}
+      {/* Account Tabs Segmented Control (Customer Segmented Pill Track) */}
       <View
         style={[
           styles.accountTabsTrack,
-          { backgroundColor: palette.isDark ? palette.bgCard : '#ECEEF0' },
+          { backgroundColor: palette.pillTrackBg || (palette.isDark ? '#1E2025' : '#EFECE6') },
         ]}
       >
         {[
@@ -517,22 +398,22 @@ export default function RiderAccountView({
                 styles.accountTabBtn,
                 active && [
                   styles.accountTabBtnActive,
-                  { backgroundColor: palette.bgSheet },
+                  { backgroundColor: palette.pillActiveBg || '#141D2E' },
                 ],
               ]}
               onPress={() => onChangeAccountTab?.(tab.id)}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               <BootstrapIcon
                 name={tab.icon}
                 size={13}
-                color={active ? palette.orange : palette.textMuted}
+                color={active ? '#FFFFFF' : palette.textMuted}
               />
               <Text
                 style={[
                   styles.accountTabText,
                   {
-                    color: active ? palette.textPrimary : palette.textMuted,
+                    color: active ? '#FFFFFF' : palette.textMuted,
                     fontWeight: active ? '600' : '500',
                   },
                 ]}
@@ -545,7 +426,7 @@ export default function RiderAccountView({
         })}
       </View>
 
-      {/* ─── TAB 1: PERSONAL INFORMATION EDITOR ─── */}
+      {/* ─── TAB 1: PERSONAL INFORMATION CARD (Customer Profile Style) ─── */}
       {accountTab === 'profile' ? (
         <View
           style={[
@@ -554,15 +435,77 @@ export default function RiderAccountView({
             {
               backgroundColor: palette.bgCard,
               borderColor: palette.border,
+              paddingBottom: isEditingProfile ? 16 : 6,
             },
           ]}
         >
-          <Text style={[styles.cardHeading, { color: palette.textPrimary }]}>
-            Personal information
-          </Text>
-          <Text style={[styles.cardSubheading, { color: palette.textMuted }]}>
-            Keep your rider contact details accurate for dispatch and customers.
-          </Text>
+          <View
+            style={[
+              styles.personalInfoHeader,
+              { marginBottom: isEditingProfile ? 10 : 6 },
+            ]}
+          >
+            <Text style={[styles.cardHeading, { color: palette.textPrimary }]}>
+              Personal information
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.editToggleBtn,
+                {
+                  borderColor: palette.borderStrong,
+                  backgroundColor: isEditingProfile
+                    ? palette.bgMuted
+                    : palette.bgCard,
+                },
+              ]}
+              onPress={() => setIsEditingProfile((prev) => !prev)}
+              activeOpacity={0.75}
+            >
+              <Text
+                style={[styles.editToggleText, { color: palette.textPrimary }]}
+              >
+                {isEditingProfile ? 'Cancel' : 'Edit'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {!isEditingProfile ? (
+            <View>
+              {infoRows.map((row, idx) => (
+                <View
+                  key={row.label}
+                  style={[
+                    styles.infoRow,
+                    idx < infoRows.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: palette.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.infoRowLabel, { color: palette.textMuted }]}
+                  >
+                    {row.label}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.infoRowValue,
+                      { color: palette.textPrimary },
+                    ]}
+                  >
+                    {row.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <>
+              <Text
+                style={[styles.cardSubheading, { color: palette.textMuted }]}
+              >
+                Keep your rider contact details accurate for dispatch and customers.
+              </Text>
 
           <View style={styles.fieldGroup}>
             <Text style={[styles.fieldLabel, { color: palette.textSecondary }]}>
@@ -790,6 +733,8 @@ export default function RiderAccountView({
               </>
             )}
           </TouchableOpacity>
+            </>
+          )}
         </View>
       ) : null}
 
@@ -829,15 +774,15 @@ export default function RiderAccountView({
             />
 
             <SettingToggleRow
-              icon="chat-dots"
-              title="SMS delivery updates"
-              description="Receive text alerts for urgent COD dispatches and customer notes"
-              value={Boolean(preferences?.smsUpdates)}
+              icon="envelope"
+              title="Email delivery updates"
+              description="Receive email alerts for urgent COD dispatches and customer notes"
+              value={Boolean(preferences?.emailUpdates ?? preferences?.smsUpdates)}
               onToggle={(val) =>
                 onUpdatePreference?.(
-                  'smsUpdates',
+                  'emailUpdates',
                   val,
-                  `SMS delivery updates ${val ? 'enabled' : 'disabled'}.`
+                  `Email delivery updates ${val ? 'enabled' : 'disabled'}.`
                 )
               }
               palette={palette}
@@ -1281,13 +1226,126 @@ export default function RiderAccountView({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingTop: 10,
     gap: 14,
   },
-  identityCard: {
-    borderRadius: 16,
+  heroProfileCard: {
+    backgroundColor: '#152923',
+    borderColor: '#1E3730',
     borderWidth: 1,
-    padding: 15,
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  heroAvatarCircle: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: '#EA580C',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  heroAvatarInitials: {
+    fontFamily: RIDER_FONT,
+    fontSize: 25,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  heroOverline: {
+    fontFamily: RIDER_FONT,
+    marginTop: 14,
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: '#6BB39B',
+    textTransform: 'uppercase',
+  },
+  heroName: {
+    fontFamily: RIDER_FONT,
+    marginTop: 5,
+    fontSize: 21,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  heroSubtitle: {
+    fontFamily: RIDER_FONT,
+    marginTop: 4,
+    fontSize: 12.5,
+    fontWeight: '400',
+    color: '#B5C5BF',
+    textAlign: 'center',
+  },
+  heroEditBtn: {
+    marginTop: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroEditBtnText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#18181B',
+  },
+  personalInfoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  editToggleBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  editToggleText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 13,
+  },
+  infoRowLabel: {
+    fontFamily: RIDER_FONT,
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  infoRowValue: {
+    fontFamily: RIDER_FONT,
+    fontSize: 13,
+    fontWeight: '500',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  identityCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
   },
   identityTopRow: {
     flexDirection: 'row',
@@ -1315,10 +1373,10 @@ const styles = StyleSheet.create({
   },
   riderFullName: {
     fontFamily: RIDER_FONT,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
     flexShrink: 1,
   },
   badgesWrap: {
@@ -1332,8 +1390,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -1343,8 +1401,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   riderIdPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
     borderRadius: 999,
   },
   riderIdPillText: {
@@ -1367,17 +1425,17 @@ const styles = StyleSheet.create({
   },
   availabilityBlock: {
     marginTop: 14,
-    padding: 11,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 16,
     borderWidth: 1,
   },
   availabilityCaption: {
     fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10.5,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    letterSpacing: 0.7,
+    marginBottom: 9,
   },
   availabilityPillsRow: {
     flexDirection: 'row',
@@ -1386,7 +1444,7 @@ const styles = StyleSheet.create({
   availPill: {
     flex: 1,
     minHeight: 38,
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1406,14 +1464,14 @@ const styles = StyleSheet.create({
   },
   accountTabsTrack: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 9999,
     padding: 4,
     gap: 4,
   },
   accountTabBtn: {
     flex: 1,
     minHeight: 40,
-    borderRadius: 9,
+    borderRadius: 9999,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1421,7 +1479,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   accountTabBtnActive: {
-    shadowColor: '#202426',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
@@ -1429,18 +1487,19 @@ const styles = StyleSheet.create({
   },
   accountTabText: {
     fontFamily: RIDER_FONT,
-    fontSize: 12,
+    fontSize: 12.5,
   },
   formCard: {
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 15,
+    padding: 16,
   },
   cardHeading: {
     fontFamily: RIDER_FONT,
-    fontSize: 15.5,
-    lineHeight: 21,
-    fontWeight: '600',
+    fontSize: 16.5,
+    lineHeight: 22,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   cardSubheading: {
     fontFamily: RIDER_FONT,
@@ -1464,9 +1523,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     minHeight: 46,
-    borderRadius: 11,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 13,
   },
   textAreaWrap: {
     alignItems: 'flex-start',
@@ -1489,7 +1548,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: 11,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1504,7 +1563,7 @@ const styles = StyleSheet.create({
   },
   primarySaveBtn: {
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

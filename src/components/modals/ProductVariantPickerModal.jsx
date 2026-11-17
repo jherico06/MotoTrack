@@ -49,13 +49,13 @@ export default function ProductVariantPickerModal({
   const { isDarkMode: themeDark } = useTheme();
   const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
 
-  const sheetBg = isDarkMode ? '#1C2025' : '#FFFFFF';
-  const subBg = isDarkMode ? '#181B1F' : '#F8FAFC';
-  const elevatedBg = isDarkMode ? '#252A30' : '#F1F5F9';
-  const borderCol = isDarkMode ? '#282D34' : '#E2E8F0';
-  const dividerCol = isDarkMode ? '#282D34' : '#F1F5F9';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const sheetBg = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const subBg = isDarkMode ? '#18181B' : '#F8FAFC';
+  const elevatedBg = isDarkMode ? '#202124' : '#F1F5F9';
+  const borderCol = isDarkMode ? '#303236' : '#E2E8F0';
+  const dividerCol = isDarkMode ? '#303236' : '#F1F5F9';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
   const brandAccent = isDarkMode ? '#FB923C' : '#EA580C';
   const colorEntries = useMemo(() => getProductColorEntries(product), [product]);
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
@@ -360,7 +360,7 @@ export default function ProductVariantPickerModal({
                 <BootstrapIcon
                   name="exclamation-circle-fill"
                   size={14}
-                  color={isDarkMode ? '#F87171' : '#EF4444'}
+                  color={isDarkMode ? '#F04444' : '#EF4444'}
                 />
                 <Text style={{ color: isDarkMode ? '#FCA5A5' : '#DC2626', fontSize: 12, fontWeight: '700' }}>
                   {validationError}
@@ -379,7 +379,7 @@ export default function ProductVariantPickerModal({
                     <Text
                       style={{
                         fontSize: 12,
-                        color: isDarkMode ? '#F87171' : '#DC2626',
+                        color: isDarkMode ? '#F04444' : '#DC2626',
                         fontWeight: '700',
                       }}
                     >
@@ -512,7 +512,7 @@ export default function ProductVariantPickerModal({
                           <Text
                             style={[
                               styles.sizeChipPrice,
-                              { color: isDarkMode ? '#F87171' : '#EF4444' },
+                              { color: isDarkMode ? '#F04444' : '#EF4444' },
                             ]}
                           >
                             Sold out

@@ -321,7 +321,7 @@ export default function BookingCalendar({
           paddingTop: isMobile ? 14 : 20,
           paddingBottom: isMobile ? 12 : 16,
           borderBottomWidth: 1,
-          borderBottomColor: isDark ? '#374151' : '#32373D',
+          borderBottomColor: isDark ? '#303236' : '#32373D',
         }}
       >
         {/* ── 1. Top Header Row ── */}
@@ -736,13 +736,13 @@ export default function BookingCalendar({
                         <BootstrapIcon
                           name={isFullyBooked ? 'slash-circle' : 'tools'}
                           size={isMobile ? 8 : 9}
-                          color={isFullyBooked ? (isDark ? '#F87171' : '#DC2626') : '#EA580C'}
+                          color={isFullyBooked ? (isDark ? '#F04444' : '#DC2626') : '#EA580C'}
                         />
                         <Text
                           style={{
                             fontSize: isMobile ? 8 : 9.5,
                             fontWeight: '600',
-                            color: isFullyBooked ? (isDark ? '#F87171' : '#DC2626') : '#EA580C',
+                            color: isFullyBooked ? (isDark ? '#F04444' : '#DC2626') : '#EA580C',
                             fontVariant: ['tabular-nums'],
                           }}
                           numberOfLines={1}
@@ -868,7 +868,7 @@ export default function BookingCalendar({
                   paddingVertical: 4,
                   borderRadius: 20,
                   borderWidth: 1,
-                  borderColor: isDark ? '#EA580C' : '#A7F3D0',
+                  borderColor: isDark ? '#FF5A00' : '#A7F3D0',
                 }}
               >
                 <BootstrapIcon name="check-circle-fill" size={12} color="#EA580C" />
@@ -923,7 +923,7 @@ export default function BookingCalendar({
                       disabled={isBooked}
                       style={{
                         backgroundColor: theme.timeSelectBg,
-                        color: isBooked ? (isDark ? '#64748B' : '#94A3B8') : theme.timeSelectText,
+                        color: isBooked ? (isDark ? '#71717A' : '#94A3B8') : theme.timeSelectText,
                         fontWeight: selectedTime === slotStr ? '600' : '500',
                       }}
                     >

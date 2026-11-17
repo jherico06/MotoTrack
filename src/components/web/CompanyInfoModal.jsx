@@ -17,21 +17,21 @@ import { fontFamily, fontWeights } from '../../styles/typography.js';
 const getPillars = (isDark) => [
   {
     icon: 'patch-check-fill',
-    iconColor: isDark ? '#34D399' : '#059669',
+    iconColor: isDark ? '#00C98D' : '#059669',
     iconBg: isDark ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
     title: '100% Authentic Parts',
     desc: 'Direct authorized partnerships with Akrapovič, Brembo, Öhlins, Motul, and Pirelli. Every component is serial-verified and covered by factory warranty.',
   },
   {
     icon: 'speedometer2',
-    iconColor: isDark ? '#60A5FA' : '#2563EB',
+    iconColor: isDark ? '#3B82F6' : '#2563EB',
     iconBg: isDark ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF',
     title: 'Dynojet Pit Bays',
     desc: 'Our Flagship Center features 6 dedicated pit bays, calibrated chassis dyno cells, and certified master technicians for precision ECU remapping and engine overhauls.',
   },
   {
     icon: 'lightning-charge-fill',
-    iconColor: isDark ? '#FBBF24' : '#D97706',
+    iconColor: isDark ? '#F5B942' : '#D97706',
     iconBg: isDark ? 'rgba(245, 158, 11, 0.14)' : '#FEF3C7',
     title: 'Fast Track Dispatch',
     desc: 'Same-day courier dispatch across Metro Cebu and express nationwide delivery with live real-time GPS tracking from our hub to your doorstep.',
@@ -229,7 +229,7 @@ export default function CompanyInfoModal({
               activeOpacity={0.7}
               accessibilityLabel="Close modal"
             >
-              <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+              <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
@@ -252,7 +252,7 @@ export default function CompanyInfoModal({
                     <BootstrapIcon
                       name={tab.icon}
                       size={14}
-                      color={isActive ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B'}
+                      color={isActive ? '#EA580C' : isDarkMode ? '#A1A1AA' : '#64748B'}
                     />
                     <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
                       {tab.label}
@@ -501,14 +501,14 @@ export default function CompanyInfoModal({
 }
 
 const createStyles = (isDark = false) => {
-  const bgDialog = isDark ? '#1C2025' : '#FFFFFF';
-  const bgSub = isDark ? '#181B1F' : '#F8FAFC';
-  const bgElevated = isDark ? '#252A30' : '#F1F5F9';
-  const border = isDark ? '#282D34' : '#E2E8F0';
+  const bgDialog = isDark ? '#191A1D' : '#FFFFFF';
+  const bgSub = isDark ? '#18181B' : '#F8FAFC';
+  const bgElevated = isDark ? '#202124' : '#F1F5F9';
+  const border = isDark ? '#303236' : '#E2E8F0';
   const borderLight = isDark ? '#242930' : '#F1F5F9';
-  const textPrimary = isDark ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDark ? '#CBD5E1' : '#475569';
-  const textMuted = isDark ? '#94A3B8' : '#64748B';
+  const textPrimary = isDark ? '#F2F2F3' : '#0F172A';
+  const textSecondary = isDark ? '#A1A1AA' : '#475569';
+  const textMuted = isDark ? '#A1A1AA' : '#64748B';
   const orangeSoft = isDark ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED';
   const orangeBorder = isDark ? 'rgba(234, 88, 12, 0.32)' : '#FED7AA';
 
@@ -800,7 +800,7 @@ const createStyles = (isDark = false) => {
       color: isDark ? '#FB923C' : '#EA580C',
     },
     copyPillTextCopied: {
-      color: isDark ? '#34D399' : '#059669',
+      color: isDark ? '#00C98D' : '#059669',
     },
     statusBadge: {
       alignSelf: 'flex-start',

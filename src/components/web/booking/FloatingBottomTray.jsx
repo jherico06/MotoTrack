@@ -4,6 +4,7 @@
 // =========================================================================
 
 import React from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { BootstrapIcon } from '../../common';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
@@ -14,6 +15,8 @@ export default function FloatingBottomTray({
   onProceed,
   onClear,
 }) {
+  const { isDarkMode } = useTheme();
+  const trayStyles = get_trayStyles(isDarkMode);
   if (!selectedPackages || selectedPackages.length === 0) {
     return null;
   }
@@ -75,7 +78,13 @@ export default function FloatingBottomTray({
   );
 }
 
-const trayStyles = StyleSheet.create({
+let _light_trayStyles = null;
+let _dark_trayStyles = null;
+function get_trayStyles(isDarkMode) {
+  if (isDarkMode && _dark_trayStyles) return _dark_trayStyles;
+  if (!isDarkMode && _light_trayStyles) return _light_trayStyles;
+  const created = StyleSheet.create({
+
   trayFixedContainer: {
     position: Platform.select({ web: 'fixed', default: 'absolute' }),
     bottom: 20,
@@ -89,10 +98,10 @@ const trayStyles = StyleSheet.create({
   trayCard: {
     width: '100%',
     maxWidth: 960,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
     paddingHorizontal: 20,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -134,7 +143,7 @@ const trayStyles = StyleSheet.create({
   summaryLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   pillsRow: {
     flexDirection: 'row',
@@ -153,7 +162,7 @@ const trayStyles = StyleSheet.create({
   pkgPillText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
   },
   rightCol: {
     flexDirection: 'row',
@@ -207,5 +216,10 @@ const trayStyles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },
-});
+
+  });
+  if (isDarkMode) _dark_trayStyles = created;
+  else _light_trayStyles = created;
+  return created;
+}
 

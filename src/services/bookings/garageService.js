@@ -2318,7 +2318,7 @@ export const garageService = {
       });
     }
 
-    // Persist downpayment transaction into Supabase payments table
+    // Persist downpayment transaction into Supabase payments table (deduplicated / linked)
     if (
       booking.downpayment_paid ||
       booking.deposit_paid ||
@@ -2327,16 +2327,26 @@ export const garageService = {
       Number(booking.amount_paid || 0) > 0
     ) {
       try {
-        await xenditPaymentService.recordPaymentTransaction({
-          bookingId: bookingId,
-          customerId: booking.customer_id || booking.user_id,
-          amount: booking.downpayment_amount || booking.amount_paid || downpaymentAmount,
-          paymentMethod: booking.downpayment_method || booking.payment_method || 'Online (GCash / Card)',
-          referenceNumber: booking.downpayment_ref || booking.transaction_ref || `DP-${bookingId}`,
-          transactionRef: booking.transaction_ref || `TXN-${bookingId}`,
-          status: 'Completed',
-          notes: `Downpayment for booking #${bookingId} (${booking.service_title})`,
-        });
+        if (newBookingData.xenditPaymentId || newBookingData.xenditInvoiceId) {
+          await xenditPaymentService.linkPaymentToBooking({
+            invoiceId: newBookingData.xenditInvoiceId || booking.transaction_ref,
+            paymentId: newBookingData.xenditPaymentId,
+            bookingId,
+            notes: `Downpayment for booking #${bookingId} (${booking.service_title})`,
+          });
+        } else {
+          await xenditPaymentService.recordPaymentTransaction({
+            bookingId: bookingId,
+            customerId: booking.customer_id || booking.user_id,
+            amount: booking.downpayment_amount || booking.amount_paid || downpaymentAmount,
+            paymentType: 'DOWNPAYMENT',
+            paymentMethod: booking.downpayment_method || booking.payment_method || 'GCash (Xendit)',
+            referenceNumber: booking.downpayment_ref || booking.transaction_ref || `DP-${bookingId}`,
+            transactionRef: booking.transaction_ref || booking.downpayment_ref || `TXN-${bookingId}`,
+            status: 'Completed',
+            notes: `Downpayment for booking #${bookingId} (${booking.service_title})`,
+          });
+        }
       } catch (payErr) {
         console.warn('[GarageService] Downpayment payment log notice:', payErr);
       }
@@ -2571,15 +2581,17 @@ export const garageService = {
 
     const updated = await this.updateBooking(bookingId, patch);
 
-    // Ensure payment transaction record is persisted in Supabase payments table
+    // Ensure payment transaction record exists in Supabase payments table (deduplicated)
     if (patch.downpayment_paid) {
       try {
         await xenditPaymentService.recordPaymentTransaction({
           bookingId: bookingId,
           customerId: local?.customer_id || local?.user_id,
           amount: patch.downpayment_amount || patch.amount_paid || 0,
-          paymentMethod: local?.downpayment_method || local?.payment_method || 'Online (GCash / Card)',
+          paymentType: 'DOWNPAYMENT',
+          paymentMethod: local?.downpayment_method || local?.payment_method || 'GCash (Xendit)',
           referenceNumber: local?.downpayment_ref || `DP-${bookingId}`,
+          transactionRef: local?.transaction_ref || local?.downpayment_ref || `DP-${bookingId}`,
           status: 'Completed',
           notes: `Downpayment verified for booking #${bookingId} (${local?.service_title || 'Service'})`,
         });
@@ -3661,32 +3673,48 @@ export const garageService = {
     let updatedBooking = null;
     const existing = current.find((b) => b.id === bookingId || b.booking_id === bookingId);
     const flexible = isFlexibleBooking(existing);
-    // Flexible bookings only forfeit if a downpayment was actually paid
-    const noChargeCancel = flexible && Number(existing?.amount_paid || 0) <= 0;
+    const paidDp = Math.round(
+      Number(
+        existing?.amount_paid ||
+          existing?.downpayment_amount ||
+          (flexible ? 0 : Math.round((existing?.pricePhp || 2500) * 0.2))
+      ) * 100
+    ) / 100;
+    const noChargeCancel = flexible && paidDp <= 0;
     const newStatus = flexible ? FLEX_BOOKING_STATUS.CANCELLED : 'Cancelled';
+    const halfRefundAmount = noChargeCancel ? 0 : Math.round(paidDp * 0.5 * 100) / 100;
+    const nowIso = new Date().toISOString();
 
     const updated = current.map((b) => {
       if (b.id === bookingId || b.booking_id === bookingId) {
-        const dpAmount = Number(
-          b.amount_paid ||
-            (b.downpayment_amount !== undefined ? b.downpayment_amount : Math.round((b.pricePhp || 2500) * 0.2))
-        );
+        const dpAmount = Math.round(
+          Number(
+            b.amount_paid ||
+              b.downpayment_amount ||
+              (flexible ? 0 : Math.round((b.pricePhp || 2500) * 0.2))
+          ) * 100
+        ) / 100;
+        const itemRefundAmount = noChargeCancel ? 0 : Math.round(dpAmount * 0.5 * 100) / 100;
         updatedBooking = noChargeCancel
           ? {
               ...b,
               status: newStatus,
               cancellation_reason: reason,
+              cancelled_reason: reason,
               current_stage: 'Service request cancelled by customer',
-              updated_at: new Date().toISOString(),
+              updated_at: nowIso,
             }
           : {
               ...b,
               status: newStatus,
               cancellation_reason: reason,
-              downpayment_status: 'Forfeited (Non-refundable policy applied)',
-              refund_status: 'Non-refundable (Forfeited)',
-              current_stage: `Appointment Cancelled • ₱${dpAmount.toLocaleString()} Downpayment Forfeited (Non-Refundable Policy)`,
-              updated_at: new Date().toISOString(),
+              cancelled_reason: reason,
+              downpayment_status: '50% Refund Pending',
+              refund_status: 'Pending 50% Refund',
+              refund_amount: itemRefundAmount,
+              refund_notes: `Customer cancelled · 50% of ₱${dpAmount.toLocaleString()} (₱${itemRefundAmount.toLocaleString()}) pending admin refund`,
+              current_stage: `Cancelled · 50% Refund Pending (₱${itemRefundAmount.toLocaleString()})`,
+              updated_at: nowIso,
             };
         return updatedBooking;
       }
@@ -3698,17 +3726,54 @@ export const garageService = {
     try {
       const client = supabaseManager.getClient();
       if (client) {
+        const dbPatch = noChargeCancel
+          ? {
+              status: newStatus,
+              cancelled_reason: reason,
+              notes: `${reason} | cancelled before payment`,
+              current_stage: updatedBooking?.current_stage || 'Cancelled',
+              updated_at: nowIso,
+            }
+          : {
+              status: newStatus,
+              cancelled_reason: reason,
+              refund_status: 'Pending 50% Refund',
+              refund_amount: halfRefundAmount,
+              refund_notes: `Customer cancelled · 50% downpayment refund (₱${halfRefundAmount.toLocaleString()}) pending admin refund`,
+              notes: `${reason} | 50% downpayment refund pending (₱${halfRefundAmount.toLocaleString()})`,
+              current_stage:
+                updatedBooking?.current_stage ||
+                `Cancelled · 50% Refund Pending (₱${halfRefundAmount.toLocaleString()})`,
+              updated_at: nowIso,
+            };
+
         await client
           .from('bookings')
-          .update({
-            status: newStatus,
-            notes: noChargeCancel
-              ? `${reason} | cancelled before payment`
-              : `${reason} | downpayment forfeited (non-refundable)`,
-            current_stage: updatedBooking?.current_stage || 'Cancelled',
-            updated_at: new Date().toISOString(),
-          })
+          .update(dbPatch)
           .eq('booking_id', bookingId);
+
+        try {
+          await client.from('booking_status_history').insert([
+            {
+              history_id: `HIS-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              booking_id: bookingId,
+              from_status: existing?.status || 'UNKNOWN',
+              to_status: newStatus,
+              event_type: 'BOOKING_CANCELLED',
+              description: noChargeCancel
+                ? `Customer cancelled before payment (${reason})`
+                : `Customer cancelled · 50% downpayment refund (₱${halfRefundAmount.toLocaleString()}) pending admin review`,
+              changed_by: updatedBooking?.customer_name || 'Customer',
+              actor_role: 'customer',
+              notes: reason,
+              metadata: {
+                downpayment_amount: paidDp,
+                refund_amount: halfRefundAmount,
+                refund_status: noChargeCancel ? null : 'Pending 50% Refund',
+              },
+            },
+          ]);
+        } catch (_histErr) {}
       }
     } catch (e) {
       console.warn('Supabase cancelBooking error:', e);
@@ -3724,10 +3789,12 @@ export const garageService = {
           customer_email: updatedBooking?.customer_email || updatedBooking?.userEmail,
           customer_name: updatedBooking?.customer_name || updatedBooking?.userName,
           customer_id: updatedBooking?.customer_id,
-          title: noChargeCancel ? 'Service Request Cancelled' : 'Pit Bay Booking Cancelled (Downpayment Forfeited)',
+          title: noChargeCancel
+            ? 'Service Request Cancelled'
+            : 'Booking Cancelled (50% Refund Pending)',
           message: noChargeCancel
             ? `Your service request #${bookingId} has been cancelled. No payment was charged.`
-            : `Your appointment #${bookingId} has been cancelled. In accordance with our anti-fake booking policy, the advance downpayment is non-refundable.`,
+            : `Your booking #${bookingId} has been cancelled. A 50% downpayment refund of ₱${halfRefundAmount.toLocaleString()} (from your ₱${paidDp.toLocaleString()} deposit) is pending admin processing.`,
           type: 'booking',
           category: 'booking_cancelled',
           link: 'bookings',
@@ -3737,6 +3804,7 @@ export const garageService = {
             customerId: updatedBooking?.customer_id,
             customerEmail: updatedBooking?.customer_email || updatedBooking?.userEmail,
             customerName: updatedBooking?.customer_name || updatedBooking?.userName,
+            refundAmount: halfRefundAmount,
           },
         });
       }
@@ -3745,7 +3813,9 @@ export const garageService = {
           bookingId,
           customerName: updatedBooking?.customer_name || 'Customer',
           serviceType: updatedBooking?.service_title || 'Pitstop Service',
-          reason,
+          reason: noChargeCancel
+            ? reason
+            : `${reason} — 50% downpayment refund due: ₱${halfRefundAmount.toLocaleString()}`,
         });
       }
       if (auditLogService?.logGarageAction) {

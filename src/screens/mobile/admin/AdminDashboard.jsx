@@ -18,6 +18,8 @@ import { adminStyles as styles } from '../../../styles/admin.styles.js';
 import { productService, resolveReorderLevel, isLowStock } from '../../../services/products/productService.js';
 import { promoService } from '../../../services/products/promoService.js';
 import { garageService } from '../../../services/bookings/garageService.js';
+import { rescheduleService, RESCHEDULE_STATUS } from '../../../services/bookings/rescheduleService.js';
+import { adminSecurityService } from '../../../services/auth/adminSecurityService.js';
 import { orderService } from '../../../services/orders/orderService.js';
 import { deliveryService } from '../../../services/delivery/deliveryService.js';
 import {
@@ -31,11 +33,11 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { authService } from '../../../services/auth/authService.js';
 import { CATEGORY_NAMES } from '../../../data/motorParts.js';
 import { AdminStatCard, BootstrapIcon, ExpectedDeliveryEditor } from '../../../components/common';
-import { AssignDeliveryModal, DeliveryAdminActionModal, DeliveryTokenModal, RiderAccessModal, AdminAccountSettingsModal, AdminOrderDetailsModal } from '../../../components/modals';
+import { AdminPinLockScreen, AssignDeliveryModal, DeliveryAdminActionModal, DeliveryTokenModal, RiderAccessModal, AdminAccountSettingsModal, AdminOrderDetailsModal } from '../../../components/modals';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import NotificationsPage from '../customer/NotificationsPage.jsx';
-import { SalesForecastPanel, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, PromosAdminPanel, DashboardInsightsPanel, AdminProfileLogsPanel } from '../../../components/admin';
+import { SalesForecastPanel, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, PromosAdminPanel, DashboardInsightsPanel, AdminProfileLogsPanel, AdminCustomerRatingsReportsPanel, AdminRescheduleModal, MotorcycleModelsAdminPanel, AdminBookingDetailsPanel } from '../../../components/admin';
 import {
   buildDashboardInsights,
   computeInventoryKpis,
@@ -213,7 +215,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
   };
 
-  // Active Navigation Tab: 'overview' | 'orders' | 'inventory' | 'pos' | 'analytics' | 'forecast' | 'products' | 'promos' | 'garage' | 'users'
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() =>
+    adminSecurityService.isSessionUnlocked(currentUser)
+  );
+  useEffect(() => {
+    setIsAdminUnlocked(adminSecurityService.isSessionUnlocked(currentUser));
+  }, [currentUser?.id]);
+
+  // Active Navigation Tab: 'overview' | 'orders' | 'inventory' | 'pos' | 'analytics' | 'forecast' | 'products' | 'promos' | 'moto_models' | 'garage' | 'users' | 'ratings_reports'
   const [activeNav, setActiveNav] = useState('overview');
   const [inventorySubTab, setInventorySubTab] = useState('telemetry'); // 'telemetry' | 'catalog'
   useEffect(() => {
@@ -346,6 +355,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [garageMechanics, setGarageMechanics] = useState(() => garageService.getMechanics());
   const [selectedBookingForApproval, setSelectedBookingForApproval] = useState(null);
   const [selectedMechanicForApproval, setSelectedMechanicForApproval] = useState('');
+  const [rescheduleRequests, setRescheduleRequests] = useState(() => rescheduleService.getAllRequests());
+  const [selectedRescheduleRequest, setSelectedRescheduleRequest] = useState(null);
+  const [selectedBookingForDetails, setSelectedBookingForDetails] = useState(null);
 
   // ─── RIDERS / DELIVERY STAFF STATE ───
   const [deliveryRiders, setDeliveryRiders] = useState(() => riderService.getRiders());
@@ -533,6 +545,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     } catch (_e) {
       setGarageBookings(garageService.getLocalBookings());
     }
+    setRescheduleRequests(rescheduleService.getAllRequests());
 
     try {
       const riders = await riderService.fetchRiders();
@@ -571,6 +584,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
     const unsubscribeBookings = garageService.subscribeBookings((bks) => {
       if (Array.isArray(bks)) setGarageBookings(bks);
+      setRescheduleRequests(rescheduleService.getAllRequests());
     });
     return () => {
       unsubscribeProd();
@@ -2253,9 +2267,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     forecast: '📊 Sales Forecast Optimization',
     products: '📦 Inventory & Products Management',
     promos: '🎟️ Promo Vouchers & Discounts',
+    moto_models: '🏍️ Motorcycle Models Catalog',
     garage: '🛠️ Bookings (PMS & Tuning)',
     riders: '🛵 Riders / Delivery Staff',
     users: '👥 Users Management',
+    ratings_reports: '⭐ Customer Ratings & Reports',
     notifications: '🔔 Notifications & Alerts Center',
     settings: '⚙️ System & Platform Settings',
     profile: '👤 Administrator Profile',
@@ -2264,6 +2280,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   return (
     <SafeAreaView style={[styles.container, !isDesktop && { backgroundColor: '#24272B' }, Platform.OS === 'android' && { paddingTop: 35 }]}>
       <StatusBar style={!isDesktop ? 'light' : isDarkMode ? 'light' : 'dark'} />
+      <AdminPinLockScreen
+        visible={!isAdminUnlocked}
+        isDarkMode={isDarkMode}
+        onUnlockSuccess={() => {
+          adminSecurityService.unlockSession(currentUser);
+          setIsAdminUnlocked(true);
+          showToast('Store Admin Console Unlocked');
+        }}
+        onNavigateToStore={onNavigateToStore}
+        adminUser={currentUser}
+      />
       {/* Toast Notification */}
       {toastMessage ? (
         <View
@@ -2466,6 +2493,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   {activeNav === 'promos' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
+                {/* 7.5 Motorcycle Models Catalog */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'moto_models' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('moto_models')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon name="speedometer2" size={16} color={activeNav === 'moto_models' ? '#FFFFFF' : '#64748B'} />
+                  </View>
+                  <Text style={[styles.sidebarNavLabel, activeNav === 'moto_models' && styles.sidebarNavLabelActive]}>
+                    Motorcycle Models
+                  </Text>
+                  {activeNav === 'moto_models' && <View style={styles.sidebarActiveDot} />}
+                </TouchableOpacity>
+
                 {/* ─── SECTION 3: GARAGE & SERVICES ─── */}
                 <Text style={styles.navHeading}>GARAGE & SERVICES</Text>
 
@@ -2520,6 +2562,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     User Accounts
                   </Text>
                   {activeNav === 'users' && <View style={styles.sidebarActiveDot} />}
+                </TouchableOpacity>
+
+                {/* 9.5 Ratings & Reports */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'ratings_reports' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('ratings_reports')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon name="chat-square-quote-fill" size={16} color={activeNav === 'ratings_reports' ? '#FFFFFF' : '#64748B'} />
+                  </View>
+                  <Text style={[styles.sidebarNavLabel, activeNav === 'ratings_reports' && styles.sidebarNavLabelActive]}>
+                    Ratings & Reports
+                  </Text>
+                  {activeNav === 'ratings_reports' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -5041,6 +5098,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                   {[
                     { id: 'bookings', label: 'Bookings', count: garageBookings.length },
+                    {
+                      id: 'reschedules',
+                      label: 'Reschedules',
+                      count: rescheduleRequests.filter(
+                        (r) =>
+                          r.status === RESCHEDULE_STATUS.PENDING_REVIEW ||
+                          r.status === RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED
+                      ).length,
+                    },
                     { id: 'packages', label: 'Packages', count: garageServices.length },
                   ].map((tab) => {
                     const active = garageSubTab === tab.id;
@@ -5058,7 +5124,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           alignItems: 'center',
                         }}
                       >
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#FFFFFF' : '#475569' }}>
+                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: active ? '#FFFFFF' : '#475569' }}>
                           {tab.label} ({tab.count})
                         </Text>
                       </TouchableOpacity>
@@ -5077,17 +5143,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </View>
                     ) : (
                       garageBookings.map((b) => {
-                        const isPending = String(b.status || '').toLowerCase() === 'pending';
+                        const normStatus = String(b.status || '')
+                          .toLowerCase()
+                          .replace(/[\s_-]+/g, '_');
+                        const isQuickApprovable = normStatus === 'pending' || normStatus === 'pending_review';
+                        const isReviewBadge = [
+                          'pending',
+                          'pending_review',
+                          'awaiting_downpayment',
+                          'quotation_sent',
+                          'under_inspection',
+                          'estimate_submitted',
+                          'awaiting_customer_approval',
+                        ].includes(normStatus);
                         return (
                           <View key={b.id || b.booking_id} style={[styles.tableRow, { flexDirection: 'column', alignItems: 'stretch' }]}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
                               <View style={{ flex: 1 }}>
                                 <Text style={styles.tableTitle}>{b.package_name || b.service_title || b.serviceName}</Text>
                                 <Text style={styles.tableSub}>
-                                  {b.customer_name || b.userName} • {b.appointment_date || b.date} • {b.time_slot || b.time}
+                                  {b.customer_name || b.userName} • {b.appointment_date || b.date || b.preferred_date} • {b.time_slot || b.time || b.preferred_time}
                                 </Text>
                                 <Text style={styles.tableSub}>
-                                  {(b.bike_brand || b.bikeBrand || '')} {(b.bike_model || b.bikeModel || '')} • {b.plate_number || b.bikePlate}
+                                  {(b.bike_brand || b.bikeBrand || '')} {(b.bike_model || b.bikeModel || '')} • {b.plate_number || b.bikePlate || b.motorcycle_plate || 'No plate'}
                                 </Text>
                               </View>
                               <View
@@ -5095,34 +5173,116 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   paddingHorizontal: 8,
                                   paddingVertical: 4,
                                   borderRadius: 8,
-                                  backgroundColor: isPending ? '#FEF3C7' : '#C8DDD3',
+                                  backgroundColor: isReviewBadge ? '#FEF3C7' : '#C8DDD3',
                                   alignSelf: 'flex-start',
                                 }}
                               >
-                                <Text style={{ fontSize: 11, fontWeight: '800', color: isPending ? '#D97706' : '#EA580C' }}>
-                                  {isPending ? 'Pending Approval' : b.status}
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: isReviewBadge ? '#D97706' : '#EA580C' }}>
+                                  {isQuickApprovable ? 'Pending Review' : b.status}
                                 </Text>
                               </View>
                             </View>
-                            {isPending && (
-                              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                                <TouchableOpacity
-                                  style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
-                                  onPress={() => {
-                                    setSelectedBookingForApproval(b);
-                                    setSelectedMechanicForApproval(garageMechanics[0]?.name || '');
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.quickStoreBtn,
+                                  { flex: 1, justifyContent: 'center', backgroundColor: '#F8FAFC', borderColor: '#CBD5E1' },
+                                ]}
+                                onPress={() => setSelectedBookingForDetails(b)}
+                              >
+                                <Text style={[styles.quickStoreBtnText, { color: '#0F172A' }]}>Details / Quote</Text>
+                              </TouchableOpacity>
+                              {isQuickApprovable && (
+                                <>
+                                  <TouchableOpacity
+                                    style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
+                                    onPress={() => {
+                                      setSelectedBookingForApproval(b);
+                                      setSelectedMechanicForApproval(garageMechanics[0]?.name || '');
+                                    }}
+                                  >
+                                    <Text style={styles.addBtnPrimaryText}>Approve</Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={[styles.quickStoreBtn, { flex: 1, justifyContent: 'center', backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}
+                                    onPress={() => handleAdvisorReject(b.id || b.booking_id)}
+                                  >
+                                    <Text style={[styles.quickStoreBtnText, { color: '#DC2626' }]}>Decline</Text>
+                                  </TouchableOpacity>
+                                </>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+
+                {garageSubTab === 'reschedules' && (
+                  <View style={styles.tableCard}>
+                    {rescheduleRequests.length === 0 ? (
+                      <View style={{ padding: 28, alignItems: 'center' }}>
+                        <BootstrapIcon name="calendar2-week" size={26} color="#94A3B8" />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B', marginTop: 8 }}>
+                          No reschedule requests yet
+                        </Text>
+                      </View>
+                    ) : (
+                      rescheduleRequests.map((reqItem) => {
+                        const isPendingReq =
+                          reqItem.status === RESCHEDULE_STATUS.PENDING_REVIEW ||
+                          reqItem.status === RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED;
+                        const isApprovedReq = reqItem.status === RESCHEDULE_STATUS.APPROVED;
+                        return (
+                          <View
+                            key={reqItem.id || reqItem.request_id}
+                            style={[styles.tableRow, { flexDirection: 'column', alignItems: 'stretch' }]}
+                          >
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.tableTitle}>
+                                  {reqItem.customer_name || 'Customer'} • {reqItem.service_title || reqItem.booking_id}
+                                </Text>
+                                <Text style={styles.tableSub}>
+                                  From: {reqItem.original_date} {reqItem.original_time} → Requested: {reqItem.requested_date} {reqItem.requested_time}
+                                </Text>
+                                {reqItem.reason ? (
+                                  <Text style={styles.tableSub} numberOfLines={2}>
+                                    Reason: {reqItem.reason}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <View
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                  borderRadius: 8,
+                                  backgroundColor: isPendingReq ? '#FEF3C7' : isApprovedReq ? '#DCFCE7' : '#FEE2E2',
+                                  alignSelf: 'flex-start',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: isPendingReq ? '#D97706' : isApprovedReq ? '#15803D' : '#DC2626',
                                   }}
                                 >
-                                  <Text style={styles.addBtnPrimaryText}>Approve</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[styles.quickStoreBtn, { flex: 1, justifyContent: 'center', backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}
-                                  onPress={() => handleAdvisorReject(b.id || b.booking_id)}
-                                >
-                                  <Text style={[styles.quickStoreBtnText, { color: '#DC2626' }]}>Decline</Text>
-                                </TouchableOpacity>
+                                  {reqItem.status}
+                                </Text>
                               </View>
-                            )}
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                              <TouchableOpacity
+                                style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
+                                onPress={() => setSelectedRescheduleRequest(reqItem)}
+                              >
+                                <Text style={styles.addBtnPrimaryText}>
+                                  {isPendingReq ? 'Review Reschedule' : 'View Decision'}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         );
                       })
@@ -6019,6 +6179,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 showConfirm={showConfirm}
                 isDesktop={isDesktop}
                 onNavigate={setActiveNav}
+              />
+            )}
+
+            {/* ─── TAB 13: RATINGS & CUSTOMER REPORTS ─── */}
+            {activeNav === 'ratings_reports' && (
+              <AdminCustomerRatingsReportsPanel
+                isDarkMode={false}
+                tokens={{}}
+                isDesktop={isDesktop}
+                currentUser={currentUser}
+                showToast={showToast}
+              />
+            )}
+
+            {/* ─── TAB 14: MOTORCYCLE MODELS CATALOG ─── */}
+            {activeNav === 'moto_models' && (
+              <MotorcycleModelsAdminPanel
+                isDarkMode={false}
+                onToast={showToast}
               />
             )}
           </ScrollView>
@@ -7773,6 +7952,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
               </TouchableOpacity>
 
+              {/* Ratings & Reports */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'ratings_reports' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('ratings_reports');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon name="chat-square-quote-fill" size={20} color={activeNav === 'ratings_reports' ? '#EA580C' : '#475569'} />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Ratings & Reports</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Reviews & issue tickets</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Motorcycle Models */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'moto_models' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('moto_models');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon name="speedometer2" size={20} color={activeNav === 'moto_models' ? '#EA580C' : '#475569'} />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Moto Models</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Bike fitment catalog</Text>
+                </View>
+              </TouchableOpacity>
+
               {/* Forecast & Stock */}
               <TouchableOpacity
                 style={[styles.mobileMoreCard, activeNav === 'forecast' && styles.mobileMoreCardActive]}
@@ -8232,6 +8441,73 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         onClose={() => setIsAdminAccountOpen(false)}
         onSaved={() => setIsAdminAccountOpen(false)}
         showToast={showToast}
+      />
+
+      {/* ─── MODAL: WORK ORDER / QUOTATION DETAILS PANEL ─── */}
+      <Modal
+        visible={Boolean(selectedBookingForDetails)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedBookingForDetails(null)}
+      >
+        <View style={[styles.modalOverlay, { padding: isDesktop ? 24 : 0 }]}>
+          <View
+            style={{
+              flex: 1,
+              width: '100%',
+              maxWidth: 980,
+              alignSelf: 'center',
+              marginTop: isDesktop ? 16 : 42,
+              backgroundColor: '#FFFFFF',
+              borderRadius: isDesktop ? 16 : 20,
+              overflow: 'hidden',
+            }}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Work Order & Booking Details</Text>
+              <TouchableOpacity onPress={() => setSelectedBookingForDetails(null)}>
+                <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            {selectedBookingForDetails ? (
+              <AdminBookingDetailsPanel
+                booking={selectedBookingForDetails}
+                onClose={() => setSelectedBookingForDetails(null)}
+                mechanics={garageMechanics}
+                onToast={showToast}
+                isDarkMode={false}
+                showConfirm={showConfirm}
+                isDesktop={isDesktop}
+                onBookingUpdated={(next, list) => {
+                  if (Array.isArray(list)) setGarageBookings(list);
+                  if (next) setSelectedBookingForDetails(next);
+                  setRescheduleRequests(rescheduleService.getAllRequests());
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── MODAL: RESCHEDULE REQUEST REVIEW ─── */}
+      <AdminRescheduleModal
+        visible={Boolean(selectedRescheduleRequest)}
+        request={selectedRescheduleRequest}
+        onClose={() => setSelectedRescheduleRequest(null)}
+        onRequestUpdated={() => {
+          setRescheduleRequests(rescheduleService.getAllRequests());
+          garageService
+            .getAllBookings()
+            .then((fresh) => {
+              if (Array.isArray(fresh)) setGarageBookings(fresh);
+            })
+            .catch(() => {
+              setGarageBookings(garageService.getLocalBookings());
+            });
+        }}
+        showToast={showToast}
+        isDarkMode={false}
+        adminName={currentUser?.fullName || currentUser?.name || currentUser?.email || 'Workshop Admin'}
       />
     </SafeAreaView>
   );

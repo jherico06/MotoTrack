@@ -132,7 +132,7 @@ function CompareBadge({ compare, isDark, tokens }) {
   if (!compare) {
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-        <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : tokens.textMuted }}>Not available</Text>
+        <Text style={{ fontSize: 11, color: isDark ? '#A1A1AA' : tokens.textMuted }}>Not available</Text>
       </View>
     );
   }
@@ -151,9 +151,9 @@ function CompareBadge({ compare, isDark, tokens }) {
             borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
           }}
         >
-          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted }}>N/A</Text>
+          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted }}>N/A</Text>
         </View>
-        <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : tokens.textMuted }}>
+        <Text style={{ fontSize: 11, color: isDark ? '#A1A1AA' : tokens.textMuted }}>
           {compare.message || 'Not available'}
         </Text>
       </View>
@@ -174,11 +174,11 @@ function CompareBadge({ compare, isDark, tokens }) {
             borderColor: isDark ? 'rgba(74, 222, 128, 0.35)' : '#A7F3D0',
           }}
         >
-          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDark ? '#4ADE80' : '#059669' }}>
+          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDark ? '#00C98D' : '#059669' }}>
             ↑ Active
           </Text>
         </View>
-        <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+        <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
           No sales in previous period
         </Text>
       </View>
@@ -199,11 +199,11 @@ function CompareBadge({ compare, isDark, tokens }) {
             borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
           }}
         >
-          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+          <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
             — 0%
           </Text>
         </View>
-        <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+        <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
           {compare.label}
         </Text>
       </View>
@@ -224,10 +224,10 @@ function CompareBadge({ compare, isDark, tokens }) {
     ? (isDark ? 'rgba(248, 113, 113, 0.35)' : '#FECACA')
     : (isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0');
   const badgeColor = isUp
-    ? (isDark ? '#4ADE80' : '#059669')
+    ? (isDark ? '#00C98D' : '#059669')
     : isDown
-    ? (isDark ? '#F87171' : '#DC2626')
-    : (isDark ? '#94A3B8' : tokens.textMuted);
+    ? (isDark ? '#F04444' : '#DC2626')
+    : (isDark ? '#A1A1AA' : tokens.textMuted);
   const arrow = isUp ? '↑' : isDown ? '↓' : '—';
   const formattedPct = `${arrow} ${Math.abs(compare.pct)}%`;
 
@@ -250,7 +250,7 @@ function CompareBadge({ compare, isDark, tokens }) {
           {formattedPct}
         </Text>
       </View>
-      <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+      <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
         {compare.label}
       </Text>
     </View>
@@ -262,10 +262,10 @@ function SectionCard({ title, subtitle, actionLabel, onAction, headerRight, chil
     <View
       style={[
         {
-          backgroundColor: isDark ? '#0F1412' : '#FFFFFF',
+          backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
           borderRadius: 16,
           borderWidth: 1,
-          borderColor: isDark ? (tokens?.border || '#26332E') : (tokens?.border || '#E2E8F0'),
+          borderColor: isDark ? (tokens?.border || '#303236') : (tokens?.border || '#E2E8F0'),
           padding: 20,
           marginBottom: 0,
           flex: 1,
@@ -293,7 +293,7 @@ function SectionCard({ title, subtitle, actionLabel, onAction, headerRight, chil
             style={{
               fontSize: 13,
               fontWeight: '600',
-              color: isDark ? '#F8FAFC' : tokens.textPrimary,
+              color: isDark ? '#F2F2F3' : tokens.textPrimary,
               textTransform: 'uppercase',
               letterSpacing: 0.6,
             }}
@@ -301,7 +301,7 @@ function SectionCard({ title, subtitle, actionLabel, onAction, headerRight, chil
             {title}
           </Text>
           {subtitle ? (
-            <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : tokens.textMuted, marginTop: 3 }}>{subtitle}</Text>
+            <Text style={{ fontSize: 12, color: isDark ? '#A1A1AA' : tokens.textMuted, marginTop: 3 }}>{subtitle}</Text>
           ) : null}
         </View>
         {headerRight ? headerRight : null}
@@ -313,10 +313,10 @@ function SectionCard({ title, subtitle, actionLabel, onAction, headerRight, chil
               paddingHorizontal: 10,
               paddingVertical: 5,
               borderRadius: 8,
-              backgroundColor: isDark ? '#1A2320' : '#F1F5F9',
+              backgroundColor: isDark ? '#202124' : '#F1F5F9',
             }}
           >
-            <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDark ? '#F5F7F6' : '#475569' }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDark ? '#F2F2F3' : '#475569' }}>
               {actionLabel}
             </Text>
           </TouchableOpacity>
@@ -328,9 +328,7 @@ function SectionCard({ title, subtitle, actionLabel, onAction, headerRight, chil
 }
 
 function SalesMetricCard({
-  iconName,
   iconColor,
-  iconBg,
   label,
   value,
   sublabel,
@@ -342,85 +340,88 @@ function SalesMetricCard({
     <View
       style={{
         flex: 1,
-        minWidth: 170,
-        backgroundColor: isDark ? '#0F1412' : '#FFFFFF',
-        borderRadius: 14,
+        minWidth: 185,
+        backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: isDark ? (tokens?.border || '#26332E') : '#E2E8F0',
-        padding: 16,
+        borderColor: isDark ? (tokens?.border || '#303236') : '#E5E7EB',
+        padding: 20,
         justifyContent: 'space-between',
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: isDark ? 0.25 : 0.03,
-        shadowRadius: 4,
+        shadowOpacity: isDark ? 0.25 : 0.02,
+        shadowRadius: 3,
         elevation: 1,
       }}
     >
-      <View>
-        {/* Top row: subtle icon container on left, optional count on right */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              backgroundColor: iconBg,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <BootstrapIcon name={iconName} size={15} color={iconColor} />
-          </View>
-          {sublabel ? (
-            <View
-              style={{
-                paddingHorizontal: 7,
-                paddingVertical: 2,
-                borderRadius: 6,
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F8FAFC',
-                borderWidth: 1,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-              }}
-            >
-              <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? '#94A3B8' : tokens.textMuted }}>
-                {sublabel}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Metric Label */}
+      {/* Top Row: Clean Muted Label Left + Sublabel Pill Right */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Text
+          numberOfLines={1}
           style={{
-            fontSize: 11,
-            fontWeight: '700',
-            color: isDark ? '#94A3B8' : tokens.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: 0.4,
-            marginTop: 12,
+            fontSize: 13,
+            fontWeight: '500',
+            color: isDark ? '#A1A1AA' : tokens.textMuted,
           }}
         >
           {label}
         </Text>
+        {sublabel ? (
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 2.5,
+              borderRadius: 999,
+              backgroundColor: isDark ? '#202124' : '#F4F4F5',
+              borderWidth: 1,
+              borderColor: isDark ? '#303236' : '#E4E4E7',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '500', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
+              {sublabel}
+            </Text>
+          </View>
+        ) : null}
+      </View>
 
-        {/* Main Currency Value */}
+      {/* Main Value + Comparison Subtext */}
+      <View style={{ marginVertical: 12 }}>
         <Text
           style={{
-            fontSize: 22,
+            fontSize: 26,
             fontWeight: '600',
-            color: isDark ? '#F8FAFC' : tokens.textPrimary,
-            marginTop: 4,
+            color: isDark ? '#F5F5F5' : tokens.textPrimary,
             fontVariant: ['tabular-nums'],
             fontFamily: Platform.select({ web: "'Inter', sans-serif", default: undefined }),
-            letterSpacing: -0.4,
+            letterSpacing: -0.6,
           }}
         >
           {value}
         </Text>
+        <View style={{ marginTop: 4 }}>
+          <CompareBadge compare={compare} isDark={isDark} tokens={tokens} />
+        </View>
       </View>
 
-      {/* Comparison Trend Indicator */}
-      <CompareBadge compare={compare} isDark={isDark} tokens={tokens} />
+      {/* Bottom Accent Progress Track */}
+      <View
+        style={{
+          height: 3,
+          borderRadius: 2,
+          backgroundColor: isDark ? '#292B2F' : '#F4F4F5',
+          overflow: 'hidden',
+          marginTop: 4,
+        }}
+      >
+        <View
+          style={{
+            height: '100%',
+            width: '70%',
+            backgroundColor: iconColor || (isDark ? '#FF5A00' : '#EA580C'),
+            borderRadius: 2,
+          }}
+        />
+      </View>
     </View>
   );
 }
@@ -556,10 +557,10 @@ function SalesRevenueTrendChart({
     <View
       ref={containerRef}
       style={{
-        backgroundColor: isDark ? '#0F1412' : '#F8FAFC',
+        backgroundColor: isDark ? '#202124' : '#F8FAFC',
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: isDark ? (tokens?.border || '#26332E') : '#E2E8F0',
+        borderColor: isDark ? (tokens?.border || '#303236') : '#E2E8F0',
         padding: 16,
         marginTop: 6,
       }}
@@ -581,7 +582,7 @@ function SalesRevenueTrendChart({
               width: 26,
               height: 26,
               borderRadius: 6,
-              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(234, 88, 12, 0.12)',
+              backgroundColor: isDark ? '#3A241B' : 'rgba(234, 88, 12, 0.12)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -589,7 +590,7 @@ function SalesRevenueTrendChart({
             <BootstrapIcon
               name="graph-up"
               size={13}
-              color={isDark ? '#4ADE80' : '#EA580C'}
+              color={isDark ? '#FF5A00' : '#EA580C'}
             />
           </View>
           <View>
@@ -597,13 +598,13 @@ function SalesRevenueTrendChart({
               style={{
                 fontSize: 12.5,
                 fontWeight: '600',
-                color: isDark ? '#F8FAFC' : tokens.textPrimary,
+                color: isDark ? '#F2F2F3' : tokens.textPrimary,
                 letterSpacing: 0.2,
               }}
             >
               Revenue Trend
             </Text>
-            <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : tokens.textMuted }}>
+            <Text style={{ fontSize: 11, color: isDark ? '#A1A1AA' : tokens.textMuted }}>
               {granularity === 'daily'
                 ? 'Daily telemetry (last 7 days)'
                 : granularity === 'weekly'
@@ -619,12 +620,12 @@ function SalesRevenueTrendChart({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
-              backgroundColor: isDark ? '#151C19' : '#FFFFFF',
+              backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
               paddingHorizontal: 9,
               paddingVertical: 4,
               borderRadius: 6,
               borderWidth: 1,
-              borderColor: isDark ? (tokens?.border || '#26332E') : '#E2E8F0',
+              borderColor: isDark ? (tokens?.border || '#303236') : '#E2E8F0',
             }}
           >
             <View
@@ -632,11 +633,11 @@ function SalesRevenueTrendChart({
                 width: 12,
                 height: 2,
                 borderTopWidth: 2,
-                borderTopColor: isDark ? '#4ADE80' : '#EA580C',
+                borderTopColor: isDark ? '#FF5A00' : '#EA580C',
                 borderStyle: 'dashed',
               }}
             />
-            <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
               Avg: {formatPeso(avgRev)}/{granularity === 'daily' ? 'day' : granularity === 'weekly' ? 'wk' : 'mo'}
             </Text>
           </View>
@@ -687,7 +688,7 @@ function SalesRevenueTrendChart({
                       textAnchor="end"
                       fontSize="10"
                       fontWeight="600"
-                      fill={isDark ? '#94A3B8' : tokens.textMuted}
+                      fill={isDark ? '#A1A1AA' : tokens.textMuted}
                       fontFamily="inherit"
                     >
                       ₱{val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k` : val}
@@ -703,7 +704,7 @@ function SalesRevenueTrendChart({
                   y1={avgY}
                   x2={chartWidth - padding.right}
                   y2={avgY}
-                  stroke={isDark ? '#34D399' : '#EA580C'}
+                  stroke={isDark ? '#00C98D' : '#EA580C'}
                   strokeWidth="1.2"
                   strokeDasharray="4 4"
                   strokeOpacity={0.7}
@@ -718,7 +719,7 @@ function SalesRevenueTrendChart({
                 <path
                   d={linePath}
                   fill="none"
-                  stroke={isDark ? '#34D399' : '#EA580C'}
+                  stroke={isDark ? '#00C98D' : '#EA580C'}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -732,7 +733,7 @@ function SalesRevenueTrendChart({
                   y1={padding.top}
                   x2={activePoint.x}
                   y2={baseline}
-                  stroke={isDark ? '#34D399' : '#EA580C'}
+                  stroke={isDark ? '#00C98D' : '#EA580C'}
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
                   strokeOpacity={0.8}
@@ -754,10 +755,10 @@ function SalesRevenueTrendChart({
                         r={isHovered ? 6 : 3.5}
                         fill={
                           isHovered || p.revenue <= 0
-                            ? (isDark ? '#34D399' : '#EA580C')
-                            : (isDark ? '#0F1412' : '#FFFFFF')
+                            ? (isDark ? '#FF5A00' : '#EA580C')
+                            : (isDark ? '#191A1D' : '#FFFFFF')
                         }
-                        stroke={isDark ? '#34D399' : '#EA580C'}
+                        stroke={isDark ? '#FF5A00' : '#EA580C'}
                         strokeWidth={isHovered ? 2.5 : 2}
                         style={{ transition: 'all 0.15s ease' }}
                       />
@@ -771,7 +772,7 @@ function SalesRevenueTrendChart({
                         textAnchor="middle"
                         fontSize="10"
                         fontWeight={isHovered ? '700' : '600'}
-                        fill={isHovered ? (isDark ? '#F8FAFC' : tokens.textPrimary) : (isDark ? '#94A3B8' : tokens.textMuted)}
+                        fill={isHovered ? (isDark ? '#F2F2F3' : tokens.textPrimary) : (isDark ? '#A1A1AA' : tokens.textMuted)}
                         fontFamily="inherit"
                       >
                         {p.label}
@@ -800,7 +801,7 @@ function SalesRevenueTrendChart({
                 style={{
                   height: '100%',
                   width: hasData ? '70%' : '10%',
-                  backgroundColor: isDark ? '#34D399' : '#EA580C',
+                  backgroundColor: isDark ? '#FF5A00' : '#EA580C',
                   borderRadius: 3,
                 }}
               />
@@ -818,7 +819,7 @@ function SalesRevenueTrendChart({
                   Math.max(10, activePoint.x - 70),
                   Math.max(10, chartWidth - 170)
                 ),
-                backgroundColor: isDark ? '#151C19' : '#0F172A',
+                backgroundColor: isDark ? '#191A1D' : '#0F172A',
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 8,
@@ -828,7 +829,7 @@ function SalesRevenueTrendChart({
                 shadowRadius: 8,
                 elevation: 6,
                 borderWidth: 1,
-                borderColor: isDark ? (tokens?.border || '#26332E') : 'rgba(255,255,255,0.1)',
+                borderColor: isDark ? (tokens?.border || '#303236') : 'rgba(255,255,255,0.1)',
                 zIndex: 99,
                 minWidth: 140,
               }}
@@ -881,43 +882,43 @@ function SalesRevenueTrendChart({
         }}
       >
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Total
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(totalRev)}
           </Text>
         </View>
 
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Average
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(avgRev)}{' '}
-            <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
               /{granularity === 'daily' ? 'day' : granularity === 'weekly' ? 'wk' : 'mo'}
             </Text>
           </Text>
         </View>
 
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Peak Period
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {peakRev > 0 ? formatPeso(peakRev) : '₱0'}{' '}
-            <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#94A3B8' : tokens.textMuted }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#A1A1AA' : tokens.textMuted }}>
               ({peakLabel})
             </Text>
           </Text>
         </View>
 
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Orders in Period
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {totalOrders} order{totalOrders === 1 ? '' : 's'}
           </Text>
         </View>
@@ -940,9 +941,9 @@ function HealthRow({ label, count, color, tokens, isDark }) {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-        <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary }}>{label}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary }}>{label}</Text>
       </View>
-      <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
+      <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
         {count}
       </Text>
     </View>
@@ -953,17 +954,17 @@ function ChannelBar({ label, amount, pct, color, tokens, isDark }) {
   return (
     <View style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : tokens.textPrimary }}>{label}</Text>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F2F2F3' : tokens.textPrimary }}>{label}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F2F2F3' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
           {formatPeso(amount)}{'  '}
-          <Text style={{ fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted }}>{pct}%</Text>
+          <Text style={{ fontWeight: '700', color: isDark ? '#A1A1AA' : tokens.textMuted }}>{pct}%</Text>
         </Text>
       </View>
       <View
         style={{
           height: 8,
           borderRadius: 4,
-          backgroundColor: isDark ? '#1A2320' : '#F1F5F9',
+          backgroundColor: isDark ? '#292B2F' : '#F1F5F9',
           overflow: 'hidden',
         }}
       >
@@ -974,7 +975,7 @@ function ChannelBar({ label, amount, pct, color, tokens, isDark }) {
 }
 
 function ProductRow({ item, tokens, isDark, tone = 'good' }) {
-  const accent = tone === 'good' ? (isDark ? '#4ADE80' : '#10B981') : isDark ? '#FBBF24' : '#D97706';
+  const accent = tone === 'good' ? (isDark ? '#00C98D' : '#10B981') : isDark ? '#F5B942' : '#D97706';
   return (
     <View
       style={{
@@ -988,10 +989,10 @@ function ProductRow({ item, tokens, isDark, tone = 'good' }) {
     >
       <View style={{ width: 4, height: 28, borderRadius: 2, backgroundColor: accent }} />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : tokens.textPrimary }} numberOfLines={1}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F2F2F3' : tokens.textPrimary }} numberOfLines={1}>
           {item.name}
         </Text>
-        <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : tokens.textMuted, marginTop: 1 }}>
+        <Text style={{ fontSize: 11, color: isDark ? '#A1A1AA' : tokens.textMuted, marginTop: 1 }}>
           {item.unitsSold} units · {formatPeso(item.revenue)}
         </Text>
       </View>
@@ -1041,11 +1042,11 @@ export default function DashboardInsightsPanel({
       style={{
         position: 'relative',
         flexDirection: 'row',
-        backgroundColor: isDarkMode ? '#151C19' : '#F1F5F9',
+        backgroundColor: isDarkMode ? '#191A1D' : '#F1F5F9',
         borderRadius: 9,
         padding: 3,
         borderWidth: 1,
-        borderColor: isDarkMode ? (tokens?.border || '#26332E') : '#E2E8F0',
+        borderColor: isDarkMode ? (tokens?.border || '#303236') : '#E2E8F0',
         width: isDesktop ? 220 : '100%',
       }}
     >
@@ -1099,7 +1100,7 @@ export default function DashboardInsightsPanel({
                 fontWeight: active ? '700' : '600',
                 color: active
                   ? '#FFFFFF'
-                  : (isDarkMode ? '#94A3B8' : '#64748B'),
+                  : (isDarkMode ? '#A1A1AA' : '#64748B'),
                 transition: 'color 200ms ease',
               }}
             >
@@ -1137,7 +1138,7 @@ export default function DashboardInsightsPanel({
             compare={sp.todayCompare}
             iconName="calendar2-check"
             iconBg={isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#ECFDF5'}
-            iconColor={isDarkMode ? '#4ADE80' : '#059669'}
+            iconColor={isDarkMode ? '#00C98D' : '#059669'}
             tokens={tokens}
             isDark={isDarkMode}
           />
@@ -1148,7 +1149,7 @@ export default function DashboardInsightsPanel({
             compare={sp.weekCompare}
             iconName="graph-up-arrow"
             iconBg={isDarkMode ? 'rgba(37, 99, 235, 0.16)' : '#F0F9FF'}
-            iconColor={isDarkMode ? '#60A5FA' : '#0284C7'}
+            iconColor={isDarkMode ? '#3B82F6' : '#0284C7'}
             tokens={tokens}
             isDark={isDarkMode}
           />
@@ -1170,7 +1171,7 @@ export default function DashboardInsightsPanel({
             compare={sp.aovCompare}
             iconName="receipt"
             iconBg={isDarkMode ? 'rgba(217, 119, 6, 0.16)' : '#FFFBEB'}
-            iconColor={isDarkMode ? '#FBBF24' : '#D97706'}
+            iconColor={isDarkMode ? '#F5B942' : '#D97706'}
             tokens={tokens}
             isDark={isDarkMode}
           />
@@ -1212,11 +1213,11 @@ export default function DashboardInsightsPanel({
         >
           {actions.length === 0 ? (
             <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <BootstrapIcon name="check-circle-fill" size={22} color={isDarkMode ? '#4ADE80' : '#10B981'} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 8 }}>
+              <BootstrapIcon name="check-circle-fill" size={22} color={isDarkMode ? '#00C98D' : '#10B981'} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F2F2F3' : tokens.textPrimary, marginTop: 8 }}>
                 All clear
               </Text>
-              <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : tokens.textMuted, marginTop: 2, textAlign: 'center' }}>
+              <Text style={{ fontSize: 12, color: isDark ? '#A1A1AA' : tokens.textMuted, marginTop: 2, textAlign: 'center' }}>
                 No critical inventory or order actions right now.
               </Text>
             </View>
@@ -1249,14 +1250,14 @@ export default function DashboardInsightsPanel({
                   }}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : tokens.textPrimary }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F2F2F3' : tokens.textPrimary }}>
                     {item.title}
                   </Text>
                   <Text style={{ fontSize: 12, fontWeight: '600', color: item.color, marginTop: 3 }}>
                     {item.actionLabel}
                   </Text>
                 </View>
-                <BootstrapIcon name="chevron-right" size={14} color={isDark ? '#94A3B8' : tokens.textMuted} />
+                <BootstrapIcon name="chevron-right" size={14} color={isDark ? '#A1A1AA' : tokens.textMuted} />
               </TouchableOpacity>
             ))
           )}
@@ -1270,14 +1271,14 @@ export default function DashboardInsightsPanel({
           style={{ minWidth: isDesktop ? 220 : '100%' }}
         >
           {(ch.total || 0) <= 0 ? (
-            <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : tokens.textMuted }}>No sales recorded yet.</Text>
+            <Text style={{ fontSize: 13, color: isDark ? '#A1A1AA' : tokens.textMuted }}>No sales recorded yet.</Text>
           ) : (
             <>
               <ChannelBar
                 label="Online Store"
                 amount={ch.online}
                 pct={ch.onlinePct}
-                color={isDarkMode ? '#4ADE80' : '#059669'}
+                color={isDarkMode ? '#00C98D' : '#059669'}
                 tokens={tokens}
                 isDark={isDarkMode}
               />
@@ -1285,11 +1286,11 @@ export default function DashboardInsightsPanel({
                 label="POS Cashier"
                 amount={ch.pos}
                 pct={ch.posPct}
-                color={isDarkMode ? '#60A5FA' : '#2563EB'}
+                color={isDarkMode ? '#3B82F6' : '#2563EB'}
                 tokens={tokens}
                 isDark={isDarkMode}
               />
-              <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : tokens.textMuted, marginTop: 4 }}>
+              <Text style={{ fontSize: 12, color: isDark ? '#A1A1AA' : tokens.textMuted, marginTop: 4 }}>
                 Total {formatPeso(ch.total)}
               </Text>
             </>
@@ -1308,7 +1309,7 @@ export default function DashboardInsightsPanel({
           isDark={isDarkMode}
         >
           {(!pp.bestSelling || pp.bestSelling.length === 0) ? (
-            <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : tokens.textMuted }}>No product sales yet.</Text>
+            <Text style={{ fontSize: 13, color: isDark ? '#A1A1AA' : tokens.textMuted }}>No product sales yet.</Text>
           ) : (
             pp.bestSelling.map((item) => (
               <ProductRow key={`best-${item.productId || item.name}`} item={item} tokens={tokens} isDark={isDarkMode} tone="good" />
@@ -1325,7 +1326,7 @@ export default function DashboardInsightsPanel({
           isDark={isDarkMode}
         >
           {(!pp.slowMoving || pp.slowMoving.length === 0) ? (
-            <Text style={{ fontSize: 13, color: isDark ? '#94A3B8' : tokens.textMuted }}>
+            <Text style={{ fontSize: 13, color: isDark ? '#A1A1AA' : tokens.textMuted }}>
               Not enough catalog history to identify slow movers.
             </Text>
           ) : (

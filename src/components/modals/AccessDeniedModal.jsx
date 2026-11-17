@@ -9,13 +9,13 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
   const { currentUser, adminLogin, logout, setRedirectReason } = useAuth();
   const { isDarkMode = false } = useTheme?.() || {};
 
-  const bgCard = isDarkMode ? '#1C2025' : '#FFFFFF';
-  const bgSub = isDarkMode ? '#252A30' : '#F1F5F9';
-  const border = isDarkMode ? '#282D34' : '#F1F5F9';
-  const borderAlt = isDarkMode ? '#334155' : '#E2E8F0';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDarkMode ? '#CBD5E1' : '#475569';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const bgCard = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const bgSub = isDarkMode ? '#202124' : '#F1F5F9';
+  const border = isDarkMode ? '#303236' : '#F1F5F9';
+  const borderAlt = isDarkMode ? '#3A3B40' : '#E2E8F0';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textSecondary = isDarkMode ? '#A1A1AA' : '#475569';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
 
   const handleInstantAdminSwitch = () => {
     if (adminLogin) {

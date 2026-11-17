@@ -4,6 +4,7 @@
 // =========================================================================
 
 import React from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet, Image } from 'react-native';
 import { BootstrapIcon } from '../../common';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
@@ -11,6 +12,8 @@ import { MOCK_MOTORCYCLES, TIME_SLOTS } from './bookingPackagesData.js';
 
 // ─── 1. FAVORITES MODAL ───
 export function FavoritesModal({ visible, onClose, favorites = [], onSelectPackage, onRemoveFavorite }) {
+  const { isDarkMode } = useTheme();
+  const modalStyles = get_modalStyles(isDarkMode);
   if (!visible) return null;
 
   return (
@@ -80,6 +83,8 @@ export function FavoritesModal({ visible, onClose, favorites = [], onSelectPacka
 
 // ─── 2. NOTIFICATIONS MODAL ───
 export function NotificationsModal({ visible, onClose }) {
+  const { isDarkMode } = useTheme();
+  const modalStyles = get_modalStyles(isDarkMode);
   if (!visible) return null;
 
   const notifications = [
@@ -158,6 +163,8 @@ export function MotorcycleSelectionModal({
   onSelectMotorcycle,
   onProceedToSchedule,
 }) {
+  const { isDarkMode } = useTheme();
+  const modalStyles = get_modalStyles(isDarkMode);
   if (!visible) return null;
 
   return (
@@ -237,6 +244,8 @@ export function ScheduleSelectionModal({
   setPreferredTimeSlot,
   onProceedToReview,
 }) {
+  const { isDarkMode } = useTheme();
+  const modalStyles = get_modalStyles(isDarkMode);
   if (!visible) return null;
 
   const dates = [
@@ -339,6 +348,8 @@ export function BookingConfirmationSuccessModal({
   schedule,
   totalPrice = 0,
 }) {
+  const { isDarkMode } = useTheme();
+  const modalStyles = get_modalStyles(isDarkMode);
   if (!visible) return null;
 
   return (
@@ -382,7 +393,7 @@ export function BookingConfirmationSuccessModal({
               </Text>
             </View>
             <View style={[modalStyles.receiptRow, { borderTopWidth: 1, borderTopColor: '#E4E4E7', paddingTop: 8, marginTop: 4 }]}>
-              <Text style={[modalStyles.receiptKey, { fontWeight: '700', color: '#18181B' }]}>Total Amount</Text>
+              <Text style={[modalStyles.receiptKey, { fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }]}>Total Amount</Text>
               <Text style={modalStyles.receiptTotal}>{formatPhp(totalPrice)}</Text>
             </View>
           </View>
@@ -398,7 +409,13 @@ export function BookingConfirmationSuccessModal({
   );
 }
 
-const modalStyles = StyleSheet.create({
+let _light_modalStyles = null;
+let _dark_modalStyles = null;
+function get_modalStyles(isDarkMode) {
+  if (isDarkMode && _dark_modalStyles) return _dark_modalStyles;
+  if (!isDarkMode && _light_modalStyles) return _light_modalStyles;
+  const created = StyleSheet.create({
+
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(24, 24, 27, 0.45)',
@@ -408,10 +425,10 @@ const modalStyles = StyleSheet.create({
     zIndex: 9999,
   },
   modalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
     width: '100%',
     maxWidth: 480,
     maxHeight: '90%',
@@ -435,7 +452,7 @@ const modalStyles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   subtitle: {
     fontSize: 12,
@@ -468,7 +485,7 @@ const modalStyles = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   emptySub: {
     fontSize: 12,
@@ -493,7 +510,7 @@ const modalStyles = StyleSheet.create({
   favName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   favSub: {
     fontSize: 11,
@@ -539,11 +556,11 @@ const modalStyles = StyleSheet.create({
   notifTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   notifDesc: {
     fontSize: 11.5,
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
     lineHeight: 16,
     marginTop: 2,
   },
@@ -566,8 +583,8 @@ const modalStyles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     cursor: 'pointer',
   },
   bikeCardActive: {
@@ -583,7 +600,7 @@ const modalStyles = StyleSheet.create({
   bikeTitle: {
     fontSize: 13.5,
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   bikeSub: {
     fontSize: 11.5,
@@ -600,7 +617,7 @@ const modalStyles = StyleSheet.create({
   ccTagText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
   },
   radioCircle: {
     width: 18,
@@ -623,7 +640,7 @@ const modalStyles = StyleSheet.create({
   sectionHeader: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -634,8 +651,8 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     alignItems: 'center',
     cursor: 'pointer',
   },
@@ -646,7 +663,7 @@ const modalStyles = StyleSheet.create({
   dateChipLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   dateChipLabelActive: {
     color: '#FFFFFF',
@@ -664,8 +681,8 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     cursor: 'pointer',
   },
   slotChipActive: {
@@ -692,7 +709,7 @@ const modalStyles = StyleSheet.create({
     backgroundColor: '#FAFAF9',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
     padding: 14,
     marginHorizontal: 20,
     marginBottom: 16,
@@ -711,7 +728,7 @@ const modalStyles = StyleSheet.create({
   receiptVal: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
     textAlign: 'right',
   },
   receiptValBold: {
@@ -752,5 +769,10 @@ const modalStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#71717A',
   },
-});
+
+  });
+  if (isDarkMode) _dark_modalStyles = created;
+  else _light_modalStyles = created;
+  return created;
+}
 

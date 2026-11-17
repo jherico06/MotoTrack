@@ -62,9 +62,9 @@ export default function ConfirmModal({
       : (isDark ? 'rgba(234, 88, 12, 0.35)' : '#FED7AA');
 
   const iconColor = isDanger
-    ? (isDark ? '#F87171' : '#DC2626')
+    ? (isDark ? '#F04444' : '#DC2626')
     : isWarning
-      ? (isDark ? '#FBBF24' : '#D97706')
+      ? (isDark ? '#F5B942' : '#D97706')
       : (isDark ? '#FB923C' : '#EA580C');
 
   // Primary action button background
@@ -75,13 +75,13 @@ export default function ConfirmModal({
     ? '#DC2626'
     : isWarning
       ? '#EA580C'
-      : (isDark ? '#27272A' : '#1E2227');
+      : (isDark ? '#202124' : '#1E2227');
 
   const confirmBorder = isDanger
     ? '#DC2626'
     : isWarning
       ? '#EA580C'
-      : (isDark ? '#3F3F46' : '#1E2227');
+      : (isDark ? '#3A3B40' : '#1E2227');
 
   const cleanItemName = itemName ? String(itemName).replace(/^"+|"+$/g, '').trim() : null;
 
@@ -119,7 +119,7 @@ export default function ConfirmModal({
                 <BootstrapIcon
                   name={isDanger ? 'trash3' : 'receipt'}
                   size={13}
-                  color={isDanger ? (isDark ? '#F87171' : '#DC2626') : (isDark ? '#FB923C' : '#EA580C')}
+                  color={isDanger ? (isDark ? '#F04444' : '#DC2626') : (isDark ? '#FB923C' : '#EA580C')}
                 />
                 <Text
                   style={[

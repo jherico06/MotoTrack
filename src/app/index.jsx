@@ -312,7 +312,8 @@ function MainAppRouter() {
       }
       if (['login', 'signup', 'admin', 'garage', 'wishlist', 'shop', 'customizer', 'profile', 'notifications', 'confirm-delivery', 'rider-run', 'rider-dashboard'].includes(s)) {
         const savedUser = authService.getCurrentUser();
-        if (!savedUser && ['garage', 'profile', 'orders', 'notifications', 'customizer'].includes(s)) {
+        const protectedInitialScreens = ['profile', 'orders', 'notifications'];
+        if (!savedUser && protectedInitialScreens.includes(s)) {
           return 'shop';
         }
         return s;
@@ -433,24 +434,6 @@ function MainAppRouter() {
       return;
     }
     if (!currentUser) {
-      if (screen === 'garage') {
-        promptRequireLogin({
-          title: 'Sign In to Book a Service',
-          message: 'Please log in first to book a pit service appointment or access your garage fleet.',
-          actionLabel: 'Sign In to Book',
-          feature: 'book',
-        });
-        return;
-      }
-      if (screen === 'customizer') {
-        promptRequireLogin({
-          title: 'Sign In to Customize',
-          message: 'Please log in first to customize motorcycle builds, save specs, and book custom installations.',
-          actionLabel: 'Sign In to Customize',
-          feature: 'customize',
-        });
-        return;
-      }
       if (screen === 'appointments') {
         promptRequireLogin({
           title: 'Sign In to View Appointments',
@@ -658,7 +641,7 @@ function MainAppRouter() {
   // If user logs out or session ends while on protected screen, return to storefront
   useEffect(() => {
     if (!currentUser) {
-      const protectedScreens = ['profile', 'garage', 'customizer', 'orders'];
+      const protectedScreens = ['profile', 'orders', 'appointments'];
       if (protectedScreens.includes(currentScreen)) {
         const t = setTimeout(() => {
           navigateScreen('shop');
@@ -1215,11 +1198,12 @@ function MainAppRouter() {
               setRedirectReason('Please sign in to book your garage appointment.');
               navigateScreen('login');
             }}
+            onRequireLogin={promptRequireLogin}
             onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
             onNavigateToAdmin={() => navigateScreen('admin')}
             onOpenCart={() => setIsCartOpen(true)}
             onLogout={handleLogout}
-            initialSearchQuery={garageParams?.search || ''}
+            initialSearchQuery={garageParams?.search || garageParams?.searchQuery || ''}
           />
         </View>
       )}
@@ -1249,6 +1233,7 @@ function MainAppRouter() {
               setRedirectReason('Please sign in to view your garage appointments.');
               navigateScreen('login');
             }}
+            onRequireLogin={promptRequireLogin}
             onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
             onNavigateToAdmin={() => navigateScreen('admin')}
             onOpenCart={() => setIsCartOpen(true)}
@@ -1284,6 +1269,7 @@ function MainAppRouter() {
             onNavigateToAdmin={() => navigateScreen('admin')}
             onOpenCart={() => setIsCartOpen(true)}
             onLogout={handleLogout}
+            onRequireLogin={promptRequireLogin}
           />
         </View>
       )}
@@ -1341,7 +1327,7 @@ function MainAppContainer() {
     <View
       style={[
         styles.rootContainer,
-        { backgroundColor: isDarkMode ? '#0F1412' : '#F3F4F6' },
+        { backgroundColor: isDarkMode ? (Platform.OS === 'web' ? '#111315' : '#0F1412') : '#F3F4F6' },
       ]}
     >
       <MainAppRouter />

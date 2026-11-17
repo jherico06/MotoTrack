@@ -40,7 +40,7 @@ import {
   RegisterMotorcycleModal,
 } from '../../../components/modals';
 import CartPage from './CartPage.jsx';
-import { garageWebStyles as gStyles } from '../../../styles/web/garagePage.web.styles.js';
+import { getGarageWebStyles } from '../../../styles/web/garagePage.web.styles.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
 import {
@@ -229,6 +229,7 @@ export default function GaragePageWeb({
   onNavigateToCustomizer,
   onNavigateToCustomize,
   onNavigateToLogin,
+  onRequireLogin,
   onNavigateToProfile,
   onNavigateToAdmin,
   onLogout,
@@ -239,6 +240,7 @@ export default function GaragePageWeb({
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
   const { currentUser, logout, setRedirectReason } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const gStyles = useMemo(() => getGarageWebStyles(isDarkMode), [isDarkMode]);
   const { wishlist } = useWishlist();
   const savedWishlistCount = useWebSavedWishlistCount(wishlist);
   const { cartItemCount } = useCart();
@@ -551,7 +553,7 @@ export default function GaragePageWeb({
   };
 
   const [garageMotorcycles, setGarageMotorcycles] = useState(() =>
-    motorcycleService.getMotorcycles(currentUser)
+    currentUser ? motorcycleService.getMotorcycles(currentUser) : []
   );
   const [selectedMotorcycleId, setSelectedMotorcycleId] = useState('');
 
@@ -1211,6 +1213,10 @@ export default function GaragePageWeb({
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
 
   const refreshBookings = () => {
+    if (!currentUser) {
+      setUserBookings([]);
+      return;
+    }
     let bookings = [];
     if (currentUser?.email || currentUser?.id || currentUser?.name || currentUser?.fullName) {
       bookings = garageService.getUserBookings(
@@ -1273,8 +1279,10 @@ export default function GaragePageWeb({
       refreshBookings();
     }, 3000);
 
-    // Initial background sync with remote Supabase database
-    garageService.fetchBookings?.().catch(() => {});
+    // Initial background sync with remote Supabase database (authenticated users only)
+    if (currentUser) {
+      garageService.fetchBookings?.().catch(() => {});
+    }
 
     return () => {
       unsubServices?.();
@@ -1363,7 +1371,25 @@ export default function GaragePageWeb({
     setBookingStep(targetStep);
   };
 
+  const promptLoginForBooking = () => {
+    if (typeof onRequireLogin === 'function') {
+      onRequireLogin({
+        title: 'Sign In to Book a Service',
+        message: 'Please log in first or create an account to book a pit service appointment for your motorcycle.',
+        actionLabel: 'Sign In to Book',
+        feature: 'book',
+      });
+    } else {
+      setRedirectReason?.('Please sign in to book your garage appointment.');
+      onNavigateToLogin?.();
+    }
+  };
+
   const handleOpenBooking = (serviceType = 'PMS') => {
+    if (!currentUser) {
+      promptLoginForBooking();
+      return;
+    }
     setSelectedServiceIds([]);
     setServiceSearch('');
     setSelectedServiceType(serviceType === 'Repair' ? 'Repair' : 'PMS');
@@ -1384,6 +1410,10 @@ export default function GaragePageWeb({
   };
 
   const handleProceedToBookingForm = () => {
+    if (!currentUser) {
+      promptLoginForBooking();
+      return;
+    }
     setGarageViewTab('book');
     setBookingStep(1);
     setIsCalendarModalOpen(false);
@@ -1611,16 +1641,27 @@ export default function GaragePageWeb({
         customerPhone: ownerPhone,
       };
 
-      const created = await garageService.addBooking(bookingDraft);
+      const created = await garageService.addBooking({
+        ...bookingDraft,
+        downpayment_paid: true,
+        downpayment_status: 'Paid',
+        payment_status: 'DOWNPAYMENT_PAID',
+        amount_paid: downpaymentAmount,
+        downpayment_amount: downpaymentAmount,
+        downpayment_method: 'GCash (Xendit)',
+        downpayment_ref: `DP-${bookingId}`,
+      });
 
-      // Persist the transaction into Supabase payments table
+      // Ensure single deduplicated payment transaction row in Supabase payments table
       try {
         await xenditPaymentService.recordPaymentTransaction({
-          bookingId: bookingId,
+          bookingId: created?.booking_id || bookingId,
           customerId: currentUser?.customer_id || currentUser?.id,
           amount: downpaymentAmount,
-          paymentMethod: 'Online (GCash / Card)',
+          paymentType: 'DOWNPAYMENT',
+          paymentMethod: 'GCash (Xendit)',
           referenceNumber: `DP-${bookingId}-${Date.now().toString().slice(-4)}`,
+          transactionRef: `DP-${bookingId}`,
           status: 'Completed',
           notes: `Downpayment for booking #${bookingId} (${serviceTitle})`,
         });
@@ -1662,18 +1703,24 @@ export default function GaragePageWeb({
 
   const handleConfirmCancelBooking = async () => {
     if (!bookingToCancel) return;
-    const noCharge = isFlexibleBooking(bookingToCancel) && !Number(bookingToCancel?.amount_paid || 0);
+    const dpAmount = Number(
+      bookingToCancel?.amount_paid || bookingToCancel?.downpayment_amount || 0
+    );
+    const noCharge = isFlexibleBooking(bookingToCancel) && dpAmount <= 0;
+    const refundAmount = Math.round(dpAmount * 0.5);
     await garageService.cancelBooking(bookingToCancel.id);
     refreshBookings();
     setIsCancelModalOpen(false);
     setBookingToCancel(null);
     showToast(
-      noCharge ? 'Service request cancelled.' : 'Appointment cancelled. Downpayment was forfeited per policy.'
+      noCharge
+        ? 'Service request cancelled.'
+        : `Booking cancelled. 50% downpayment refund (₱${refundAmount.toLocaleString()}) is pending admin processing.`
     );
   };
 
   return (
-    <View style={[gStyles.container, isDarkMode && { backgroundColor: '#0F1412' }]}>
+    <View style={[gStyles.container, isDarkMode && { backgroundColor: '#111315' }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
@@ -1695,7 +1742,7 @@ export default function GaragePageWeb({
         <View
           style={[
             gStyles.headerWrapper,
-            isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' },
+            isDarkMode && { backgroundColor: '#111315', borderBottomColor: '#303236' },
           ]}
           className="web-header"
           dataSet={{ webHeader: true }}
@@ -1984,7 +2031,13 @@ export default function GaragePageWeb({
               existingBookings={userBookings}
               searchQuery={bookingSearchQuery}
               onSearchQueryChange={setBookingSearchQuery}
-              onAddNewMotorcycle={() => setIsRegisterBikeModalOpen(true)}
+              onAddNewMotorcycle={() => {
+                if (!currentUser) {
+                  promptLoginForBooking();
+                  return;
+                }
+                setIsRegisterBikeModalOpen(true);
+              }}
               onBookingCreated={async () => {
                 await refreshBookings();
               }}
@@ -2011,6 +2064,7 @@ export default function GaragePageWeb({
                 setRedirectReason?.('Please sign in to book a service for your motorcycle.');
                 onNavigateToLogin?.();
               }}
+              onRequireLogin={onRequireLogin}
               showToast={showToast}
             />
           )}
@@ -2023,7 +2077,7 @@ export default function GaragePageWeb({
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                   My Appointments
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-lg leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-[#A1A1AA] mt-2 max-w-lg leading-relaxed">
                   Track your scheduled pit stops, approval stages, live bay progress, and<br className="hidden sm:inline" /> verified service receipts.
                 </p>
                 <div className="mt-4">
@@ -2041,9 +2095,9 @@ export default function GaragePageWeb({
               </div>
 
               {/* 3. Scheduled Bookings Filter & View Mode Bar (Matching Image 1) */}
-              <div className="bg-white dark:bg-[#18181B] border border-slate-200/80 dark:border-[#27272A] rounded-xl p-3.5 sm:p-4 mb-6 shadow-xs flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+              <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/80 dark:border-[#27272A] rounded-xl p-3.5 sm:p-4 mb-6 shadow-xs flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                  <div className="w-9 h-9 rounded-lg border border-slate-200 dark:border-[#303236]/80 dark:border-[#303236] flex items-center justify-center text-slate-500 dark:text-[#A1A1AA] shrink-0">
                     <BootstrapIcon name="calendar-event" size={14} color="#64748B" />
                   </div>
                   <div>
@@ -2077,7 +2131,7 @@ export default function GaragePageWeb({
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
                             isSel
                               ? 'bg-[#1E2227] text-white shadow-xs'
-                              : 'bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                              : 'bg-slate-50 dark:bg-[#202124]/60 border border-slate-200 dark:border-[#303236]/60 dark:border-[#303236]/80 text-slate-600 dark:text-[#A1A1AA] hover:text-slate-900 dark:text-[#F2F2F3] dark:hover:text-white'
                           }`}
                         >
                           <span>{tab.name}</span>
@@ -2096,13 +2150,13 @@ export default function GaragePageWeb({
                   </div>
 
                   {/* Grid / List Mode Toggle */}
-                  <div className="hidden sm:flex items-center gap-1 p-1 bg-slate-100/90 dark:bg-[#27272A] border border-slate-200/80 dark:border-slate-700 rounded-lg shrink-0">
+                  <div className="hidden sm:flex items-center gap-1 p-1 bg-slate-100 dark:bg-[#202124]/90 dark:bg-[#27272A] border border-slate-200 dark:border-[#303236]/80 dark:border-[#303236] rounded-lg shrink-0">
                     <button
                       onClick={() => setBookingViewMode('grid')}
                       className={`flex items-center justify-center p-1.5 rounded-md transition-all cursor-pointer ${
                         bookingViewMode === 'grid'
                           ? 'bg-white dark:bg-[#18181B] text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-400 hover:text-slate-700 dark:hover:text-white'
+                          : 'text-slate-400 hover:text-slate-700 dark:text-[#A1A1AA] dark:hover:text-white'
                       }`}
                       title="Grid View"
                     >
@@ -2117,7 +2171,7 @@ export default function GaragePageWeb({
                       className={`flex items-center justify-center p-1.5 rounded-md transition-all cursor-pointer ${
                         bookingViewMode === 'list'
                           ? 'bg-white dark:bg-[#18181B] text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-400 hover:text-slate-700 dark:hover:text-white'
+                          : 'text-slate-400 hover:text-slate-700 dark:text-[#A1A1AA] dark:hover:text-white'
                       }`}
                       title="List View"
                     >
@@ -2146,16 +2200,16 @@ export default function GaragePageWeb({
                   {!currentUser ? (
                     <div
                       className={`${
-                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
+                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white dark:bg-[#191A1D] border-slate-200 dark:border-[#303236]/90'
                       } rounded-2xl border p-10 text-center flex flex-col items-center justify-center shadow-xs my-2`}
                     >
                       <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center mb-4 text-[#EA580C]">
                         <BootstrapIcon name="person-lock" size={26} color="#EA580C" />
                       </div>
-                      <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                      <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                         Sign In to View Scheduled Bookings
                       </h3>
-                      <p className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <p className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-[#71717A]'}`}>
                         Sign in to your account to view your scheduled appointments, track master mechanic assignments, and manage service downpayments.
                       </p>
                       <button
@@ -2172,16 +2226,16 @@ export default function GaragePageWeb({
                   ) : userBookings.length === 0 ? (
                     <div
                       className={`${
-                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
+                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white dark:bg-[#191A1D] border-slate-200 dark:border-[#303236]/90'
                       } rounded-2xl border p-12 text-center flex flex-col items-center justify-center shadow-xs my-2`}
                     >
                       <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center mb-4 text-[#EA580C]">
                         <BootstrapIcon name="calendar-plus" size={26} color="#EA580C" />
                       </div>
-                      <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                      <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                         No scheduled bookings
                       </h3>
-                      <p className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <p className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-[#71717A]'}`}>
                         You don't have any service appointments booked yet. Choose a package from our catalog to reserve your guaranteed slot.
                       </p>
                       <button
@@ -2195,16 +2249,16 @@ export default function GaragePageWeb({
                   ) : filteredBookings.length === 0 ? (
                     <div
                       className={`${
-                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
+                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white dark:bg-[#191A1D] border-slate-200 dark:border-[#303236]/90'
                       } rounded-2xl border p-10 text-center flex flex-col items-center justify-center shadow-xs my-2`}
                     >
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mb-3 text-slate-400">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#202124] border border-slate-200 dark:border-[#303236] flex items-center justify-center mb-3 text-slate-400">
                         <BootstrapIcon name="calendar2-x" size={22} color="#94A3B8" />
                       </div>
-                      <h3 className={`text-sm font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                      <h3 className={`text-sm font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-800 dark:text-[#F2F2F3]'}`}>
                         No bookings in this filter
                       </h3>
-                      <p className={`text-xs mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <p className={`text-xs mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-[#71717A]'}`}>
                         Switch to "All" to view your full booking history.
                       </p>
                       <button
@@ -2221,14 +2275,17 @@ export default function GaragePageWeb({
                     <div className={`flex flex-col gap-5 w-full ${isSingleBooking ? 'lg:h-full flex-1' : ''}`}>
                       {pagedBookings.map((b) => {
                         const flexStatus = normalizeBookingStatus(b?.status);
-                        const canCancel = [
-                          'PENDING_REVIEW',
-                          'APPROVED',
-                          'SCHEDULED',
-                          'AWAITING_CUSTOMER_APPROVAL',
-                          'QUOTATION_SENT',
-                          'AWAITING_DOWNPAYMENT',
-                        ].includes(flexStatus);
+                        const canCancel =
+                          Boolean(flexStatus) &&
+                          ![
+                            'COMPLETED',
+                            'CANCELLED',
+                            'REJECTED',
+                            'CUSTOMER_DECLINED',
+                            'BOOKING_EXPIRED',
+                            'READY_FOR_PICKUP',
+                            'AWAITING_FINAL_PAYMENT',
+                          ].includes(flexStatus);
                         return (
                           <div
                             key={b.id || b.booking_id}
@@ -2273,13 +2330,13 @@ export default function GaragePageWeb({
                         onClick={() => setBookingsPage((p) => Math.max(1, p - 1))}
                         className={`p-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
                           bookingsPage <= 1
-                            ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
-                            : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                            ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-[#303236] text-slate-400'
+                            : 'border-slate-300 text-slate-700 dark:text-[#A1A1AA] hover:bg-slate-100 dark:bg-[#202124]'
                         }`}
                       >
                         <BootstrapIcon name="chevron-left" size={14} color="#EA580C" />
                       </button>
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                      <span className="text-xs font-bold text-slate-600 dark:text-[#A1A1AA]">
                         Page {safeBookingsPage} of {bookingsTotalPages}
                       </span>
                       <button
@@ -2287,8 +2344,8 @@ export default function GaragePageWeb({
                         onClick={() => setBookingsPage((p) => Math.min(bookingsTotalPages, p + 1))}
                         className={`p-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
                           bookingsPage >= bookingsTotalPages
-                            ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
-                            : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                            ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-[#303236] text-slate-400'
+                            : 'border-slate-300 text-slate-700 dark:text-[#A1A1AA] hover:bg-slate-100 dark:bg-[#202124]'
                         }`}
                       >
                         <BootstrapIcon name="chevron-right" size={14} color="#EA580C" />
@@ -2304,7 +2361,7 @@ export default function GaragePageWeb({
                 >
                   {/* Card 1: Next Steps & Protocol */}
                   <div
-                    className={`bg-white dark:bg-[#18181B] border border-slate-200/90 dark:border-[#27272A] rounded-xl p-6 sm:p-7 shadow-xs flex flex-col justify-between ${
+                    className={`bg-white dark:bg-[#18181B] border border-slate-200 dark:border-[#303236]/90 dark:border-[#27272A] rounded-xl p-6 sm:p-7 shadow-xs flex flex-col justify-between ${
                       isSingleBooking ? 'lg:h-full flex-1' : ''
                     }`}
                   >
@@ -2313,7 +2370,7 @@ export default function GaragePageWeb({
                         <span className="bg-[#1E2227] text-white text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
                           ATELIER STANDARD
                         </span>
-                        <div className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                        <div className="w-8 h-8 rounded-lg border border-slate-200 dark:border-[#303236] flex items-center justify-center text-slate-600 dark:text-[#A1A1AA]">
                           <BootstrapIcon name="shield-check" size={13} color="#475569" />
                         </div>
                       </div>
@@ -2321,13 +2378,13 @@ export default function GaragePageWeb({
                       <h3 className="font-extrabold text-base text-slate-900 dark:text-white mt-1">
                         Next Steps & Protocol
                       </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-4">
+                      <p className="text-xs text-slate-500 dark:text-[#A1A1AA] mt-0.5 mb-4">
                         {protocolState.subtitle}
                       </p>
 
                       {/* Booking Reference Selector (shown when customer has multiple bookings) */}
                       {userBookings.length > 1 ? (
-                        <div className="mb-4 pt-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <div className="mb-4 pt-1 pb-2 border-b border-slate-100 dark:border-[#303236]">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                             Active Protocol Tracking:
                           </span>
@@ -2342,7 +2399,7 @@ export default function GaragePageWeb({
                                   className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0 ${
                                     isCur
                                       ? 'bg-[#1E2227] text-white'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                      : 'bg-slate-100 dark:bg-[#202124] text-slate-600 dark:text-[#A1A1AA] hover:bg-slate-200 dark:hover:bg-slate-700'
                                   }`}
                                 >
                                   {bId}
@@ -2368,11 +2425,11 @@ export default function GaragePageWeb({
                               {/* Step Indicator Dot / Icon */}
                               {isDone ? (
                                 <div className="w-4 h-4 rounded-full bg-[#1E2227] dark:bg-slate-200 flex items-center justify-center shrink-0 mt-0.5 text-white dark:text-[#18181B] shadow-2xs">
-                                  <BootstrapIcon name="check" size={11} color={isDarkMode ? '#18181B' : '#FFFFFF'} />
+                                  <BootstrapIcon name="check" size={11} color={isDarkMode ? '#191A1D' : '#FFFFFF'} />
                                 </div>
                               ) : isCurrent ? (
-                                <div className="w-4 h-4 rounded-full border-2 border-[#1E2227] dark:border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${step.isLive ? 'bg-[#EA580C] animate-ping' : 'bg-[#1E2227] dark:bg-slate-100'}`} />
+                                <div className="w-4 h-4 rounded-full border-2 border-[#1E2227] dark:border-slate-100 dark:border-[#292B2F] flex items-center justify-center shrink-0 mt-0.5">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${step.isLive ? 'bg-[#EA580C] animate-ping' : 'bg-[#1E2227] dark:bg-slate-100 dark:bg-[#202124]'}`} />
                                 </div>
                               ) : isFailed ? (
                                 <div className="w-4 h-4 rounded-full bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 flex items-center justify-center shrink-0 mt-0.5 text-rose-600">
@@ -2388,8 +2445,8 @@ export default function GaragePageWeb({
                                   <span
                                     className={`font-bold text-xs ${
                                       isDone || isCurrent
-                                        ? 'text-slate-900 dark:text-slate-100'
-                                        : 'text-slate-500 dark:text-slate-400'
+                                        ? 'text-slate-900 dark:text-[#F2F2F3]'
+                                        : 'text-slate-500 dark:text-[#A1A1AA]'
                                     }`}
                                   >
                                     {step.title}
@@ -2413,8 +2470,8 @@ export default function GaragePageWeb({
                                 <p
                                   className={`text-xs mt-1 leading-relaxed ${
                                     isCurrent
-                                      ? 'text-slate-600 dark:text-slate-300 font-medium'
-                                      : 'text-slate-500 dark:text-slate-400'
+                                      ? 'text-slate-600 dark:text-[#A1A1AA] font-medium'
+                                      : 'text-slate-500 dark:text-[#A1A1AA]'
                                   }`}
                                 >
                                   {step.desc}
@@ -2428,7 +2485,7 @@ export default function GaragePageWeb({
                                 className={`border-l-2 ml-2 flex-1 min-h-[18px] my-1 transition-colors ${
                                   isDone
                                     ? 'border-[#1E2227] dark:border-slate-400'
-                                    : 'border-slate-200 dark:border-slate-700'
+                                    : 'border-slate-200 dark:border-[#303236]'
                                 }`}
                               />
                             ) : null}
@@ -2438,12 +2495,12 @@ export default function GaragePageWeb({
                     </div>
 
                     {/* Bottom Atelier Telemetry Status Footer (Aligns with bottom baseline of appointment card) */}
-                    <div className="pt-3.5 mt-auto border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                    <div className="pt-3.5 mt-auto border-t border-slate-100 dark:border-[#303236]/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-[#A1A1AA]">
                       <div className="flex items-center gap-1.5 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         <span>Live Bay Telemetry</span>
                       </div>
-                      <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[150px]">
+                      <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 dark:text-[#71717A] truncate max-w-[150px]">
                         {activeProtocolBooking?.bay_name || 'Naga Atelier Bay 02'}
                       </span>
                     </div>
@@ -2452,9 +2509,9 @@ export default function GaragePageWeb({
               </div>
 
               {/* 5. Contextual Bottom Footer (Matching Image 3) */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 pb-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200/70 dark:border-slate-800 mt-8 w-full">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 pb-2 text-xs text-slate-500 dark:text-[#A1A1AA] border-t border-slate-200 dark:border-[#303236]/70 dark:border-[#303236] mt-8 w-full">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 shrink-0">
+                  <div className="w-6 h-6 rounded-md border border-slate-200 dark:border-[#303236] flex items-center justify-center text-slate-400 shrink-0">
                     <BootstrapIcon name="chevron-left" size={9} color="#94A3B8" />
                   </div>
                   <span>
@@ -2464,18 +2521,18 @@ export default function GaragePageWeb({
                         setBookingStatusFilter('COMPLETED');
                         setBookingsPage(1);
                       }}
-                      className="text-slate-800 dark:text-slate-200 font-semibold hover:underline cursor-pointer bg-transparent border-none p-0"
+                      className="text-slate-800 dark:text-[#F2F2F3] font-semibold hover:underline cursor-pointer bg-transparent border-none p-0"
                     >
                       Switch tab to Completed Service History.
                     </button>
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-[#A1A1AA]">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     All Pit Records Encrypted
                   </span>
-                  <span className="text-slate-400 dark:text-slate-600 font-mono text-[11px] uppercase tracking-wider">
+                  <span className="text-slate-400 dark:text-slate-600 dark:text-[#A1A1AA] font-mono text-[11px] uppercase tracking-wider">
                     ATELIER OS v2.4.9
                   </span>
                 </div>
@@ -2519,7 +2576,7 @@ export default function GaragePageWeb({
                 {garageMotorcycles.map((moto) => (
                   <div
                     key={moto.motorcycle_id || moto.id}
-                    className={`rounded-2xl p-4 border transition-all ${isDarkMode ? 'bg-[#151C19] border-[#374151]' : 'bg-white border-slate-200'
+                    className={`rounded-2xl p-4 border transition-all ${isDarkMode ? 'bg-[#191A1D] border-[#303236]' : 'bg-white dark:bg-[#191A1D] border-slate-200 dark:border-[#303236]'
                       }`}
                   >
                     <div className="flex items-center gap-3 mb-3">
@@ -2531,7 +2588,7 @@ export default function GaragePageWeb({
                         )}
                       </div>
                       <div>
-                        <div className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <div className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-slate-900 dark:text-[#F2F2F3]'}`}>
                           {moto.brand} {moto.model}
                         </div>
                         <div className="text-xs text-slate-400">
@@ -2955,6 +3012,7 @@ export default function GaragePageWeb({
                   setRedirectReason?.('Please sign in to book a service for your motorcycle.');
                   onNavigateToLogin?.();
                 }}
+                onRequireLogin={onRequireLogin}
                 showToast={showToast}
               />
             </ScrollView>
@@ -3083,25 +3141,43 @@ export default function GaragePageWeb({
         </View>
       </Modal>
 
-      {/* Strict Non-Refundable Cancellation Confirmation Modal */}
+      {/* Cancellation Confirmation Modal (50% Downpayment Refund Policy) */}
       <ConfirmModal
         visible={isCancelModalOpen}
         title={
-          isFlexibleBooking(bookingToCancel) && !Number(bookingToCancel?.amount_paid || 0)
+          isFlexibleBooking(bookingToCancel) &&
+          !Number(bookingToCancel?.amount_paid || bookingToCancel?.downpayment_amount || 0)
             ? 'Cancel Service Request?'
-            : 'Cancel Pit Bay Appointment?'
+            : 'Cancel Service Booking?'
         }
-        message={
-          isFlexibleBooking(bookingToCancel) && !Number(bookingToCancel?.amount_paid || 0)
-            ? `Cancel service request #${bookingToCancel?.id}? No payment has been made, so nothing will be charged.`
-            : `⚠️ STRICT NON-REFUNDABLE POLICY NOTICE:\n\nYour advance downpayment of ₱${(bookingToCancel?.amount_paid || bookingToCancel?.downpayment_amount || Math.round((bookingToCancel?.pricePhp || 2500) * 0.2)).toLocaleString()} is STRICTLY NON-REFUNDABLE.\n\nCancelling Ticket #${bookingToCancel?.id} will forfeit your downpayment to cover reserved technician allocation and bay scheduling. Are you sure you wish to cancel?`
-        }
+        message={(() => {
+          const dp = Number(
+            bookingToCancel?.amount_paid || bookingToCancel?.downpayment_amount || 0
+          );
+          if (isFlexibleBooking(bookingToCancel) && dp <= 0) {
+            return 'No downpayment has been made for this request, so nothing will be charged.';
+          }
+          const half = Math.round(dp * 0.5);
+          return `Cancelling this booking entitles you to a 50% downpayment refund (₱${half.toLocaleString()} of ₱${dp.toLocaleString()}) processed by the admin via GCash.`;
+        })()}
+        itemName={(() => {
+          if (!bookingToCancel?.id) return undefined;
+          const dp = Number(
+            bookingToCancel?.amount_paid || bookingToCancel?.downpayment_amount || 0
+          );
+          if (isFlexibleBooking(bookingToCancel) && dp <= 0) {
+            return `Ticket #${bookingToCancel.id}`;
+          }
+          const half = Math.round(dp * 0.5);
+          return `Ticket #${bookingToCancel.id} · 50% Refund: ₱${half.toLocaleString()}`;
+        })()}
         confirmText={
-          isFlexibleBooking(bookingToCancel) && !Number(bookingToCancel?.amount_paid || 0)
-            ? 'Yes, Cancel Request'
-            : 'Yes, Cancel & Forfeit Downpayment'
+          isFlexibleBooking(bookingToCancel) &&
+          !Number(bookingToCancel?.amount_paid || bookingToCancel?.downpayment_amount || 0)
+            ? 'Cancel Request'
+            : 'Cancel Booking'
         }
-        cancelText="Keep My Booking"
+        cancelText="Keep Booking"
         type="danger"
         confirmIcon="exclamation-triangle-fill"
         onConfirm={handleConfirmCancelBooking}

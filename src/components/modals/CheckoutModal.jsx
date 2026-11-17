@@ -34,14 +34,14 @@ export default function CheckoutModal({
   const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
   const checkoutStyles = useMemo(() => createCheckoutStyles(isDarkMode), [isDarkMode]);
 
-  const sheetBg = isDarkMode ? '#1C2025' : '#FFFFFF';
-  const subBg = isDarkMode ? '#181B1F' : '#F8FAFC';
-  const elevatedBg = isDarkMode ? '#252A30' : '#F1F5F9';
-  const borderCol = isDarkMode ? '#282D34' : '#E2E8F0';
+  const sheetBg = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const subBg = isDarkMode ? '#18181B' : '#F8FAFC';
+  const elevatedBg = isDarkMode ? '#202124' : '#F1F5F9';
+  const borderCol = isDarkMode ? '#303236' : '#E2E8F0';
   const inputBorderCol = isDarkMode ? '#333A42' : '#CBD5E1';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDarkMode ? '#CBD5E1' : '#475569';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textSecondary = isDarkMode ? '#A1A1AA' : '#475569';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
   const brandAccent = isDarkMode ? '#FB923C' : '#EA580C';
   const { currentUser, updateProfile } = useAuth();
   const {
@@ -429,7 +429,7 @@ export default function CheckoutModal({
 
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
                             <View style={{ backgroundColor: elevatedBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
-                              <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#334155' }}>
                                 Qty: {qty}
                               </Text>
                             </View>
@@ -499,7 +499,7 @@ export default function CheckoutModal({
                         justifyContent: 'center',
                       }}
                     >
-                      <BootstrapIcon name="cash-stack" size={18} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
+                      <BootstrapIcon name="cash-stack" size={18} color={isDarkMode ? '#00C98D' : '#16A34A'} />
                     </View>
                     <View>
                       <Text style={[styles.paymentOptionTitle, { color: textPrimary }]}>
@@ -536,7 +536,7 @@ export default function CheckoutModal({
                         marginBottom: 8,
                       }}
                     >
-                      <BootstrapIcon name="cash-coin" size={14} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
+                      <BootstrapIcon name="cash-coin" size={14} color={isDarkMode ? '#00C98D' : '#16A34A'} />
                       <Text style={{ fontSize: 11.5, color: isDarkMode ? '#86EFAC' : '#166534', fontWeight: '700', flex: 1 }}>
                         Exact amount to prepare: ₱
                         {displayTotal.toLocaleString(undefined, {
@@ -708,7 +708,7 @@ export default function CheckoutModal({
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <BootstrapIcon name="check-circle-fill" size={13} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
+                        <BootstrapIcon name="check-circle-fill" size={13} color={isDarkMode ? '#00C98D' : '#16A34A'} />
                         <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? '#86EFAC' : '#166534' }}>
                           Reference: {gcashReference}
                         </Text>
@@ -719,7 +719,7 @@ export default function CheckoutModal({
                           showToast('Generated fresh GCash reference code');
                         }}
                       >
-                        <BootstrapIcon name="arrow-clockwise" size={13} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
+                        <BootstrapIcon name="arrow-clockwise" size={13} color={isDarkMode ? '#00C98D' : '#16A34A'} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -751,11 +751,11 @@ export default function CheckoutModal({
 
               {summaryDiscount > 0 ? (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#00C98D' : '#16A34A', fontWeight: '700' }}>
                     {appliedPromoMeta?.code || 'Discount'}
                     {discountPercent > 0 ? ` −${discountPercent}%` : ''}
                   </Text>
-                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#00C98D' : '#16A34A', fontWeight: '700' }}>
                     −₱{Number(summaryDiscount).toFixed(2)}
                   </Text>
                 </View>
@@ -770,10 +770,10 @@ export default function CheckoutModal({
 
               {summaryFreeShipping ? (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#00C98D' : '#16A34A', fontWeight: '700' }}>
                     ✓ Free Shipping
                   </Text>
-                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#00C98D' : '#16A34A', fontWeight: '700' }}>
                     −₱{Number(shippingRate || 150).toFixed(2)}
                   </Text>
                 </View>
@@ -834,11 +834,11 @@ export default function CheckoutModal({
 const createCheckoutStyles = (isDarkMode) =>
   StyleSheet.create({
     addressCardContainer: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       borderRadius: 16,
       padding: 14,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       marginBottom: 14,
     },
     addressCardHeader: {
@@ -847,12 +847,12 @@ const createCheckoutStyles = (isDarkMode) =>
       justifyContent: 'space-between',
       paddingBottom: 8,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#EDF2F7',
+      borderBottomColor: isDarkMode ? '#303236' : '#EDF2F7',
     },
     addressCardTitle: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     editProfileAddressBtn: {
       paddingHorizontal: 8,
@@ -874,7 +874,7 @@ const createCheckoutStyles = (isDarkMode) =>
     addressRecipientName: {
       fontSize: 13.5,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     addressPhoneText: {
       fontSize: 12.5,
@@ -883,7 +883,7 @@ const createCheckoutStyles = (isDarkMode) =>
     },
     addressFullText: {
       fontSize: 12.5,
-      color: isDarkMode ? '#CBD5E1' : '#334155',
+      color: isDarkMode ? '#A1A1AA' : '#334155',
       lineHeight: 18,
       marginTop: 2,
     },
@@ -911,7 +911,7 @@ const createCheckoutStyles = (isDarkMode) =>
     inlineFormLabel: {
       fontSize: 11.5,
       fontWeight: '700',
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
     },
     inlineInput: {
       backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
@@ -920,7 +920,7 @@ const createCheckoutStyles = (isDarkMode) =>
       borderWidth: 1,
       borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
       fontSize: 12.5,
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       minHeight: 60,
       textAlignVertical: 'top',
     },

@@ -38,6 +38,59 @@
     --line-height-section-header: 22px;
     --line-height-page-header: 26px;
     --line-height-kpi: 36px;
+
+    /* MOTOTRACK Global Theme Tokens (Light Mode Default) */
+    --background: #F3F4F6;
+    --sidebar: #24272B;
+    --header: #FFFFFF;
+    --content: #F3F4F6;
+    --card: #FFFFFF;
+    --card-secondary: #F8F9FA;
+    --input: #FFFFFF;
+    --border: #E5E7EB;
+    --border-secondary: #F1F5F9;
+    --divider: #E5E7EB;
+    --border-input: #D1D5DB;
+    --foreground: #111827;
+    --foreground-secondary: #374151;
+    --muted: #6B7280;
+    --disabled: #9CA3AF;
+    --heading: #111827;
+    --primary: #FF5A00;
+    --primary-hover: #E95000;
+    --primary-subtle: #FFF7ED;
+    --primary-border: #FED7AA;
+    --success: #16A34A;
+    --warning: #D97706;
+    --error: #DC2626;
+    --info: #2563EB;
+  }
+
+  .dark {
+    --background: #111315;
+    --sidebar: #18181B;
+    --header: #111315;
+    --content: #18181B;
+    --card: #191A1D;
+    --card-secondary: #202124;
+    --input: #202124;
+    --border: #303236;
+    --border-secondary: #292B2F;
+    --divider: #303236;
+    --border-input: #3A3B40;
+    --foreground: #F2F2F3;
+    --foreground-secondary: #A1A1AA;
+    --muted: #71717A;
+    --disabled: #52525B;
+    --heading: #F5F5F5;
+    --primary: #FF5A00;
+    --primary-hover: #E95000;
+    --primary-subtle: #3A241B;
+    --primary-border: #8A3D19;
+    --success: #00C98D;
+    --warning: #F5B942;
+    --error: #F04444;
+    --info: #3B82F6;
   }
 
   *, *::before, *::after {
@@ -241,11 +294,11 @@
 
   /* ─── Minimalist Admin Dashboard UI System ─── */
   .admin-minimal-card {
-    @apply bg-white dark:bg-[#24272B] border border-slate-200/80 dark:border-slate-700/60 rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
+    @apply bg-white dark:bg-[#191A1D] border border-slate-200/80 dark:border-[#303236] rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-stat-card {
-    @apply bg-white dark:bg-[#24272B] rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
+    @apply bg-white dark:bg-[#191A1D] rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-icon-pill {
@@ -254,31 +307,31 @@
 
   .admin-icon-pill-teal,
   .admin-icon-pill-orange {
-    @apply bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100 dark:border-orange-800/40;
+    @apply bg-orange-50 text-orange-600 dark:bg-[#3A241B] dark:text-[#FF5A00] border border-orange-100 dark:border-[#8A3D19];
   }
 
   .admin-icon-pill-blue {
-    @apply bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40;
+    @apply bg-blue-50 text-blue-700 dark:bg-[#3B82F6]/15 dark:text-[#3B82F6] border border-blue-100 dark:border-[#3B82F6]/30;
   }
 
   .admin-icon-pill-amber {
-    @apply bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-100 dark:border-amber-800/40;
+    @apply bg-amber-50 text-amber-700 dark:bg-[#F5B942]/15 dark:text-[#F5B942] border border-amber-100 dark:border-[#F5B942]/30;
   }
 
   .admin-icon-pill-rose {
-    @apply bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40;
+    @apply bg-rose-50 text-rose-700 dark:bg-[#F04444]/15 dark:text-[#F04444] border border-rose-100 dark:border-[#F04444]/30;
   }
 
   .admin-icon-pill-slate {
-    @apply bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60;
+    @apply bg-slate-100 text-slate-700 dark:bg-[#202124] dark:text-[#A1A1AA] border border-slate-200/60 dark:border-[#303236];
   }
 
   .admin-table-head {
-    @apply bg-[#24272B] dark:bg-[#1E2124] text-[13px] font-bold text-white border-b border-slate-700/60;
+    @apply bg-[#24272B] dark:bg-[#202124] text-[13px] font-bold text-white border-b border-slate-700/60;
   }
 
   .admin-table-row {
-    @apply border-b border-slate-100 dark:border-slate-700/60 hover:bg-slate-50/80 dark:hover:bg-[#2D3136] transition-colors duration-150;
+    @apply border-b border-slate-100 dark:border-[#303236] hover:bg-slate-50/80 dark:hover:bg-[#202124] transition-colors duration-150;
   }
 
   .admin-nav-item {
@@ -286,20 +339,23 @@
   }
 
   .admin-nav-item-active {
-    @apply bg-[#F97316] text-white shadow-sm;
+    @apply bg-[#FF5A00] text-white shadow-sm;
   }
 }
 
 /* Dark mode — charcoal admin chrome (scrollbars, selection, focus) */
 html.dark,
-html.dark body {
-  background-color: #181A1D;
-  color: #F9FAFB;
+html.dark body,
+html.dark #root,
+html.dark #__next,
+html.dark [data-reactroot] {
+  background-color: #111315;
+  color: #F2F2F3;
   color-scheme: dark;
 }
 
 html.dark ::selection {
-  background: rgba(249, 115, 22, 0.35);
+  background: rgba(255, 90, 0, 0.35);
   color: #FFFFFF;
 }
 
@@ -341,17 +397,17 @@ html.dark ::-webkit-scrollbar-track {
   background: transparent;
 }
 html.dark ::-webkit-scrollbar-thumb {
-  background: #EA580C;
+  background: #FF5A00;
   border-radius: 9999px;
   border: none;
 }
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #C2410C;
+  background: #E95000;
 }
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #9CA3AF !important;
+  color: #71717A !important;
   opacity: 1;
 }
 
@@ -359,13 +415,13 @@ html.dark input:focus,
 html.dark textarea:focus,
 html.dark button:focus-visible,
 html.dark [role='button']:focus-visible {
-  outline: 2px solid rgba(249, 115, 22, 0.60);
+  outline: 2px solid rgba(255, 90, 0, 0.60);
   outline-offset: 2px;
 }
 
 /* Dark mode — table row hover (slightly lighter charcoal) */
 html.dark [data-admin-table-row='true']:hover {
-  background-color: #2D3136 !important;
+  background-color: #202124 !important;
 }
 
 
@@ -418,9 +474,9 @@ html.dark [data-admin-table-row='true']:hover {
 html.dark .mototrack-skeleton-shimmer {
   background: linear-gradient(
     90deg,
-    #1E2824 0%,
-    #2A3A33 50%,
-    #1E2824 100%
+    #191A1D 0%,
+    #202124 50%,
+    #191A1D 100%
   );
   background-size: 200% 100%;
 }
@@ -445,9 +501,9 @@ html.dark .mototrack-sidebar-skeleton [data-testid="skeleton-placeholder"],
 html.dark .mototrack-sidebar-skeleton .mototrack-skeleton-shimmer {
   background: linear-gradient(
     90deg,
-    #1E2824 0%,
-    #2B3B34 50%,
-    #1E2824 100%
+    #191A1D 0%,
+    #292B2F 50%,
+    #191A1D 100%
   );
   background-size: 200% 100%;
 }
@@ -553,8 +609,8 @@ html.dark .mototrack-nav-item:hover {
 }
 
 html.dark .mototrack-nav-item.mototrack-nav-item-active {
-  background-color: rgba(234, 88, 12, 0.16) !important;
-  border-left-color: #EA580C !important;
+  background-color: #3A241B !important;
+  border-left-color: #FF5A00 !important;
   color: #FFFFFF !important;
   box-shadow: none !important;
 }
@@ -621,8 +677,8 @@ html.dark .mototrack-collapse-btn:hover {
 }
 
 html.dark .mototrack-profile-card:hover {
-  background-color: #19231F !important;
-  border-color: #2F4239 !important;
+  background-color: #202124 !important;
+  border-color: #303236 !important;
 }
 
 .mototrack-profile-arrow {
@@ -654,4 +710,23 @@ html.dark .mototrack-profile-card:hover .mototrack-profile-arrow {
     animation: none !important;
     background-image: none !important;
   }
+}
+
+
+/* Hide visible vertical/horizontal scrollbars inside POS Cashier while preserving scrolling */
+[data-posscroll="true"],
+[data-pos-scroll="true"],
+[data-posscroll="true"] *,
+[data-pos-scroll="true"] * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+[data-posscroll="true"]::-webkit-scrollbar,
+[data-pos-scroll="true"]::-webkit-scrollbar,
+[data-posscroll="true"] *::-webkit-scrollbar,
+[data-pos-scroll="true"] *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }

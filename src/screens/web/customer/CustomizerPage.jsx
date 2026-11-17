@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { customizerWebStyles as styles } from '../../../styles/web/customizer.web.styles.js';
+import { getCustomizerWebStyles } from '../../../styles/web/customizer.web.styles.js';
 import { usdToPhp } from '../../../utils/currency.js';
 import { aiCustomizerService, BIKE_PRESETS, CUSTOM_THEMES } from '../../../services/ai/aiCustomizerService.js';
 import { productService } from '../../../services/products/productService.js';
@@ -60,8 +60,10 @@ export default function CustomizerPageWeb({
   onLogout,
   onOpenCart,
   onNavigateToAppointments,
+  onRequireLogin,
 }) {
   const { isDarkMode, toggleDarkMode, tokens } = useTheme();
+  const styles = useMemo(() => getCustomizerWebStyles(isDarkMode), [isDarkMode]);
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 1024;
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
@@ -558,7 +560,7 @@ export default function CustomizerPageWeb({
     <View
       style={[
         styles.container,
-        isDarkMode && { backgroundColor: '#0F1412' },
+        isDarkMode && { backgroundColor: '#111315' },
         Platform.OS === 'web' ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' } : {},
       ]}
     >
@@ -569,7 +571,7 @@ export default function CustomizerPageWeb({
       <ScrollView
         style={[
           { flex: 1, width: '100%' },
-          isDarkMode && { backgroundColor: '#0F1412' },
+          isDarkMode && { backgroundColor: '#111315' },
           Platform.OS === 'web'
             ? { overflowY: 'scroll', overscrollBehavior: 'none', overscrollBehaviorY: 'none' }
             : {},
@@ -581,7 +583,7 @@ export default function CustomizerPageWeb({
       >
         {/* ─── 1. NAVBAR ─── */}
         <View
-          style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}
+          style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#111315', borderBottomColor: '#303236' }]}
           className="web-header"
           dataSet={{ webHeader: true }}
           accessibilityRole="header">
@@ -815,7 +817,18 @@ export default function CustomizerPageWeb({
           <AiMotorcycleInstallStudio
             currentUser={currentUser}
             initialSelectedProduct={initialSelectedProduct}
-            onRequireLogin={() => {
+            onRequireLogin={(promptOptions) => {
+              if (onRequireLogin) {
+                onRequireLogin(
+                  promptOptions || {
+                    title: 'Sign In to Customize',
+                    message: 'Your 1 free guest preview is complete. Sign in to generate more AI previews, save builds, and book custom installations.',
+                    actionLabel: 'Sign In to Customize',
+                    feature: 'customize',
+                  }
+                );
+                return;
+              }
               setRedirectReason?.('ai-install');
               onNavigateToLogin?.();
             }}
@@ -830,42 +843,42 @@ export default function CustomizerPageWeb({
       <Modal visible={viewingPartDetails !== null} transparent animationType="fade">
         <View style={styles.partModalOverlay}>
           {viewingPartDetails && (
-            <View style={[styles.partModalSheet, isDarkMode && { backgroundColor: '#151C19', borderColor: '#26332E' }]}>
-              <View style={[styles.partModalHeader, isDarkMode && { borderBottomColor: '#26332E' }]}>
+            <View style={[styles.partModalSheet, isDarkMode && { backgroundColor: '#191A1D', borderColor: '#303236' }]}>
+              <View style={[styles.partModalHeader, isDarkMode && { borderBottomColor: '#303236' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <BootstrapIcon name="info-circle-fill" size={18} color={isDarkMode ? '#EA580C' : '#EA580C'} />
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? '#F5F7F6' : '#0F172A' }}>
+                  <BootstrapIcon name="info-circle-fill" size={18} color="#FF5A00" />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? '#F5F5F5' : '#0F172A' }}>
                     Part Details & Fitment
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setViewingPartDetails(null)}>
-                  <BootstrapIcon name="x" size={22} color={isDarkMode ? '#AAB4B0' : '#64748B'} />
+                  <BootstrapIcon name="x" size={22} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
-              <View style={[styles.partModalImgBox, isDarkMode && { backgroundColor: '#131A17' }]}>
+              <View style={[styles.partModalImgBox, isDarkMode && { backgroundColor: '#202124' }]}>
                 <Image
                   source={{ uri: viewingPartDetails.image }}
                   style={styles.partModalImg}
                   resizeMode="cover"
                 />
-                <View style={[styles.partModalBadge, isDarkMode && { backgroundColor: '#1E3A2F' }]}>
-                  <Text style={[styles.partModalBadgeText, isDarkMode && { color: '#EA580C' }]}>
+                <View style={[styles.partModalBadge, isDarkMode && { backgroundColor: '#3A241B' }]}>
+                  <Text style={[styles.partModalBadgeText, isDarkMode && { color: '#FF5A00' }]}>
                     {viewingPartDetails.category || 'Performance'}
                   </Text>
                 </View>
               </View>
 
-              <Text style={[styles.partModalTitle, isDarkMode && { color: '#F5F7F6' }]}>{viewingPartDetails.name}</Text>
-              <Text style={[styles.partModalBrand, isDarkMode && { color: '#AAB4B0' }]}>
+              <Text style={[styles.partModalTitle, isDarkMode && { color: '#F5F5F5' }]}>{viewingPartDetails.name}</Text>
+              <Text style={[styles.partModalBrand, isDarkMode && { color: '#A1A1AA' }]}>
                 {viewingPartDetails.brand} • In Stock ({viewingPartDetails.stock || 8} available)
               </Text>
 
               <View style={styles.partModalPriceRow}>
-                <Text style={[styles.partModalPricePhp, isDarkMode && { color: '#EA580C' }]}>
+                <Text style={[styles.partModalPricePhp, isDarkMode && { color: '#FF5A00' }]}>
                   ₱{usdToPhp(viewingPartDetails.price || 0).toLocaleString()}
                 </Text>
-                <Text style={[styles.partModalPriceUsd, isDarkMode && { color: '#AAB4B0' }]}>
+                <Text style={[styles.partModalPriceUsd, isDarkMode && { color: '#A1A1AA' }]}>
                   ${Number(viewingPartDetails.price || 0).toFixed(2)} USD
                 </Text>
               </View>
@@ -874,22 +887,22 @@ export default function CustomizerPageWeb({
                 <View
                   style={[
                     styles.partModalSpecChip,
-                    isDarkMode && { backgroundColor: '#1E2A24', borderWidth: 1, borderColor: '#26332E' },
+                    isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
                   ]}
                 >
-                  <BootstrapIcon name="check-circle" size={12} color="#EA580C" />
-                  <Text style={[styles.partModalSpecText, isDarkMode && { color: '#CBD5E1' }]}>
+                  <BootstrapIcon name="check-circle" size={12} color="#FF5A00" />
+                  <Text style={[styles.partModalSpecText, isDarkMode && { color: '#F2F2F3' }]}>
                     Compatible with {activeMotorcycle?.brand} {activeMotorcycle?.model}
                   </Text>
                 </View>
                 <View
                   style={[
                     styles.partModalSpecChip,
-                    isDarkMode && { backgroundColor: '#1E2A24', borderWidth: 1, borderColor: '#26332E' },
+                    isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
                   ]}
                 >
-                  <BootstrapIcon name="lightning-charge-fill" size={12} color="#10B981" />
-                  <Text style={[styles.partModalSpecText, isDarkMode && { color: '#CBD5E1' }]}>
+                  <BootstrapIcon name="lightning-charge-fill" size={12} color="#00C98D" />
+                  <Text style={[styles.partModalSpecText, isDarkMode && { color: '#F2F2F3' }]}>
                     Plug-and-Play Fitment
                   </Text>
                 </View>
@@ -908,12 +921,12 @@ export default function CustomizerPageWeb({
                 <TouchableOpacity
                   style={[
                     styles.partModalCancelBtn,
-                    isDarkMode && { backgroundColor: '#1E2A24', borderColor: '#334155' },
+                    isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
                   ]}
                   onPress={() => setViewingPartDetails(null)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.partModalCancelBtnText, isDarkMode && { color: '#CBD5E1' }]}>
+                  <Text style={[styles.partModalCancelBtnText, isDarkMode && { color: '#F2F2F3' }]}>
                     Cancel / Back
                   </Text>
                 </TouchableOpacity>

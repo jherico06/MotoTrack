@@ -119,11 +119,11 @@ export default function CustomerRescheduleModal({
     }
   };
 
-  const bgCard = isDarkMode ? '#1E2227' : '#FFFFFF';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const bgCard = isDarkMode ? '#202124' : '#FFFFFF';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
   const borderCol = isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0';
-  const inputBg = isDarkMode ? '#0F172A' : '#F8FAFC';
+  const inputBg = isDarkMode ? '#191A1D' : '#F8FAFC';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -237,7 +237,7 @@ export default function CustomerRescheduleModal({
 
                 <View
                   style={{
-                    backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                    backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
                     borderRadius: 10,
                     padding: 12,
                     gap: 6,
@@ -306,7 +306,7 @@ export default function CustomerRescheduleModal({
                     disabled={isSubmitting}
                     style={{
                       flex: 1,
-                      backgroundColor: isDarkMode ? '#334155' : '#E2E8F0',
+                      backgroundColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                       paddingVertical: 10,
                       borderRadius: 10,
                       alignItems: 'center',
@@ -470,7 +470,7 @@ export default function CustomerRescheduleModal({
                 style={{
                   fontSize: 11.5,
                   fontWeight: '600',
-                  color: availability.available ? (isDarkMode ? '#34D399' : '#065F46') : '#DC2626',
+                  color: availability.available ? (isDarkMode ? '#00C98D' : '#065F46') : '#DC2626',
                 }}
               >
                 {availability.available

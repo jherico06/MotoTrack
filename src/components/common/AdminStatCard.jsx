@@ -160,15 +160,28 @@ export default function AdminStatCard({
   const theme = ACCENT_THEMES[accent] || ACCENT_THEMES.orange;
   const resolvedIcon = icon || getAutoIcon(label);
 
+  const isWeb = Platform.OS === 'web';
   const iconBg = resolvedIsDark ? theme.iconBgDark : theme.iconBg;
   const iconColor = resolvedIsDark ? theme.iconColorDark : theme.iconColor;
-  const cardBorderColor = resolvedIsDark ? '#374151' : '#E5E7EB';
-  const cardBg = resolvedIsDark ? '#24272B' : '#FFFFFF';
+  const cardBorderColor = isWeb
+    ? resolvedIsDark
+      ? '#303236'
+      : '#E5E7EB'
+    : resolvedIsDark
+      ? '#374151'
+      : '#E5E7EB';
+  const cardBg = isWeb
+    ? resolvedIsDark
+      ? '#191A1D'
+      : '#FFFFFF'
+    : resolvedIsDark
+      ? '#24272B'
+      : '#FFFFFF';
 
   // Value color resolution
   const resolvedValueColor =
     valueColor ||
-    (resolvedIsDark ? '#F9FAFB' : '#111827');
+    (isWeb ? (resolvedIsDark ? '#F5F5F5' : '#18181B') : resolvedIsDark ? '#F9FAFB' : '#111827');
 
   // Badge resolution
   const badgeContent = badge || trend;
@@ -228,6 +241,96 @@ export default function AdminStatCard({
       }
     : { testID };
 
+  const webIndicatorColor =
+    badgeType === 'success' || trendPositive === true
+      ? '#00C98D'
+      : badgeType === 'danger' || trendPositive === false || accent === 'red'
+        ? '#F04444'
+        : badgeType === 'warning' || accent === 'amber'
+          ? '#F5B942'
+          : badgeType === 'info' || accent === 'blue'
+            ? '#3B82F6'
+            : accent === 'gray' || badgeType === 'neutral'
+              ? resolvedIsDark
+                ? '#52525B'
+                : '#A1A1AA'
+              : '#FF5A00';
+
+  const webPillBg =
+    badgeType === 'success' || trendPositive === true
+      ? resolvedIsDark
+        ? 'rgba(0, 201, 141, 0.14)'
+        : '#ECFDF5'
+      : badgeType === 'danger' || trendPositive === false
+        ? resolvedIsDark
+          ? 'rgba(240, 68, 68, 0.14)'
+          : '#FEF2F2'
+        : badgeType === 'warning'
+          ? resolvedIsDark
+            ? 'rgba(245, 185, 66, 0.14)'
+            : '#FFFBEB'
+          : badgeType === 'info'
+            ? resolvedIsDark
+              ? 'rgba(59, 130, 246, 0.14)'
+              : '#EFF6FF'
+            : badgeType === 'neutral'
+              ? resolvedIsDark
+                ? '#202124'
+                : '#F4F4F5'
+              : resolvedIsDark
+                ? '#3A241B'
+                : '#FFF7ED';
+
+  const webPillBorder =
+    badgeType === 'success' || trendPositive === true
+      ? resolvedIsDark
+        ? 'rgba(0, 201, 141, 0.28)'
+        : '#A7F3D0'
+      : badgeType === 'danger' || trendPositive === false
+        ? resolvedIsDark
+          ? 'rgba(240, 68, 68, 0.28)'
+          : '#FECACA'
+        : badgeType === 'warning'
+          ? resolvedIsDark
+            ? 'rgba(245, 185, 66, 0.28)'
+            : '#FDE68A'
+          : badgeType === 'info'
+            ? resolvedIsDark
+              ? 'rgba(59, 130, 246, 0.28)'
+              : '#BFDBFE'
+            : badgeType === 'neutral'
+              ? resolvedIsDark
+                ? '#303236'
+                : '#E4E4E7'
+              : resolvedIsDark
+                ? '#8A3D19'
+                : '#FED7AA';
+
+  const webPillText =
+    badgeType === 'success' || trendPositive === true
+      ? resolvedIsDark
+        ? '#00C98D'
+        : '#047857'
+      : badgeType === 'danger' || trendPositive === false
+        ? resolvedIsDark
+          ? '#F04444'
+          : '#DC2626'
+        : badgeType === 'warning'
+          ? resolvedIsDark
+            ? '#F5B942'
+            : '#B45309'
+          : badgeType === 'info'
+            ? resolvedIsDark
+              ? '#3B82F6'
+              : '#1D4ED8'
+            : badgeType === 'neutral'
+              ? resolvedIsDark
+                ? '#A1A1AA'
+                : '#71717A'
+              : resolvedIsDark
+                ? '#FF5A00'
+                : '#EA580C';
+
   return (
     <ContainerComponent
       {...containerProps}
@@ -242,11 +345,12 @@ export default function AdminStatCard({
           flex: 1,
           minWidth: 200,
           backgroundColor: cardBg,
-          borderRadius: 14,
-          paddingVertical: 14,
-          paddingHorizontal: 16,
+          borderRadius: isWeb ? 16 : 14,
+          paddingVertical: isWeb ? 20 : 14,
+          paddingHorizontal: isWeb ? 20 : 16,
           borderWidth: 1,
           borderColor: cardBorderColor,
+          justifyContent: isWeb ? 'space-between' : 'flex-start',
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: resolvedIsDark ? 0.25 : 0.03,
@@ -257,104 +361,217 @@ export default function AdminStatCard({
         style,
       ]}
     >
-      {/* ─── TOP ROW: Icon Box (Top-Left) & Status Badge (Top-Right) ─── */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 10,
-        }}
-      >
-        {/* Subtle colored square with rounded corners */}
-        <View
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 9,
-            backgroundColor: iconBg,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <BootstrapIcon name={resolvedIcon} size={17} color={iconColor} />
-        </View>
-
-        {/* Compact percentage change or status indicator pill */}
-        {badgeContent ? (
+      {isWeb ? (
+        <>
+          {/* ─── DASHBOARD-UNIFIED WEB KPI HEADER ─── */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 3,
-              paddingHorizontal: 7,
-              paddingVertical: 2.5,
-              borderRadius: 6,
-              backgroundColor: resolvedBadgeBg,
+              justifyContent: 'space-between',
+              gap: 8,
             }}
           >
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: 11,
-                fontWeight: '700',
-                color: resolvedBadgeText,
+                flex: 1,
+                fontSize: 13,
+                fontWeight: '500',
+                color: resolvedIsDark ? '#A1A1AA' : '#71717A',
+              }}
+            >
+              {label}
+            </Text>
+
+            {badgeContent ? (
+              <View
+                style={{
+                  backgroundColor: webPillBg,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2.5,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: webPillBorder,
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: webPillText,
+                  }}
+                >
+                  {badgeContent}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 999,
+                  backgroundColor: resolvedIsDark ? '#202124' : '#F4F4F5',
+                  borderWidth: 1,
+                  borderColor: resolvedIsDark ? '#303236' : '#E4E4E7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name={resolvedIcon} size={11} color={webIndicatorColor} />
+              </View>
+            )}
+          </View>
+
+          {/* ─── VALUE & SUBTEXT ─── */}
+          <View style={{ marginVertical: 12 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 28,
+                fontWeight: '600',
+                letterSpacing: -0.6,
+                lineHeight: 34,
+                color: resolvedValueColor,
+                fontVariant: ['tabular-nums'],
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+              }}
+            >
+              {value}
+            </Text>
+            {sub ? (
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: 12,
+                  fontWeight: '400',
+                  color: resolvedIsDark ? '#71717A' : '#6B7280',
+                  marginTop: 3,
+                }}
+              >
+                {sub}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* ─── BOTTOM PROGRESS TRACK INDICATOR ─── */}
+          <View
+            style={{
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: resolvedIsDark ? '#292B2F' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 4,
+            }}
+          >
+            <View
+              style={{
+                height: '100%',
+                width:
+                  accent === 'gray' || badgeType === 'neutral'
+                    ? '58%'
+                    : '74%',
+                backgroundColor: webIndicatorColor,
+                borderRadius: 2,
+              }}
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          {/* ─── NATIVE TOP ROW: Icon Box (Top-Left) & Status Badge (Top-Right) ─── */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 10,
+            }}
+          >
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 9,
+                backgroundColor: iconBg,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <BootstrapIcon name={resolvedIcon} size={17} color={iconColor} />
+            </View>
+
+            {badgeContent ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 3,
+                  paddingHorizontal: 7,
+                  paddingVertical: 2.5,
+                  borderRadius: 6,
+                  backgroundColor: resolvedBadgeBg,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: resolvedBadgeText,
+                    letterSpacing: -0.1,
+                  }}
+                >
+                  {badgeContent}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 12.5,
+              fontWeight: '600',
+              color: resolvedIsDark ? '#9CA3AF' : '#6B7280',
+              marginBottom: 2,
+              letterSpacing: -0.1,
+            }}
+          >
+            {label}
+          </Text>
+
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 28,
+              fontWeight: '600',
+              letterSpacing: -0.5,
+              lineHeight: 34,
+              color: resolvedValueColor,
+              fontVariant: ['tabular-nums'],
+              fontFamily: 'Inter-Bold',
+            }}
+          >
+            {value}
+          </Text>
+
+          {sub ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 11.5,
+                fontWeight: '400',
+                color: resolvedIsDark ? '#AAB4B0' : '#64748B',
+                marginTop: 2,
                 letterSpacing: -0.1,
               }}
             >
-              {badgeContent}
+              {sub}
             </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* ─── KPI LABEL: Muted Gray ─── */}
-      <Text
-        numberOfLines={1}
-        style={{
-          fontSize: 12.5,
-          fontWeight: '600',
-          color: resolvedIsDark ? '#9CA3AF' : '#6B7280',
-          marginBottom: 2,
-          letterSpacing: -0.1,
-        }}
-      >
-        {label}
-      </Text>
-
-      {/* ─── LARGE BOLD METRIC VALUE ─── */}
-      <Text
-        numberOfLines={1}
-        style={{
-          fontSize: 28,
-          fontWeight: '600',
-          letterSpacing: -0.5,
-          lineHeight: 34,
-          color: resolvedValueColor,
-          fontVariant: ['tabular-nums'],
-          fontFamily: Platform.select({
-            web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-            default: 'Inter-Bold',
-          }),
-        }}
-      >
-        {value}
-      </Text>
-
-      {/* ─── SHORT DESCRIPTION / COMPARISON PERIOD ─── */}
-      {sub ? (
-        <Text
-          numberOfLines={1}
-          style={{
-            fontSize: 11.5,
-            fontWeight: '400',
-            color: resolvedIsDark ? '#AAB4B0' : '#64748B',
-            marginTop: 2,
-            letterSpacing: -0.1,
-          }}
-        >
-          {sub}
-        </Text>
-      ) : null}
+          ) : null}
+        </>
+      )}
     </ContainerComponent>
   );
 }

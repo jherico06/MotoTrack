@@ -5,20 +5,36 @@
 // =========================================================================
 
 import React, { useEffect, useState } from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, Platform } from 'react-native';
 import { BootstrapIcon } from '../../common';
 
-const C = {
-  surface: '#FAF9F6',
-  card: '#FFFFFF',
-  border: '#E7E5E0',
-  divider: '#ECEAE5',
-  text: '#18181B',
-  muted: '#71717A',
-  subtle: '#A1A1AA',
-  orange: '#EA580C',
-  charcoal: '#1C1917',
-};
+const getColors = (isDarkMode) =>
+  isDarkMode
+    ? {
+        surface: '#111315',
+        card: '#191A1D',
+        border: '#303236',
+        divider: '#292B2F',
+        text: '#F2F2F3',
+        muted: '#A1A1AA',
+        subtle: '#71717A',
+        orange: '#FF5A00',
+        charcoal: '#202124',
+      }
+    : {
+        surface: '#FAF9F6',
+        card: '#FFFFFF',
+        border: '#E7E5E0',
+        divider: '#ECEAE5',
+        text: '#18181B',
+        muted: '#71717A',
+        subtle: '#A1A1AA',
+        orange: '#EA580C',
+        charcoal: '#1C1917',
+      };
+
+const C = getColors(false);
 
 const MONO = Platform.OS === 'web' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'monospace';
 
@@ -42,25 +58,32 @@ function getTier(cc) {
   return { label: 'Big Bikes 200cc+', bg: '#F5F3FF', border: '#DDD6FE', fg: '#6D28D9' };
 }
 
-const inputStyle = {
-  backgroundColor: '#FFFFFF',
-  borderWidth: 1,
-  borderColor: C.border,
-  borderRadius: 8,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  fontSize: 13,
-  color: C.text,
+const getInputStyle = (isDarkMode) => {
+  const t = getColors(isDarkMode);
+  return {
+    backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
+    borderWidth: 1,
+    borderColor: isDarkMode ? '#3A3B40' : t.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: t.text,
+  };
 };
 
-const labelStyle = {
+const inputStyle = getInputStyle(false);
+
+const getLabelStyle = (isDarkMode) => ({
   fontSize: 10.5,
   fontWeight: '600',
-  color: C.muted,
+  color: getColors(isDarkMode).muted,
   marginBottom: 5,
   textTransform: 'uppercase',
   letterSpacing: 0.5,
-};
+});
+
+const labelStyle = getLabelStyle(false);
 
 export default function CustomerMotorcyclesModal({
   visible,
@@ -70,6 +93,10 @@ export default function CustomerMotorcyclesModal({
   onSelectMotorcycle,
   onAddNewMotorcycle,
 }) {
+  const { isDarkMode } = useTheme();
+  const C = getColors(isDarkMode);
+  const inputStyle = getInputStyle(isDarkMode);
+  const labelStyle = getLabelStyle(isDarkMode);
   const [pendingId, setPendingId] = useState(selectedMotorcycleId);
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -185,7 +212,7 @@ export default function CustomerMotorcyclesModal({
                 width: 36,
                 height: 36,
                 borderRadius: 18,
-                backgroundColor: '#FFF7ED',
+                backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                 borderWidth: 1,
                 borderColor: '#FED7AA',
                 alignItems: 'center',
@@ -315,7 +342,7 @@ export default function CustomerMotorcyclesModal({
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 4,
-                            backgroundColor: '#ECFDF5',
+                            backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
                             borderWidth: 1,
                             borderColor: '#A7F3D0',
                             paddingHorizontal: 7,
@@ -466,7 +493,7 @@ export default function CustomerMotorcyclesModal({
                 </View>
 
                 {Boolean(formError) && (
-                  <View style={{ backgroundColor: '#FEF2F2', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#FECACA' }}>
+                  <View style={{ backgroundColor: isDarkMode ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#FECACA' }}>
                     <Text style={{ fontSize: 12, color: '#DC2626' }}>{formError}</Text>
                   </View>
                 )}

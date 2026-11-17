@@ -17,8 +17,10 @@ import {
   ScrollView,
   TextInput,
   Platform,
+  Linking,
 } from 'react-native';
 import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { xenditPaymentService } from '../../services/payments/xenditPaymentService.js';
 import { garageService } from '../../services/bookings/garageService.js';
 import { rescheduleService, RESCHEDULE_STATUS } from '../../services/bookings/rescheduleService.js';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../services/products/motorcycleService.js';
@@ -266,6 +268,9 @@ export default function CustomerServiceBookingCard({
   const [infoReply, setInfoReply] = useState('');
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [receiptVisible, setReceiptVisible] = useState(false);
+  const [finalCheckout, setFinalCheckout] = useState(null);
+  const [finalPayBusy, setFinalPayBusy] = useState(false);
+  const [finalPayMessage, setFinalPayMessage] = useState('');
 
   const toast = (m) => onToast?.(m);
 
@@ -348,7 +353,7 @@ export default function CustomerServiceBookingCard({
         items: [],
         status:
           status === FLEX_BOOKING_STATUS.QUOTATION_SENT ||
-          status === FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL
+            status === FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL
             ? 'pending'
             : 'accepted',
       };
@@ -436,9 +441,9 @@ export default function CustomerServiceBookingCard({
   const showDownpayment = status === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT;
   const showDueTime = Boolean(
     booking?.payment_deadline &&
-      showDownpayment &&
-      String(booking?.downpayment_status || '').toLowerCase() !== 'paid' &&
-      Number(booking?.amount_paid || 0) <= 0
+    showDownpayment &&
+    String(booking?.downpayment_status || '').toLowerCase() !== 'paid' &&
+    Number(booking?.amount_paid || 0) <= 0
   );
   const dueCountdown = showDueTime ? getDueCountdown(booking.payment_deadline, nowTick) : null;
   const showFinalBill =
@@ -625,9 +630,8 @@ export default function CustomerServiceBookingCard({
     );
   };
 
-  const bikeLabel = `${booking?.bike_brand || booking?.bikeBrand || ''} ${
-    booking?.bike_model || booking?.bikeModel || ''
-  }`.trim();
+  const bikeLabel = `${booking?.bike_brand || booking?.bikeBrand || ''} ${booking?.bike_model || booking?.bikeModel || ''
+    }`.trim();
   const plate = booking?.plate_number || booking?.bikePlate || booking?.bike_plate || '';
 
   // Lookup the customer's registered motorcycle record
@@ -809,8 +813,8 @@ export default function CustomerServiceBookingCard({
             effectiveQuotation.status === 'accepted'
               ? 'Accepted'
               : effectiveQuotation.status === 'declined'
-              ? 'Declined'
-              : null
+                ? 'Declined'
+                : null
           }
         >
           {parts.length > 0 ? (
@@ -896,10 +900,10 @@ export default function CustomerServiceBookingCard({
                     Number(effectiveQuotation.remaining_balance) > 0
                       ? effectiveQuotation.remaining_balance
                       : Math.max(
-                          0,
-                          Number(effectiveQuotation.total_amount || 0) -
-                            Number(effectiveQuotation.downpayment_amount || 0)
-                        )
+                        0,
+                        Number(effectiveQuotation.total_amount || 0) -
+                        Number(effectiveQuotation.downpayment_amount || 0)
+                      )
                   )}
                 </Text>
               </View>
@@ -1037,8 +1041,8 @@ export default function CustomerServiceBookingCard({
                   Number(booking?.remaining_balance) > 0
                     ? booking.remaining_balance
                     : Number(effectiveQuotation?.remaining_balance) > 0
-                    ? effectiveQuotation.remaining_balance
-                    : Math.max(0, (booking?.estimated_service_total || effectiveQuotation?.total_amount || 450) - downpaymentRecord.amount)
+                      ? effectiveQuotation.remaining_balance
+                      : Math.max(0, (booking?.estimated_service_total || effectiveQuotation?.total_amount || 450) - downpaymentRecord.amount)
                 )}
               </Text>
             </View>
@@ -1215,21 +1219,21 @@ export default function CustomerServiceBookingCard({
             />
             {parts.length > 0
               ? parts.map((i, idx) => (
-                  <Line
-                    key={`rp-${idx}`}
-                    label={`Part: ${i.product_name || 'Item'} × ${i.quantity || 1}`}
-                    value={formatPhp(i.line_total ?? Number(i.quantity || 1) * Number(i.unit_price || 0))}
-                  />
-                ))
+                <Line
+                  key={`rp-${idx}`}
+                  label={`Part: ${i.product_name || 'Item'} × ${i.quantity || 1}`}
+                  value={formatPhp(i.line_total ?? Number(i.quantity || 1) * Number(i.unit_price || 0))}
+                />
+              ))
               : <Line label="Parts" value={formatPhp(partsTotal)} />}
             {others.length > 0
               ? others.map((i, idx) => (
-                  <Line
-                    key={`ro-${idx}`}
-                    label={i.description || i.product_name || 'Other'}
-                    value={formatPhp(i.line_total ?? i.unit_price ?? 0)}
-                  />
-                ))
+                <Line
+                  key={`ro-${idx}`}
+                  label={i.description || i.product_name || 'Other'}
+                  value={formatPhp(i.line_total ?? i.unit_price ?? 0)}
+                />
+              ))
               : otherTotal > 0
                 ? <Line label="Other charges" value={formatPhp(otherTotal)} />
                 : null}
@@ -1252,11 +1256,105 @@ export default function CustomerServiceBookingCard({
             </View>
 
             {showFinalPay && remaining > 0 ? (
-              <View style={[styles.noteBox, { marginTop: 10 }]}>
+              <View style={[styles.noteBox, { marginTop: 10, gap: 8 }]}>
                 <Text style={styles.noteText}>
-                  Please settle the remaining balance at the shop. Admin will record Cash or Other
-                  payment before your motorcycle is released.
+                  Remaining balance of {formatPhp(remaining)} is due before vehicle release. Pay online with GCash (Xendit) or settle at the shop counter.
                 </Text>
+                {!finalCheckout ? (
+                  <TouchableOpacity
+                    style={[styles.btnAccept, { backgroundColor: '#1D4ED8', opacity: finalPayBusy ? 0.7 : 1 }]}
+                    disabled={finalPayBusy}
+                    onPress={async () => {
+                      setFinalPayBusy(true);
+                      setFinalPayMessage('');
+                      try {
+                        const invoice = await xenditPaymentService.createBookingCheckout({
+                          bookingId,
+                          customerId: booking?.customer_id || booking?.user_id || null,
+                          amount: remaining,
+                          paymentType: 'FINAL_PAYMENT',
+                          description: `Final balance for booking #${bookingId}`,
+                          customerName: booking?.customer_name || 'Customer',
+                          customerEmail: booking?.customer_email || 'customer@mototrack.ph',
+                          customerPhone: booking?.customer_phone || '09170000000',
+                          idempotencyKey: `bk-fin-${bookingId}-${Math.round(remaining)}`,
+                        });
+                        setFinalCheckout(invoice);
+                        if (invoice?.invoiceUrl) {
+                          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                            window.open(invoice.invoiceUrl, '_blank', 'noopener,noreferrer');
+                          } else {
+                            Linking.openURL(invoice.invoiceUrl).catch(() => { });
+                          }
+                        }
+                        setFinalPayMessage('GCash checkout opened. Complete payment, then tap Verify Payment.');
+                      } catch (err) {
+                        const msg = err?.message || 'Could not start GCash payment.';
+                        setFinalPayMessage(msg);
+                        toast(msg);
+                      } finally {
+                        setFinalPayBusy(false);
+                      }
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.btnAcceptText}>
+                      {finalPayBusy ? 'Creating GCash Checkout...' : `Pay ${formatPhp(remaining)} via GCash (Xendit)`}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      <TouchableOpacity
+                        style={[styles.btnAccept, { flex: 1, backgroundColor: '#EA580C', opacity: finalPayBusy ? 0.7 : 1 }]}
+                        disabled={finalPayBusy}
+                        onPress={async () => {
+                          setFinalPayBusy(true);
+                          try {
+                            const verifyRes = await xenditPaymentService.verifyInvoicePayment(finalCheckout.invoiceId);
+                            if (verifyRes?.paid) {
+                              setFinalCheckout(null);
+                              setFinalPayMessage('');
+                              toast('✓ Remaining balance verified via GCash!');
+                              await reload();
+                              onUpdated?.();
+                            } else if (verifyRes?.expired) {
+                              setFinalCheckout(null);
+                              setFinalPayMessage('Checkout expired. Tap Pay via GCash to retry.');
+                            } else {
+                              setFinalPayMessage('Payment still Pending in Xendit. Complete checkout then verify again.');
+                            }
+                          } catch (err) {
+                            setFinalPayMessage(err?.message || 'Verification failed.');
+                          } finally {
+                            setFinalPayBusy(false);
+                          }
+                        }}
+                      >
+                        <Text style={styles.btnAcceptText}>
+                          {finalPayBusy ? 'Verifying...' : 'Verify GCash Payment'}
+                        </Text>
+                      </TouchableOpacity>
+                      {finalCheckout?.invoiceUrl ? (
+                        <TouchableOpacity
+                          style={[styles.btnAccept, { backgroundColor: '#1D4ED8' }]}
+                          onPress={() => {
+                            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                              window.open(finalCheckout.invoiceUrl, '_blank', 'noopener,noreferrer');
+                            } else {
+                              Linking.openURL(finalCheckout.invoiceUrl).catch(() => { });
+                            }
+                          }}
+                        >
+                          <Text style={styles.btnAcceptText}>Open Checkout</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                    {finalPayMessage ? (
+                      <Text style={styles.muted}>{finalPayMessage}</Text>
+                    ) : null}
+                  </View>
+                )}
               </View>
             ) : (
               <Text style={styles.receiptNotice}>
@@ -1388,8 +1486,8 @@ export default function CustomerServiceBookingCard({
         style={[
           styles.listCard,
           {
-            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
-            backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
+            borderColor: isDarkMode ? '#303236' : (semanticColors.border || '#FED7AA'),
+            backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
             cursor: 'pointer',
           },
           style,
@@ -1401,8 +1499,8 @@ export default function CustomerServiceBookingCard({
           {/* Left Column: Ref, Status, Title, Motorcycle */}
           <View style={styles.listColLeft}>
             <View style={styles.listRefRow}>
-              <View style={[styles.refContainer, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-                <Text style={[styles.refLabel, isDarkMode && { color: '#CBDCEE' }]}>REF: {bookingId}</Text>
+              <View style={[styles.refContainer, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}>
+                <Text style={[styles.refLabel, isDarkMode && { color: '#F2F2F3' }]}>REF: {bookingId}</Text>
               </View>
               <View
                 style={[
@@ -1420,13 +1518,13 @@ export default function CustomerServiceBookingCard({
               </View>
             </View>
 
-            <Text style={[styles.listServiceTitle, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
+            <Text style={[styles.listServiceTitle, isDarkMode && { color: '#F5F5F5' }]} numberOfLines={1}>
               {booking?.service_title || booking?.package_name || 'Service Booking'}
             </Text>
 
-            <View style={[styles.listMotoBadge, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-              <BootstrapIcon name="bicycle" size={13} color={isDarkMode ? '#EA580C' : '#EA580C'} />
-              <Text style={[styles.listMotoText, isDarkMode && { color: '#CBDCEE' }]} numberOfLines={1}>
+            <View style={[styles.listMotoBadge, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}>
+              <BootstrapIcon name="bicycle" size={13} color={isDarkMode ? '#FF5A00' : '#EA580C'} />
+              <Text style={[styles.listMotoText, isDarkMode && { color: '#F2F2F3' }]} numberOfLines={1}>
                 {bikeLabel || 'Registered Motorcycle'}
                 {plate ? ` • ${plate}` : ''}
               </Text>
@@ -1554,19 +1652,19 @@ export default function CustomerServiceBookingCard({
     const isDownpaymentDue = showDownpayment;
     const priceDisplay = isDownpaymentDue
       ? {
-          label: 'Down Payment',
-          value: formatPhpDecimals(
-            booking?.downpayment_amount ||
-            effectiveQuotation?.downpayment_amount ||
-            Math.round((Number(booking?.estimated_service_total || booking?.pricePhp || 2500)) * 0.3)
-          ),
-        }
+        label: 'Down Payment',
+        value: formatPhpDecimals(
+          booking?.downpayment_amount ||
+          effectiveQuotation?.downpayment_amount ||
+          Math.round((Number(booking?.estimated_service_total || booking?.pricePhp || 2500)) * 0.3)
+        ),
+      }
       : finalTotal > 0
-      ? {
+        ? {
           label: 'Service Estimate',
           value: formatPhp(finalTotal),
         }
-      : {
+        : {
           label: 'Service Estimate',
           value: 'Quote Pending',
         };
@@ -1576,12 +1674,12 @@ export default function CustomerServiceBookingCard({
         ? `Due · ${dueCountdown.label}`
         : 'View Due Time'
       : showQuotationActions
-      ? 'Review Quote'
-      : showFinalPay
-      ? 'Pay Balance'
-      : showPickup
-      ? 'Pickup QR'
-      : 'View Details';
+        ? 'Review Quote'
+        : showFinalPay
+          ? 'Pay Balance'
+          : showPickup
+            ? 'Pickup QR'
+            : 'View Details';
 
     const shortDate = fmtShortDate(booking?.preferred_date || booking?.appointment_date || booking?.date);
     const shortTime = fmtShortTime(booking?.preferred_time || booking?.time_slot);
@@ -1672,12 +1770,12 @@ export default function CustomerServiceBookingCard({
             StyleSheet.absoluteFillObject,
             Platform.OS === 'web'
               ? {
-                  backgroundImage:
-                    'linear-gradient(180deg, rgba(15, 28, 44, 0.75) 0%, rgba(15, 28, 44, 0.22) 32%, transparent 62%), linear-gradient(90deg, #172B42 0%, #1A3452 35%, rgba(26, 52, 82, 0.94) 52%, rgba(26, 52, 82, 0.58) 72%, rgba(26, 52, 82, 0.15) 90%, rgba(26, 52, 82, 0.05) 100%)',
-                }
+                backgroundImage:
+                  'linear-gradient(180deg, rgba(15, 28, 44, 0.75) 0%, rgba(15, 28, 44, 0.22) 32%, transparent 62%), linear-gradient(90deg, #172B42 0%, #1A3452 35%, rgba(26, 52, 82, 0.94) 52%, rgba(26, 52, 82, 0.58) 72%, rgba(26, 52, 82, 0.15) 90%, rgba(26, 52, 82, 0.05) 100%)',
+              }
               : {
-                  backgroundColor: 'rgba(23, 43, 66, 0.86)',
-                },
+                backgroundColor: 'rgba(23, 43, 66, 0.86)',
+              },
           ]}
         />
 
@@ -1836,14 +1934,14 @@ export default function CustomerServiceBookingCard({
     return (
       <View style={styles.modalBodyContainer}>
         {/* 1. Overview Summary Card */}
-        <View style={[styles.modalOverviewCard, isDarkMode && { backgroundColor: '#181E1B', borderColor: '#26332E' }]}>
+        <View style={[styles.modalOverviewCard, isDarkMode && { backgroundColor: '#191A1D', borderColor: '#303236' }]}>
           {/* Header Row: Title, Price & Status */}
           <View style={styles.modalOverviewHeader}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.modalServiceTitle, isDarkMode && { color: '#F1F5F9' }]}>
+              <Text style={[styles.modalServiceTitle, isDarkMode && { color: '#F5F5F5' }]}>
                 {booking?.service_title || booking?.package_name || 'Service Booking'}
               </Text>
-              <Text style={[styles.modalServiceSub, isDarkMode && { color: '#94A3B8' }]}>
+              <Text style={[styles.modalServiceSub, isDarkMode && { color: '#A1A1AA' }]}>
                 {booking?.cc_category_name ? `${booking.cc_category_name} Engine Displacement • ` : ''}
                 {booking?.service_type || 'Preventive Maintenance Service'}
               </Text>
@@ -1851,7 +1949,7 @@ export default function CustomerServiceBookingCard({
 
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
               {finalTotal > 0 ? (
-                <Text style={[styles.modalPriceText, isDarkMode && { color: '#EA580C' }]}>
+                <Text style={[styles.modalPriceText, isDarkMode && { color: '#FF5A00' }]}>
                   {formatPhp(finalTotal)}
                 </Text>
               ) : null}
@@ -1873,17 +1971,17 @@ export default function CustomerServiceBookingCard({
           </View>
 
           {/* Divider */}
-          <View style={[styles.modalCardDivider, isDarkMode && { backgroundColor: '#26332E' }]} />
+          <View style={[styles.modalCardDivider, isDarkMode && { backgroundColor: '#303236' }]} />
 
           {/* Key Details Grid */}
           <View style={styles.modalKeyDetailsGrid}>
-            <View style={[styles.modalKeyDetailItem, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-              <View style={[styles.modalIconBox, isDarkMode && { backgroundColor: '#26332E' }]}>
-                <BootstrapIcon name="bicycle" size={14} color="#EA580C" />
+            <View style={[styles.modalKeyDetailItem, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}>
+              <View style={[styles.modalIconBox, isDarkMode && { backgroundColor: '#3A241B' }]}>
+                <BootstrapIcon name="bicycle" size={14} color="#FF5A00" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.modalKeyDetailLabel}>MOTORCYCLE</Text>
-                <Text style={[styles.modalKeyDetailValue, isDarkMode && { color: '#F1F5F9' }]} numberOfLines={1}>
+                <Text style={[styles.modalKeyDetailValue, isDarkMode && { color: '#F2F2F3' }]} numberOfLines={1}>
                   {bikeLabel || 'Registered Bike'}
                 </Text>
                 {plate ? (
@@ -1892,13 +1990,13 @@ export default function CustomerServiceBookingCard({
               </View>
             </View>
 
-            <View style={[styles.modalKeyDetailItem, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-              <View style={[styles.modalIconBox, isDarkMode && { backgroundColor: '#26332E' }]}>
-                <BootstrapIcon name="calendar-event" size={14} color="#EA580C" />
+            <View style={[styles.modalKeyDetailItem, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}>
+              <View style={[styles.modalIconBox, isDarkMode && { backgroundColor: '#3A241B' }]}>
+                <BootstrapIcon name="calendar-event" size={14} color="#FF5A00" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.modalKeyDetailLabel}>APPOINTMENT SCHEDULE</Text>
-                <Text style={[styles.modalKeyDetailValue, isDarkMode && { color: '#F1F5F9' }]}>
+                <Text style={[styles.modalKeyDetailValue, isDarkMode && { color: '#F2F2F3' }]}>
                   {fmtDate(booking?.preferred_date || booking?.appointment_date)}
                 </Text>
                 <Text style={styles.modalKeyDetailSub}>
@@ -1910,15 +2008,20 @@ export default function CustomerServiceBookingCard({
 
           {/* Single Consolidated Status Notice */}
           {status === FLEX_BOOKING_STATUS.PENDING_REVIEW ? (
-            <View style={[styles.modalNoticeBox, isDarkMode && { backgroundColor: '#132A1E', borderColor: '#1B4D36' }]}>
+            <View
+              style={[
+                styles.modalNoticeBox,
+                isDarkMode && { backgroundColor: 'rgba(0, 201, 141, 0.10)', borderColor: 'rgba(0, 201, 141, 0.28)' },
+              ]}
+            >
               <View style={{ marginTop: 2 }}>
-                <BootstrapIcon name="info-circle-fill" size={15} color="#059669" />
+                <BootstrapIcon name="info-circle-fill" size={15} color={isDarkMode ? '#00C98D' : '#059669'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.modalNoticeTitle, isDarkMode && { color: '#34D399' }]}>
+                <Text style={[styles.modalNoticeTitle, isDarkMode && { color: '#00C98D' }]}>
                   Request Submitted for Admin Review
                 </Text>
-                <Text style={[styles.modalNoticeBody, isDarkMode && { color: '#A7F3D0' }]}>
+                <Text style={[styles.modalNoticeBody, isDarkMode && { color: '#A1A1AA' }]}>
                   Our shop team will review your requested schedule and parts availability. Once approved, you will receive a notification to review your quotation and pay the downpayment. No payment is required yet.
                 </Text>
               </View>
@@ -1926,15 +2029,20 @@ export default function CustomerServiceBookingCard({
           ) : showDueTime ? (
             renderDueTimePanel('full')
           ) : booking?.current_stage ? (
-            <View style={[styles.modalNoticeBox, isDarkMode && { backgroundColor: '#132A1E', borderColor: '#1B4D36' }]}>
+            <View
+              style={[
+                styles.modalNoticeBox,
+                isDarkMode && { backgroundColor: 'rgba(0, 201, 141, 0.10)', borderColor: 'rgba(0, 201, 141, 0.28)' },
+              ]}
+            >
               <View style={{ marginTop: 2 }}>
-                <BootstrapIcon name="info-circle-fill" size={15} color="#059669" />
+                <BootstrapIcon name="info-circle-fill" size={15} color={isDarkMode ? '#00C98D' : '#059669'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.modalNoticeTitle, isDarkMode && { color: '#34D399' }]}>
+                <Text style={[styles.modalNoticeTitle, isDarkMode && { color: '#00C98D' }]}>
                   Current Status
                 </Text>
-                <Text style={[styles.modalNoticeBody, isDarkMode && { color: '#A7F3D0' }]}>
+                <Text style={[styles.modalNoticeBody, isDarkMode && { color: '#A1A1AA' }]}>
                   {booking.current_stage}
                 </Text>
               </View>
@@ -1982,8 +2090,8 @@ export default function CustomerServiceBookingCard({
     style: [
       styles.card,
       {
-        borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
-        backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
+        borderColor: isDarkMode ? '#303236' : (semanticColors.border || '#FED7AA'),
+        backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
         cursor: 'pointer',
       },
       style,
@@ -1996,8 +2104,8 @@ export default function CustomerServiceBookingCard({
     <CardContainer {...containerProps}>
       {/* 1. Top Row: Reference Number + Semantic Status Badge */}
       <View style={styles.cardHeaderRow}>
-        <View style={[styles.refContainer, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-          <Text style={[styles.refLabel, isDarkMode && { color: '#CBDCEE' }]}>REF: {bookingId}</Text>
+        <View style={[styles.refContainer, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}>
+          <Text style={[styles.refLabel, isDarkMode && { color: '#F2F2F3' }]}>REF: {bookingId}</Text>
         </View>
         <View
           style={[
@@ -2017,21 +2125,21 @@ export default function CustomerServiceBookingCard({
 
       {/* 2. Service Title + Optional Total */}
       <View style={styles.titleRow}>
-        <Text style={[styles.serviceTitle, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
+        <Text style={[styles.serviceTitle, isDarkMode && { color: '#F5F5F5' }]} numberOfLines={1}>
           {booking?.service_title || booking?.package_name || 'Service Booking'}
         </Text>
         {finalTotal > 0 ? (
-          <Text style={[styles.headTotal, isDarkMode && { color: '#EA580C' }]}>{formatPhp(finalTotal)}</Text>
+          <Text style={[styles.headTotal, isDarkMode && { color: '#FF5A00' }]}>{formatPhp(finalTotal)}</Text>
         ) : null}
       </View>
 
       {/* 3. Motorcycle Info Badge */}
-      <View style={[styles.motoInfoBox, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-        <View style={[styles.motoIconWrap, isDarkMode && { backgroundColor: '#23302B' }]}>
-          <BootstrapIcon name="bicycle" size={14} color={isDarkMode ? '#EA580C' : '#EA580C'} />
+      <View style={[styles.motoInfoBox, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}>
+        <View style={[styles.motoIconWrap, isDarkMode && { backgroundColor: '#3A241B' }]}>
+          <BootstrapIcon name="bicycle" size={14} color="#FF5A00" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.motoName, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
+          <Text style={[styles.motoName, isDarkMode && { color: '#F2F2F3' }]} numberOfLines={1}>
             {bikeLabel || 'Registered Motorcycle'}
           </Text>
           <Text style={[styles.motoPlate, isDarkMode && { color: '#9CA3AF' }]}>

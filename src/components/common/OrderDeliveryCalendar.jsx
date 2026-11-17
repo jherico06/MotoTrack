@@ -43,18 +43,18 @@ export default function OrderDeliveryCalendar({
   let themeCtx = null;
   try {
     themeCtx = useTheme();
-  } catch (_e) {}
+  } catch (_e) { }
   const isDarkMode = propIsDarkMode !== undefined
     ? Boolean(propIsDarkMode)
     : Boolean(
-        themeCtx?.isDarkMode ||
-        (typeof document !== 'undefined' && document?.documentElement?.classList?.contains('dark')) ||
-        (typeof appStorage !== 'undefined' && (
-          appStorage.getItem('mototrack_admin_dark_mode') === 'true' ||
-          appStorage.getItem('mototrack_customer_dark_mode') === 'true' ||
-          appStorage.getItem('mototrack_theme_mode') === 'dark'
-        ))
-      );
+      themeCtx?.isDarkMode ||
+      (typeof document !== 'undefined' && document?.documentElement?.classList?.contains('dark')) ||
+      (typeof appStorage !== 'undefined' && (
+        appStorage.getItem('mototrack_admin_dark_mode') === 'true' ||
+        appStorage.getItem('mototrack_customer_dark_mode') === 'true' ||
+        appStorage.getItem('mototrack_theme_mode') === 'dark'
+      ))
+    );
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => localYmd(today), [today]);
   const rangeMode = mode === 'range';
@@ -166,8 +166,8 @@ export default function OrderDeliveryCalendar({
       style={[
         styles.container,
         isDarkMode && {
-          backgroundColor: '#141A18',
-          borderColor: '#2D3748',
+          backgroundColor: '#191A1D',
+          borderColor: '#303236',
         },
       ]}
     >
@@ -180,7 +180,7 @@ export default function OrderDeliveryCalendar({
             style={styles.navBtn}
             activeOpacity={0.7}
           >
-            <BootstrapIcon name="chevron-left" size={11} color={isDarkMode ? '#CBD5E1' : '#EA580C'} />
+            <BootstrapIcon name="chevron-left" size={11} color={isDarkMode ? '#A1A1AA' : '#EA580C'} />
           </TouchableOpacity>
 
           {/* Month & Year Title */}
@@ -199,7 +199,7 @@ export default function OrderDeliveryCalendar({
             style={styles.navBtn}
             activeOpacity={0.7}
           >
-            <BootstrapIcon name="chevron-right" size={11} color={isDarkMode ? '#CBD5E1' : '#EA580C'} />
+            <BootstrapIcon name="chevron-right" size={11} color={isDarkMode ? '#A1A1AA' : '#EA580C'} />
           </TouchableOpacity>
         </View>
 
@@ -257,15 +257,15 @@ export default function OrderDeliveryCalendar({
               const isSunday = cIdx === 0;
               const { isSelected, isToday, isPast, isInRange } = cell;
 
-              let cardBg = isDarkMode ? '#1E293B' : '#FFFFFF';
-              let cardBorder = isDarkMode ? '#334155' : '#E2E8F0';
+              let cardBg = isDarkMode ? '#202124' : '#FFFFFF';
+              let cardBorder = isDarkMode ? '#3A3B40' : '#E2E8F0';
               let borderWidth = 1.2;
               let numColor = isDarkMode ? '#F1F5F9' : '#1E293B';
               let dotColor = '#10B981';
               let statusLabel = isSunday ? 'Rest' : 'Open';
 
               if (isSelected) {
-                cardBg = isDarkMode ? '#EA580C' : '#FFF7ED';
+                cardBg = isDarkMode ? '#FF5A00' : '#FFF7ED';
                 cardBorder = '#EA580C';
                 borderWidth = 1.8;
                 numColor = isDarkMode ? '#FFFFFF' : '#143325';
@@ -277,7 +277,7 @@ export default function OrderDeliveryCalendar({
                   : 'Selected';
               } else if (isInRange) {
                 cardBg = isDarkMode ? 'rgba(36, 39, 43, 0.5)' : '#F0FDF4';
-                cardBorder = isDarkMode ? '#EA580C' : '#86EFAC';
+                cardBorder = isDarkMode ? '#FF5A00' : '#86EFAC';
                 numColor = isDarkMode ? '#A7F3D0' : '#143325';
                 dotColor = '#EA580C';
                 statusLabel = 'In range';
@@ -287,8 +287,8 @@ export default function OrderDeliveryCalendar({
                 numColor = isDarkMode ? '#A7F3D0' : '#065F46';
                 dotColor = '#10B981';
               } else if (isPast) {
-                cardBg = isDarkMode ? '#141A18' : '#F8FAFC';
-                cardBorder = isDarkMode ? '#1E293B' : '#F1F5F9';
+                cardBg = isDarkMode ? '#191A1D' : '#F8FAFC';
+                cardBorder = isDarkMode ? '#202124' : '#F1F5F9';
                 numColor = isDarkMode ? '#475569' : '#CBD5E1';
                 statusLabel = '';
               }
@@ -328,7 +328,7 @@ export default function OrderDeliveryCalendar({
                       <View
                         style={[
                           styles.statusDot,
-                          { backgroundColor: isSunday ? (isDarkMode ? '#64748B' : '#CBD5E1') : dotColor },
+                          { backgroundColor: isSunday ? (isDarkMode ? '#71717A' : '#CBD5E1') : dotColor },
                         ]}
                       />
                     )}
@@ -343,7 +343,7 @@ export default function OrderDeliveryCalendar({
                         {
                           color: isSelected
                             ? (isDarkMode ? '#A7F3D0' : '#EA580C')
-                            : (isDarkMode ? '#94A3B8' : '#64748B'),
+                            : (isDarkMode ? '#A1A1AA' : '#64748B'),
                           fontWeight: isSelected ? '600' : '500',
                         },
                       ]}

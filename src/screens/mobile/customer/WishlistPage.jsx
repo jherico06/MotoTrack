@@ -14,7 +14,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { wishlistStyles as styles } from '../../../styles/wishlistPage.styles.js';
 import { wishlistService } from '../../../services/products/wishlistService.js';
-import { BootstrapIcon, BottomNavBar, BrandLogo } from '../../../components/common';
+import MobileBottomNavBar from '../../../components/mobile/customer/MobileBottomNavBar.jsx';
+import { BootstrapIcon, BrandLogo } from '../../../components/common';
 import { BookInstallationModal } from '../../../components/modals';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
@@ -22,8 +23,10 @@ import { useCart } from '../../../context/CartContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
 import { productService } from '../../../services/products/productService.js';
 import { promoService } from '../../../services/products/promoService.js';
+import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { CATEGORY_NAMES } from '../../../data/motorParts.js';
 import { getRatedScore, productHasCustomerRatings, sanitizeCompareAtPrice } from '../../../utils/productCatalog.js';
+import { isProductSoldOut } from '../../../utils/productSizes.js';
 import { aiCustomizerService } from '../../../services/ai/aiCustomizerService.js';
 import { GARAGE_BRANCHES, TIME_SLOTS } from '../../../services/bookings/garageService.js';
 
@@ -54,7 +57,7 @@ export default function WishlistPage({
   const { isDarkMode = false } = useTheme?.() || {};
 
   const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth?.currentUser;
-  const showToast = propShowToast || cartCtx?.showToast || (() => {});
+  const showToast = propShowToast || cartCtx?.showToast || (() => { });
   const { width: windowWidth } = useWindowDimensions();
 
   const userId = currentUser?.id || 'guest';
@@ -321,16 +324,25 @@ export default function WishlistPage({
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: '#24272B' }]}>
-      <StatusBar style="light" translucent backgroundColor="transparent" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
       {/* ─── 1. NATIVE MOBILE APP HEADER ─── */}
-      <View style={[styles.appHeaderRow, isDarkMode && { backgroundColor: '#24272B' }]}>
-        <Text style={styles.appHeaderTitle}>My Wishlist</Text>
+      <View
+        style={[
+          styles.appHeaderRow,
+          {
+            backgroundColor: isDarkMode ? '#121518' : '#F7F5F0',
+            borderBottomWidth: 1,
+            borderBottomColor: isDarkMode ? '#2B3035' : '#EDE9E0',
+          },
+        ]}
+      >
+        <Text style={[styles.appHeaderTitle, !isDarkMode && { color: '#0F172A' }]}>My Wishlist</Text>
       </View>
 
       <ScrollView
-        style={[styles.container, isDarkMode && { backgroundColor: '#121518' }]}
+        style={[styles.container, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -347,7 +359,7 @@ export default function WishlistPage({
 
             <View style={styles.titleRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <BootstrapIcon name="heart-fill" size={24} color="#EF4444" style={{ marginRight: 10 }} />
+                <BootstrapIcon name="bookmark-fill" size={24} color="#EA580C" style={{ marginRight: 10 }} />
                 <Text style={[styles.pageTitle, isDarkMode && { color: '#F9FAFB' }]}>My Saved Wishlist</Text>
                 <View style={[styles.itemCountBadge, isDarkMode && { backgroundColor: '#23272B' }]}>
                   <Text style={[styles.itemCountBadgeText, isDarkMode && { color: '#E2E8F0' }]}>
@@ -580,109 +592,63 @@ export default function WishlistPage({
           {/* ─── PRODUCT GRID OR EMPTY STATE ─── */}
           {wishlistedProducts.length === 0 && aiInstalls.length === 0 ? (
             <View style={[styles.emptyStateWrap, isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' }]}>
-              <View style={[styles.emptyIconWrap, isDarkMode && { backgroundColor: '#2B1A1A' }]}>
-                <BootstrapIcon name="heart" size={40} color="#EF4444" />
+                <View style={[styles.emptyIconWrap, isDarkMode && { backgroundColor: '#2B1F16' }]}>
+                  <BootstrapIcon name="bookmark" size={40} color="#EA580C" />
+                </View>
+                <Text style={[styles.emptyTitle, isDarkMode && { color: '#F9FAFB' }]}>Your Wishlist is Empty</Text>
+                <Text style={[styles.emptySubtitle, isDarkMode && { color: '#94A3B8' }]}>
+                  Save catalog parts with the save icon, or save AI installation previews from Install
+                  Studio.
+                </Text>
+                <TouchableOpacity style={styles.emptyShopBtn} onPress={onNavigateToStore} activeOpacity={0.9}>
+                  <BootstrapIcon name="cart-fill" size={15} color="#FFFFFF" />
+                  <Text style={styles.emptyShopBtnText}>Explore Store Catalog</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.emptyShopBtn, { backgroundColor: '#0F172A', marginTop: 10 }]}
+                  onPress={() => onNavigateToCustomizer?.() || onNavigateToCustomize?.()}
+                  activeOpacity={0.9}
+                >
+                  <BootstrapIcon name="stars" size={15} color="#FFFFFF" />
+                  <Text style={styles.emptyShopBtnText}>Open Install Studio</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.emptyTitle, isDarkMode && { color: '#F9FAFB' }]}>Your Wishlist is Empty</Text>
-              <Text style={[styles.emptySubtitle, isDarkMode && { color: '#94A3B8' }]}>
-                Save catalog parts with the heart icon, or save AI installation previews from Install
-                Studio.
-              </Text>
-              <TouchableOpacity style={styles.emptyShopBtn} onPress={onNavigateToStore} activeOpacity={0.9}>
-                <BootstrapIcon name="cart-fill" size={15} color="#FFFFFF" />
-                <Text style={styles.emptyShopBtnText}>Explore Store Catalog</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.emptyShopBtn, { backgroundColor: '#0F172A', marginTop: 10 }]}
-                onPress={() => onNavigateToCustomizer?.() || onNavigateToCustomize?.()}
-                activeOpacity={0.9}
-              >
-                <BootstrapIcon name="stars" size={15} color="#FFFFFF" />
-                <Text style={styles.emptyShopBtnText}>Open Install Studio</Text>
-              </TouchableOpacity>
-            </View>
-          ) : wishlistedProducts.length === 0 ? null : displayedProducts.length === 0 ? (
-            <View style={[styles.emptyStateWrap, isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' }]}>
-              <BootstrapIcon name="search" size={36} color={isDarkMode ? '#64748B' : '#94A3B8'} style={{ marginBottom: 12 }} />
-              <Text style={[styles.emptyTitle, isDarkMode && { color: '#F9FAFB' }]}>No matching items found</Text>
-              <Text style={[styles.emptySubtitle, isDarkMode && { color: '#94A3B8' }]}>
-                No saved items match your filter "{selectedCategory}" or search query "{searchQuery}".
-              </Text>
-              <TouchableOpacity
-                style={[styles.headerSecondaryBtn, isDarkMode && { backgroundColor: '#23272B', borderColor: '#2B3035' }]}
-                onPress={() => {
-                  setSelectedCategory('All');
-                  setSearchQuery('');
-                  setSortBy('default');
-                }}
-              >
-                <Text style={[styles.headerSecondaryBtnText, isDarkMode && { color: '#E2E8F0' }]}>Reset Filters</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={[styles.grid, windowWidth < 700 && { gap: 10 }]}>
-              {displayedProducts.map((product) => {
-                const isOutOfStock = Number(product.stock || 0) <= 0;
-                const compareAt = sanitizeCompareAtPrice(product.oldPrice, product.price);
-                return (
-                  <View
-                    key={product.id}
-                    style={[
-                      styles.productCard,
-                      getGridItemStyle(),
-                      isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' },
-                    ]}
-                  >
-                    {/* Image & Badges */}
-                    <TouchableOpacity
-                      style={[styles.imageWrap, isDarkMode && { backgroundColor: '#14171A' }]}
-                      activeOpacity={0.9}
-                      onPress={() => {
-                        if (onNavigateToProductDetails) {
-                          onNavigateToProductDetails(product);
-                        } else if (onNavigateToScreen) {
-                          onNavigateToScreen('product-details', { product });
-                        } else {
-                          setSelectedProductForSpecs(product);
-                          setIsSpecsModalOpen(true);
-                        }
-                      }}
+              ) : wishlistedProducts.length === 0 ? null : displayedProducts.length === 0 ? (
+              <View style={[styles.emptyStateWrap, isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' }]}>
+                <BootstrapIcon name="search" size={36} color={isDarkMode ? '#64748B' : '#94A3B8'} style={{ marginBottom: 12 }} />
+                <Text style={[styles.emptyTitle, isDarkMode && { color: '#F9FAFB' }]}>No matching items found</Text>
+                <Text style={[styles.emptySubtitle, isDarkMode && { color: '#94A3B8' }]}>
+                  No saved items match your filter "{selectedCategory}" or search query "{searchQuery}".
+                </Text>
+                <TouchableOpacity
+                  style={[styles.headerSecondaryBtn, isDarkMode && { backgroundColor: '#23272B', borderColor: '#2B3035' }]}
+                  onPress={() => {
+                    setSelectedCategory('All');
+                    setSearchQuery('');
+                    setSortBy('default');
+                  }}
+                >
+                  <Text style={[styles.headerSecondaryBtnText, isDarkMode && { color: '#E2E8F0' }]}>Reset Filters</Text>
+                </TouchableOpacity>
+              </View>
+              ) : (
+              <View style={[styles.grid, windowWidth < 700 && { gap: 10 }]}>
+                {displayedProducts.map((product) => {
+                  const isOutOfStock = isProductSoldOut(product);
+                  const compareAt = sanitizeCompareAtPrice(product.oldPrice, product.price);
+                  return (
+                    <View
+                      key={product.id}
+                      style={[
+                        styles.productCard,
+                        getGridItemStyle(),
+                        isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' },
+                      ]}
                     >
-                      <Image source={{ uri: product.image }} style={styles.productImage} />
-                      {product.discount ? (
-                        <View style={styles.discountBadge}>
-                          <Text style={styles.badgePillText}>{product.discount}</Text>
-                        </View>
-                      ) : product.badge ? (
-                        <View style={styles.badgePill}>
-                          <Text style={styles.badgePillText}>{product.badge}</Text>
-                        </View>
-                      ) : null}
-
+                      {/* Image & Badges */}
                       <TouchableOpacity
-                        style={[
-                          styles.removeIconBtn,
-                          isDarkMode && { backgroundColor: 'rgba(30, 34, 38, 0.9)', borderColor: '#2B3035' },
-                        ]}
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          handleRemove(product.id, product.name);
-                        }}
-                        activeOpacity={0.8}
-                        title="Remove from favorites"
-                      >
-                        <BootstrapIcon name="heart-fill" size={16} color="#EF4444" />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-
-                    {/* Card Body */}
-                    <View style={[styles.cardBody, isDarkMode && { backgroundColor: '#1C1F23' }]}>
-                      <View style={styles.brandCategoryRow}>
-                        <Text style={[styles.brandText, isDarkMode && { color: '#94A3B8' }]}>{product.brand}</Text>
-                        <Text style={[styles.categoryText, isDarkMode && { color: '#64748B' }]}>{product.category}</Text>
-                      </View>
-
-                      <TouchableOpacity
+                        style={[styles.imageWrap, isDarkMode && { backgroundColor: '#14171A' }]}
+                        activeOpacity={0.9}
                         onPress={() => {
                           if (onNavigateToProductDetails) {
                             onNavigateToProductDetails(product);
@@ -693,64 +659,42 @@ export default function WishlistPage({
                             setIsSpecsModalOpen(true);
                           }
                         }}
-                        activeOpacity={0.8}
                       >
-                        <Text style={[styles.productName, isDarkMode && { color: '#F9FAFB' }]} numberOfLines={2}>
-                          {product.name}
-                        </Text>
+                        <Image source={{ uri: product.image }} style={styles.productImage} />
+                        {product.discount ? (
+                          <View style={styles.discountBadge}>
+                            <Text style={styles.badgePillText}>{product.discount}</Text>
+                          </View>
+                        ) : product.badge ? (
+                          <View style={styles.badgePill}>
+                            <Text style={styles.badgePillText}>{product.badge}</Text>
+                          </View>
+                        ) : null}
+
+                        <TouchableOpacity
+                          style={[
+                            styles.removeIconBtn,
+                            isDarkMode && { backgroundColor: 'rgba(30, 34, 38, 0.9)', borderColor: '#2B3035' },
+                          ]}
+                          onPress={(e) => {
+                            e?.stopPropagation?.();
+                            handleRemove(product.id, product.name);
+                          }}
+                          activeOpacity={0.8}
+                          title="Remove from saved"
+                        >
+                          <BootstrapIcon name="bookmark-fill" size={16} color="#EA580C" />
+                        </TouchableOpacity>
                       </TouchableOpacity>
 
-                      <View style={styles.ratingRow}>
-                        {productHasCustomerRatings(product) ? (
-                          <>
-                            <BootstrapIcon name="star-fill" size={12} color="#F59E0B" />
-                            <Text style={styles.ratingText}>{Number(product.rating).toFixed(1)}</Text>
-                            <Text style={styles.reviewCountText}>({product.reviews} reviews)</Text>
-                          </>
-                        ) : (
-                          <>
-                            <BootstrapIcon name="star" size={12} color="#94A3B8" />
-                            <Text style={[styles.reviewCountText, { color: '#94A3B8' }]}>No ratings yet</Text>
-                          </>
-                        )}
-                      </View>
-
-                      {/* Stock Indicator */}
-                      <View style={styles.stockBadgeInStock}>
-                        <BootstrapIcon
-                          name={isOutOfStock ? 'x-lg' : 'check2'}
-                          size={11}
-                          color={isOutOfStock ? '#DC2626' : '#16A34A'}
-                        />
-                        <Text style={[styles.stockBadgeText, isOutOfStock && { color: '#DC2626' }]}>
-                          {isOutOfStock ? 'Out of Stock' : `In Stock (${product.stock || 15} units)`}
-                        </Text>
-                      </View>
-
-                      {/* Price Row */}
-                      <View style={styles.priceRow}>
-                        <Text style={styles.mainPrice}>₱{Number(product.price || 0).toFixed(2)}</Text>
-                        {compareAt ? (
-                          <Text style={styles.oldPrice}>₱{Number(compareAt || 0).toFixed(2)}</Text>
-                        ) : null}
-                      </View>
-
-                      {/* Action Buttons */}
-                      <View style={styles.cardActions}>
-                        <TouchableOpacity
-                          style={[styles.addToCartBtn, isOutOfStock && { backgroundColor: '#94A3B8' }]}
-                          disabled={isOutOfStock}
-                          onPress={() => handleAddToCart(product)}
-                          activeOpacity={0.85}
-                        >
-                          <BootstrapIcon name="cart-plus-fill" size={13} color="#FFFFFF" />
-                          <Text style={styles.addToCartBtnText}>
-                            {isOutOfStock ? 'Sold Out' : 'Add to Cart'}
-                          </Text>
-                        </TouchableOpacity>
+                      {/* Card Body */}
+                      <View style={[styles.cardBody, isDarkMode && { backgroundColor: '#1C1F23' }]}>
+                        <View style={styles.brandCategoryRow}>
+                          <Text style={[styles.brandText, isDarkMode && { color: '#94A3B8' }]}>{product.brand}</Text>
+                          <Text style={[styles.categoryText, isDarkMode && { color: '#64748B' }]}>{product.category}</Text>
+                        </View>
 
                         <TouchableOpacity
-                          style={styles.quickViewBtn}
                           onPress={() => {
                             if (onNavigateToProductDetails) {
                               onNavigateToProductDetails(product);
@@ -762,18 +706,86 @@ export default function WishlistPage({
                             }
                           }}
                           activeOpacity={0.8}
-                          title="View specifications"
                         >
-                          <BootstrapIcon name="eye" size={15} color="#475569" />
+                          <Text style={[styles.productName, isDarkMode && { color: '#F9FAFB' }]} numberOfLines={2}>
+                            {product.name}
+                          </Text>
                         </TouchableOpacity>
+
+                        <View style={styles.ratingRow}>
+                          {productHasCustomerRatings(product) ? (
+                            <>
+                              <BootstrapIcon name="star-fill" size={12} color="#F59E0B" />
+                              <Text style={styles.ratingText}>{Number(product.rating).toFixed(1)}</Text>
+                              <Text style={styles.reviewCountText}>({product.reviews} reviews)</Text>
+                            </>
+                          ) : (
+                            <>
+                              <BootstrapIcon name="star" size={12} color="#94A3B8" />
+                              <Text style={[styles.reviewCountText, { color: '#94A3B8' }]}>No ratings yet</Text>
+                            </>
+                          )}
+                        </View>
+
+                        {/* Stock Indicator */}
+                        <View style={styles.stockBadgeInStock}>
+                          <BootstrapIcon
+                            name={isOutOfStock ? 'x-lg' : 'check2'}
+                            size={11}
+                            color={isOutOfStock ? '#DC2626' : '#16A34A'}
+                          />
+                          <Text style={[styles.stockBadgeText, isOutOfStock && { color: '#DC2626' }]}>
+                            {isOutOfStock ? 'Out of Stock' : `In Stock (${product.stock || 15} units)`}
+                          </Text>
+                        </View>
+
+                        {/* Price Row */}
+                        <View style={styles.priceRow}>
+                          <Text style={styles.mainPrice}>₱{Number(product.price || 0).toFixed(2)}</Text>
+                          {compareAt ? (
+                            <Text style={styles.oldPrice}>₱{Number(compareAt || 0).toFixed(2)}</Text>
+                          ) : null}
+                        </View>
+
+                        {/* Action Buttons */}
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity
+                            style={[styles.addToCartBtn, isOutOfStock && { backgroundColor: '#94A3B8' }]}
+                            disabled={isOutOfStock}
+                            onPress={() => handleAddToCart(product)}
+                            activeOpacity={0.85}
+                          >
+                            <BootstrapIcon name="cart-plus-fill" size={13} color="#FFFFFF" />
+                            <Text style={styles.addToCartBtnText}>
+                              {isOutOfStock ? 'Sold Out' : 'Add to Cart'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.quickViewBtn}
+                            onPress={() => {
+                              if (onNavigateToProductDetails) {
+                                onNavigateToProductDetails(product);
+                              } else if (onNavigateToScreen) {
+                                onNavigateToScreen('product-details', { product });
+                              } else {
+                                setSelectedProductForSpecs(product);
+                                setIsSpecsModalOpen(true);
+                              }
+                            }}
+                            activeOpacity={0.8}
+                            title="View specifications"
+                          >
+                            <BootstrapIcon name="eye" size={15} color="#475569" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                );
-              })}
-            </View>
+                  );
+                })}
+              </View>
           )}
-        </View>
+            </View>
       </ScrollView>
 
       {/* ─── MOBILE BOTTOM FLOATING SUMMARY BAR ─── */}
@@ -943,7 +955,7 @@ export default function WishlistPage({
           <View
             style={{
               width: '100%',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               paddingHorizontal: 20,
@@ -962,9 +974,9 @@ export default function WishlistPage({
                 width: 52,
                 height: 52,
                 borderRadius: 26,
-                backgroundColor: '#FEF2F2',
+                backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
                 borderWidth: 1.5,
-                borderColor: '#FEE2E2',
+                borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FEE2E2',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: 14,
@@ -972,13 +984,13 @@ export default function WishlistPage({
             >
               <BootstrapIcon name="trash3-fill" size={24} color="#EF4444" />
             </View>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: isDarkMode ? '#F9FAFB' : '#0F172A', marginBottom: 6 }}>
               Clear Your Saved Wishlist?
             </Text>
             <Text
               style={{
                 fontSize: 13.5,
-                color: '#64748B',
+                color: isDarkMode ? '#94A3B8' : '#64748B',
                 textAlign: 'center',
                 lineHeight: 20,
                 marginBottom: 20,
@@ -993,7 +1005,7 @@ export default function WishlistPage({
               <TouchableOpacity
                 style={{
                   flex: 1,
-                  backgroundColor: '#F1F5F9',
+                  backgroundColor: isDarkMode ? '#23272B' : '#F1F5F9',
                   paddingVertical: 13,
                   borderRadius: 14,
                   alignItems: 'center',
@@ -1001,7 +1013,7 @@ export default function WishlistPage({
                 }}
                 onPress={() => setIsClearModalOpen(false)}
               >
-                <Text style={{ color: '#475569', fontWeight: '700', fontSize: 13.5 }}>Cancel</Text>
+                <Text style={{ color: isDarkMode ? '#E2E8F0' : '#475569', fontWeight: '700', fontSize: 13.5 }}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1034,7 +1046,7 @@ export default function WishlistPage({
             : ''
         }
         serviceName={bookingTarget?.name || bookingTarget?.title || 'AI Custom Installation'}
-        laborFeePhp={3250}
+        laborFeePhp={systemSettingsService.getCustomizationLaborFee?.() ?? 3250}
         freeInstallPromo={bookingFreeInstall}
         branches={GARAGE_BRANCHES}
         selectedBranch={bookingBranch}
@@ -1051,10 +1063,11 @@ export default function WishlistPage({
       />
 
       {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION ─── */}
-      <BottomNavBar
+      <MobileBottomNavBar
         activeTab="Wishlist"
         onTabChange={handleBottomNavChange}
         wishlistCount={wishlistedProducts.length}
+        ordersCount={0}
         currentUser={currentUser}
       />
     </SafeAreaView>

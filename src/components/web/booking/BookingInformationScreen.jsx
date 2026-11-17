@@ -6,7 +6,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { garageService } from '../../../services/bookings/garageService.js';
 
 // Shop pin location (triangulated from the Street View storefront frames)
@@ -59,6 +60,8 @@ export default function BookingInformationScreen({
   onContinue,
   showToast: _showToast,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const [mapMode, setMapMode] = useState('street'); // 'street' | 'satellite' | 'map'
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 960;
@@ -523,10 +526,10 @@ export default function BookingInformationScreen({
               flex: 1.15,
               minWidth: 280,
               maxWidth: '100%',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
               borderRadius: 20,
               borderWidth: 1,
-              borderColor: '#E4E4E7',
+              borderColor: isDarkMode ? '#303236' : '#E4E4E7',
               overflow: 'hidden',
               shadowColor: '#000000',
               shadowOpacity: 0.04,
@@ -716,7 +719,7 @@ export default function BookingInformationScreen({
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EA580C' }} />
-                <Text style={{ fontSize: 11, fontWeight: '600', color: '#18181B' }}>Selected</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>Selected</Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -727,7 +730,7 @@ export default function BookingInformationScreen({
                     borderRadius: 5,
                     borderWidth: 1.5,
                     borderColor: '#FED7AA',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   }}
                 />
                 <Text style={{ fontSize: 11, fontWeight: '500', color: '#71717A' }}>
@@ -742,7 +745,7 @@ export default function BookingInformationScreen({
                     height: 10,
                     borderRadius: 5,
                     borderWidth: 1,
-                    borderColor: '#E4E4E7',
+                    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
                     backgroundColor: '#FAFAF9',
                   }}
                 />
@@ -759,10 +762,10 @@ export default function BookingInformationScreen({
               flex: 1,
               minWidth: 280,
               maxWidth: '100%',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
               borderRadius: 20,
               borderWidth: 1,
-              borderColor: '#E4E4E7',
+              borderColor: isDarkMode ? '#303236' : '#E4E4E7',
               padding: 22,
               shadowColor: '#000000',
               shadowOpacity: 0.04,
@@ -772,7 +775,7 @@ export default function BookingInformationScreen({
           >
             {/* Header */}
             <View style={{ marginBottom: 18 }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#18181B', letterSpacing: -0.3 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: isDarkMode ? '#F2F2F3' : '#18181B', letterSpacing: -0.3 }}>
                 Live Booking Time & Availability
               </Text>
               <Text style={{ fontSize: 12.5, fontWeight: '500', color: '#71717A', marginTop: 3 }}>
@@ -809,7 +812,7 @@ export default function BookingInformationScreen({
             {availableSlots.length === 0 && (
               <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center' }}>
                 <BootstrapIcon name="calendar-x" size={28} color="#94A3B8" />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#18181B', marginTop: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B', marginTop: 8 }}>
                   No Available Slots
                 </Text>
                 <Text style={{ fontSize: 12, color: '#71717A', textAlign: 'center', marginTop: 2 }}>
@@ -824,7 +827,7 @@ export default function BookingInformationScreen({
       {/* ─── 2. WORKSHOP LOCATION & INTERACTIVE MAP ─── */}
       <View
         style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
           borderRadius: 20,
           borderWidth: 1,
           borderColor: '#EFECE6',
@@ -858,7 +861,7 @@ export default function BookingInformationScreen({
                 style={{
                   fontSize: 22,
                   fontWeight: '600',
-                  color: '#18181B',
+                  color: isDarkMode ? '#F2F2F3' : '#18181B',
                   letterSpacing: -0.3,
                 }}
               >
@@ -878,7 +881,7 @@ export default function BookingInformationScreen({
               {/* Information Box */}
               <View
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderRadius: 16,
                   borderWidth: 1,
                   borderColor: '#EFECE6',
@@ -922,7 +925,7 @@ export default function BookingInformationScreen({
                         width: 30,
                         height: 30,
                         borderRadius: 10,
-                        backgroundColor: '#FFF7ED',
+                        backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
@@ -933,7 +936,7 @@ export default function BookingInformationScreen({
                       <Text style={{ fontSize: 11, fontWeight: '500', color: '#A1A1AA', letterSpacing: 0.3 }}>
                         {row.label}
                       </Text>
-                      <Text style={{ fontSize: 13, fontWeight: '500', color: '#18181B', marginTop: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? '#F2F2F3' : '#18181B', marginTop: 2 }}>
                         {row.lines[0]}
                       </Text>
                       <Text style={{ fontSize: 12, color: '#71717A', marginTop: 1 }}>{row.lines[1]}</Text>
@@ -1105,7 +1108,7 @@ export default function BookingInformationScreen({
                 borderRadius: 16,
                 overflow: 'hidden',
                 borderWidth: 1,
-                borderColor: '#E4E4E7',
+                borderColor: isDarkMode ? '#303236' : '#E4E4E7',
                 backgroundColor: '#0F172A',
                 position: 'relative',
               }}

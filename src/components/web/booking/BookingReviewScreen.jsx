@@ -3,10 +3,11 @@
 // Minimalist, high-clarity summary layout
 // =========================================================================
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 import { GARAGE_BRANCHES } from '../../../services/bookings/garageService.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
@@ -28,12 +29,13 @@ function formatDisplayDate(dateStr) {
 }
 
 function DetailItem({ label, value, subvalue, style }) {
+  const { isDarkMode } = useTheme();
   return (
     <View style={style}>
       <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#71717A', textTransform: 'uppercase', letterSpacing: 0.6 }}>
         {label}
       </Text>
-      <Text style={{ fontSize: 14, fontWeight: '600', color: '#18181B', marginTop: 3, letterSpacing: -0.1 }}>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#18181B', marginTop: 3, letterSpacing: -0.1 }}>
         {value}
       </Text>
       {subvalue ? (
@@ -54,13 +56,14 @@ const sectionLabelStyle = {
 };
 
 function ReviewCard({ icon, eyebrow, title, subtitle, actions = [], children }) {
+  const { isDarkMode } = useTheme();
   return (
     <View
       style={{
-        backgroundColor: '#FFFFFF',
+        backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#E4E4E7',
+        borderColor: isDarkMode ? '#303236' : '#E4E4E7',
         padding: 22,
         shadowColor: '#000000',
         shadowOpacity: 0.03,
@@ -84,7 +87,7 @@ function ReviewCard({ icon, eyebrow, title, subtitle, actions = [], children }) 
               width: 40,
               height: 40,
               borderRadius: 20,
-              backgroundColor: '#FFF7ED',
+              backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
               borderWidth: 1,
               borderColor: '#FED7AA',
               alignItems: 'center',
@@ -95,7 +98,7 @@ function ReviewCard({ icon, eyebrow, title, subtitle, actions = [], children }) 
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={sectionLabelStyle}>{eyebrow}</Text>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#18181B', marginTop: 2 }} numberOfLines={2}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B', marginTop: 2 }} numberOfLines={2}>
               {title}
             </Text>
             {subtitle ? (
@@ -162,6 +165,8 @@ export default function BookingReviewScreen({
   onEditSection,
   onBack,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const branch = GARAGE_BRANCHES[0] || {
     name: "D'Blockchain Motorparts and Accessories",
     address: 'Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu',
@@ -309,7 +314,7 @@ export default function BookingReviewScreen({
               >
                 <View style={{ flex: 1, paddingRight: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#18181B' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>
                       {pkg.name}
                     </Text>
                     {pkg.category ? (
@@ -337,7 +342,7 @@ export default function BookingReviewScreen({
                   </View>
                 </View>
 
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#18181B', fontVariant: ['tabular-nums'] }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: isDarkMode ? '#F2F2F3' : '#18181B', fontVariant: ['tabular-nums'] }}>
                   {formatPhp(price)}
                 </Text>
               </View>
@@ -363,7 +368,7 @@ export default function BookingReviewScreen({
                   borderColor: '#F4F4F5',
                 }}
               >
-                <Text style={{ fontSize: 13, color: '#334155', fontStyle: 'italic', lineHeight: 19 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#334155', fontStyle: 'italic', lineHeight: 19 }}>
                   "{customerNotes}"
                 </Text>
               </View>
@@ -546,7 +551,7 @@ export default function BookingReviewScreen({
               width: 28,
               height: 28,
               borderRadius: 14,
-              backgroundColor: '#FEF3C7',
+              backgroundColor: isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FEF3C7',
               alignItems: 'center',
               justifyContent: 'center',
             }}

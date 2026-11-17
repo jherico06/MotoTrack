@@ -93,17 +93,17 @@ export default function DeliveryAdminActionModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#191A1D', borderWidth: 1, borderColor: '#303236' }]}>
           <View style={styles.header}>
-            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>
+            <Text style={[styles.title, isDark && { color: '#F5F5F5' }]}>
               {isMarkDelivered
                 ? 'Confirm Delivery'
                 : isIssue
                   ? 'Delivery Issue'
                   : 'Mark Delivery Reported'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]} disabled={busy}>
-              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#202124' }]} disabled={busy}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#A1A1AA' : '#64748b'} />
             </TouchableOpacity>
           </View>
 

@@ -139,15 +139,15 @@ export default function RiderAccessModal({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#191A1D', borderWidth: 1, borderColor: '#303236' }]}>
           <View style={styles.header}>
-            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>Rider dashboard link</Text>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]}>
-              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
+            <Text style={[styles.title, isDark && { color: '#F5F5F5' }]}>Rider dashboard link</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#202124' }]}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#A1A1AA' : '#64748b'} />
             </TouchableOpacity>
           </View>
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={[styles.meta, isDark && { color: '#34D399' }]}>{riderName}</Text>
+            <Text style={[styles.meta, isDark && { color: '#00C98D' }]}>{riderName}</Text>
             <Text style={[styles.hint, isDark && { color: '#94A3B8' }]}>
               Temporary access — no rider account. Opens a phone-friendly list of this rider’s assigned
               deliveries with Google Maps navigation. The link expires after 48 hours or when all assigned

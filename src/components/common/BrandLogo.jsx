@@ -92,7 +92,7 @@ export default function BrandLogo({
       const rest = upper.slice(4);
       return (
         <>
-          MOTO<Text style={{ color: isDark ? '#EA580C' : (accentColor || '#EA580C') }}>{rest}</Text>
+          MOTO<Text style={{ color: isDark ? '#FF5A00' : (accentColor || '#EA580C') }}>{rest}</Text>
         </>
       );
     }
@@ -103,7 +103,7 @@ export default function BrandLogo({
       return (
         <>
           {first.toUpperCase()}{' '}
-          <Text style={{ color: isDark ? '#EA580C' : (accentColor || '#EA580C') }}>
+          <Text style={{ color: isDark ? '#FF5A00' : (accentColor || '#EA580C') }}>
             {last.toUpperCase()}
           </Text>
         </>

@@ -18,14 +18,14 @@ import { getRatedScore } from '../../../utils/productCatalog.js';
 
 // ─── COMPONENTS & MODALS ───
 import ProductCard from '../../../components/mobile/customer/ProductCard.jsx';
+import MobileFilterChips from '../../../components/mobile/customer/MobileFilterChips.jsx';
+import MobileHeroBanner from '../../../components/mobile/customer/MobileHeroBanner.jsx';
+import MobileBottomNavBar from '../../../components/mobile/customer/MobileBottomNavBar.jsx';
+import MobileCartPage from './CartPage.jsx';
 import {
-  BottomNavBar,
   ToastNotification,
   MobileHeader,
-  HeroBanner,
-  FilterChips,
   ProductSpecsModal,
-  CartModal,
   CheckoutModal,
   ProfileModal,
   AccessDeniedModal,
@@ -38,9 +38,11 @@ import {
   compatibilityService,
   COMPAT_STATUS,
 } from '../../../services/products/compatibilityService.js';
+import { categoryService } from '../../../services/products/categoryService.js';
+import { promoService } from '../../../services/products/promoService.js';
 import { motorcycleService } from '../../../services/products/motorcycleService.js';
 
-export default function ShopPage({ onNavigateToScreen }) {
+export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onRequireLogin }) {
   const mainScrollRef = useRef(null);
   // Contexts
   const { currentUser, setRedirectReason, logout } = useAuth();
@@ -74,6 +76,10 @@ export default function ShopPage({ onNavigateToScreen }) {
 
   // Local state
   const [productsList, setProductsList] = useState([]);
+  const [categoriesList, setCategoriesList] = useState(
+    () => categoryService.getCachedCategories?.() || []
+  );
+  const [activePromos, setActivePromos] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [brandSettings, setBrandSettings] = useState(() =>
     typeof systemSettingsService?.getSettings === 'function'
@@ -109,6 +115,18 @@ export default function ShopPage({ onNavigateToScreen }) {
     setCompanyInfoTab(tab);
     setIsCompanyInfoOpen(true);
   };
+
+  const requireAuthForAction = useCallback(
+    ({ title, message, actionLabel, feature }, fallbackReason) => {
+      if (typeof onRequireLogin === 'function') {
+        onRequireLogin({ title, message, actionLabel, feature });
+      } else {
+        setRedirectReason?.(fallbackReason || message);
+        onNavigateToScreen?.('login');
+      }
+    },
+    [onRequireLogin, onNavigateToScreen, setRedirectReason]
+  );
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
   const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
@@ -217,6 +235,48 @@ export default function ShopPage({ onNavigateToScreen }) {
     }
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    categoryService
+      .getCategories?.()
+      .then((data) => {
+        if (alive && Array.isArray(data) && data.length > 0) {
+          setCategoriesList(data);
+        }
+      })
+      .catch(() => { });
+    const unsubCat = categoryService.subscribe?.((updated) => {
+      if (alive && Array.isArray(updated) && updated.length > 0) {
+        setCategoriesList(updated);
+      }
+    });
+
+    promoService
+      .getActivePromos?.()
+      .then((list) => {
+        if (alive && Array.isArray(list)) {
+          setActivePromos(list);
+        }
+      })
+      .catch(() => { });
+    const unsubPromo = promoService.subscribe?.(() => {
+      promoService
+        .getActivePromos?.()
+        .then((list) => {
+          if (alive && Array.isArray(list)) {
+            setActivePromos(list);
+          }
+        })
+        .catch(() => { });
+    });
+
+    return () => {
+      alive = false;
+      unsubCat?.();
+      unsubPromo?.();
+    };
+  }, []);
+
   const loadUserBikes = useCallback(async () => {
     const userId = currentUser?.id || currentUser?.user_id || currentUser?.customer_id;
     const customerEmail = currentUser?.email || '';
@@ -225,7 +285,7 @@ export default function ShopPage({ onNavigateToScreen }) {
       if (userId) {
         await motorcycleService.syncFromSupabase?.(userId, customerEmail);
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     let bikes = [];
     if (userId || customerEmail) {
@@ -302,8 +362,20 @@ export default function ShopPage({ onNavigateToScreen }) {
     const prods = Array.isArray(productsList) ? productsList : [];
     const map = compatMap || new Map();
     let list = prods.filter((item) => {
-      const matchCategory =
-        selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase();
+      const catLower = (item.category || '').toLowerCase();
+      const selLower = selectedCategory.toLowerCase();
+      let matchCategory = selectedCategory === 'All' || catLower === selLower;
+      if (!matchCategory) {
+        if ((selLower === 'engine' || selLower === 'engine parts') && (catLower.includes('engine') || catLower.includes('fuel') || catLower.includes('motor'))) matchCategory = true;
+        if ((selLower === 'maintenance' || selLower === 'lubricants') && (catLower.includes('oil') || catLower.includes('maintenance') || catLower.includes('lubricant') || catLower.includes('filter') || catLower.includes('service'))) matchCategory = true;
+        if (selLower === 'tires' && (catLower.includes('tire') || catLower.includes('wheel') || catLower.includes('rim'))) matchCategory = true;
+        if (selLower === 'brakes' && (catLower.includes('brake') || catLower.includes('pad') || catLower.includes('rotor') || catLower.includes('caliper'))) matchCategory = true;
+        if (selLower === 'drivetrain' && (catLower.includes('drivetrain') || catLower.includes('chain') || catLower.includes('sprocket'))) matchCategory = true;
+        if (selLower === 'exhaust' && (catLower.includes('exhaust') || catLower.includes('muffler') || catLower.includes('pipe'))) matchCategory = true;
+        if (selLower === 'suspension' && (catLower.includes('suspension') || catLower.includes('shock') || catLower.includes('fork'))) matchCategory = true;
+        if (selLower === 'accessories' && (catLower.includes('access') || catLower.includes('body') || catLower.includes('mirror') || catLower.includes('seat') || catLower.includes('mount'))) matchCategory = true;
+        if (catLower && selLower && (catLower.includes(selLower) || selLower.includes(catLower))) matchCategory = true;
+      }
       const query = searchQuery.toLowerCase().trim();
       const matchSearch =
         !query ||
@@ -358,8 +430,15 @@ export default function ShopPage({ onNavigateToScreen }) {
   // Add to cart with auth check
   const handleAddToCartAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
-      setRedirectReason('Please sign in or create an account to add items to your cart.');
-      onNavigateToScreen?.('login');
+      requireAuthForAction(
+        {
+          title: 'Sign In to Add to Cart',
+          message: 'Please log in or create an account to add motorcycle parts to your shopping bag.',
+          actionLabel: 'Sign In to Shop',
+          feature: 'cart',
+        },
+        'Please sign in or create an account to add items to your cart.'
+      );
       return;
     }
     const size = options.size || product?.selectedSize || '';
@@ -393,8 +472,15 @@ export default function ShopPage({ onNavigateToScreen }) {
   // Buy Now — skip cart, go straight to checkout (login required)
   const handleBuyNowAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
-      setRedirectReason('Please sign in or create an account to buy this item.');
-      onNavigateToScreen?.('login');
+      requireAuthForAction(
+        {
+          title: 'Sign In to Checkout',
+          message: 'Please log in or create an account to complete your purchase.',
+          actionLabel: 'Sign In to Buy',
+          feature: 'buy',
+        },
+        'Please sign in or create an account to buy this item.'
+      );
       return;
     }
     const size = options.size || product?.selectedSize || '';
@@ -553,7 +639,7 @@ export default function ShopPage({ onNavigateToScreen }) {
             : paymentMethod === 'PayPal'
               ? '🎉 PayPal payment confirmed! Live order tracking active.'
               : paymentMethod === 'Credit / Debit Card' ||
-                  (paymentMethod || '').toLowerCase().includes('card')
+                (paymentMethod || '').toLowerCase().includes('card')
                 ? '🎉 Card payment confirmed! Live order tracking active.'
                 : '🎉 GCash Payment Confirmed! Live order tracking active.'
       );
@@ -577,8 +663,8 @@ export default function ShopPage({ onNavigateToScreen }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" translucent backgroundColor="transparent" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#24272B' : '#F7F5F0' }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
       {/* Toast Notification */}
       <ToastNotification message={toastMessage} />
@@ -595,8 +681,15 @@ export default function ShopPage({ onNavigateToScreen }) {
         }}
         onOpenCart={() => {
           if (!currentUser) {
-            setRedirectReason('Please sign in to view and manage your shopping cart.');
-            onNavigateToScreen?.('login');
+            requireAuthForAction(
+              {
+                title: 'Sign In to View Cart',
+                message: 'Please log in or create an account to view and manage your shopping bag.',
+                actionLabel: 'Sign In',
+                feature: 'cart',
+              },
+              'Please sign in to view and manage your shopping cart.'
+            );
           } else {
             setIsCartOpen(true);
           }
@@ -606,7 +699,7 @@ export default function ShopPage({ onNavigateToScreen }) {
             setRedirectReason('Please sign in to access your account.');
             onNavigateToScreen?.('login');
           } else {
-            onNavigateToScreen?.('profile', { tab: 'menu' });
+            onNavigateToScreen?.('profile', { tab: 'profile' });
           }
         }}
         onNavigateToLogin={() => {
@@ -614,7 +707,11 @@ export default function ShopPage({ onNavigateToScreen }) {
           onNavigateToScreen?.('login');
         }}
         onNavigateToNotifications={() => onNavigateToScreen?.('notifications')}
-        onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
+        onNavigateToWishlist={() =>
+          typeof onNavigateToWishlist === 'function'
+            ? onNavigateToWishlist()
+            : onNavigateToScreen?.('wishlist')
+        }
         onNavigateToAdmin={() => {
           if (currentUser?.role === 'admin') {
             onNavigateToScreen?.('admin');
@@ -626,7 +723,7 @@ export default function ShopPage({ onNavigateToScreen }) {
 
       <ScrollView
         ref={mainScrollRef}
-        style={[styles.container, isDarkMode && { backgroundColor: '#121518' }]}
+        style={[styles.container, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -639,14 +736,23 @@ export default function ShopPage({ onNavigateToScreen }) {
         }
       >
         <View style={[styles.maxContainer, { paddingHorizontal: isSmallMobile ? 12 : 14 }]}>
-          {/* Hero Promo Banner */}
-          <HeroBanner onSelectCategory={(cat) => setSelectedCategory(cat)} showToast={showToast} />
+          {/* Compact Hero Promo Banner (keeps featured products prominent above the fold) */}
+          <MobileHeroBanner
+            onSelectCategory={(cat) => setSelectedCategory(cat)}
+            onNavigateToScreen={(screen, params) => onNavigateToScreen?.(screen, params)}
+            onShopParts={() => {
+              setSelectedCategory('All');
+              mainScrollRef.current?.scrollTo({ y: 120, animated: true });
+            }}
+            showToast={showToast}
+          />
 
-          {/* Filter Chips Row: Category, Motorcycle Selector & Compatibility Filter Aligned */}
-          <FilterChips
+          {/* Filter Chips Row: Dynamic Admin Categories, Motorcycle Selector & Compatibility Filter */}
+          <MobileFilterChips
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
             productsList={productsList}
+            categoriesList={categoriesList}
             activeBike={activeBike}
             onOpenBikeModal={() => setIsBikeModalOpen(true)}
             compatOnly={compatOnly}
@@ -966,6 +1072,61 @@ export default function ShopPage({ onNavigateToScreen }) {
             </TouchableOpacity>
           </Modal>
 
+          {/* Dynamic Active Admin Promos Strip */}
+          {activePromos.length > 0 && (
+            <View style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <BootstrapIcon name="tag-fill" size={13} color="#EA580C" />
+                  <Text style={{ fontSize: 13.5, fontWeight: '800', color: isDarkMode ? '#F9FAFB' : '#0F172A' }}>
+                    Active Store Deals
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#EA580C' }}>
+                  {activePromos.length} live {activePromos.length === 1 ? 'promo' : 'promos'}
+                </Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                {activePromos.map((promo) => (
+                  <View
+                    key={promo.promo_id || promo.id || promo.code || promo.title}
+                    style={{
+                      backgroundColor: isDarkMode ? '#1C1F23' : '#FFF7ED',
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#43230A' : '#FED7AA',
+                      borderRadius: 14,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      minWidth: 196,
+                      maxWidth: 230,
+                      gap: 4,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <Text
+                        style={{ fontSize: 12.5, fontWeight: '800', color: isDarkMode ? '#FDBA74' : '#9A3412', flex: 1 }}
+                        numberOfLines={1}
+                      >
+                        {promo.title || promo.name || 'Special Promo'}
+                      </Text>
+                      {promo.code ? (
+                        <View style={{ backgroundColor: '#EA580C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF' }}>{promo.code}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text
+                      style={{ fontSize: 11, color: isDarkMode ? '#CBD5E1' : '#7C2D12' }}
+                      numberOfLines={2}
+                    >
+                      {promo.description || promo.subtitle || 'Applied automatically on eligible items at checkout.'}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Section Title */}
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, isDarkMode && { color: '#F9FAFB' }]}>
@@ -1051,7 +1212,7 @@ export default function ShopPage({ onNavigateToScreen }) {
       </ScrollView>
 
       {/* Persistent Bottom Navigation Bar for Mobile */}
-      <BottomNavBar
+      <MobileBottomNavBar
         activeTab="Home"
         onTabChange={(tab) => {
           if (tab === 'Home' || tab === 'Shop') {
@@ -1117,6 +1278,7 @@ export default function ShopPage({ onNavigateToScreen }) {
           }
         }}
         wishlistCount={wishlistCount}
+        ordersCount={0}
         currentUser={currentUser}
       />
 
@@ -1129,10 +1291,16 @@ export default function ShopPage({ onNavigateToScreen }) {
         onBuyNow={handleBuyNowAttempt}
       />
 
-      <CartModal
+      <MobileCartPage
         visible={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onProceedToCheckout={handleProceedToCheckout}
+        onNavigateToWishlist={() => {
+          setIsCartOpen(false);
+          onNavigateToWishlist?.();
+        }}
+        onNavigateToStore={() => setIsCartOpen(false)}
+        onBuyNow={handleBuyNowAttempt}
       />
 
       <CheckoutModal

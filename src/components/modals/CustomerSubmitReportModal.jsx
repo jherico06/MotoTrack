@@ -129,7 +129,7 @@ export default function CustomerSubmitReportModal({
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75}>
-                  <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                  <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -139,7 +139,7 @@ export default function CustomerSubmitReportModal({
                     <BootstrapIcon
                       name="exclamation-circle-fill"
                       size={14}
-                      color={isDarkMode ? '#F87171' : '#DC2626'}
+                      color={isDarkMode ? '#F04444' : '#DC2626'}
                     />
                     <Text style={styles.errorText}>{errorMsg}</Text>
                   </View>
@@ -166,7 +166,7 @@ export default function CustomerSubmitReportModal({
                         <BootstrapIcon
                           name={cat.icon}
                           size={13}
-                          color={isSelected ? cat.color : isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isSelected ? cat.color : isDarkMode ? '#A1A1AA' : '#64748B'}
                         />
                         <Text
                           style={[
@@ -383,7 +383,7 @@ const createStyles = (isDarkMode) =>
     },
     modalCard: {
       width: '100%',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
@@ -393,7 +393,7 @@ const createStyles = (isDarkMode) =>
       shadowRadius: 24,
       elevation: 8,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     modalCardDesktop: {
       maxWidth: 620,
@@ -415,8 +415,8 @@ const createStyles = (isDarkMode) =>
       paddingHorizontal: 20,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#E2E8F0',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderBottomColor: isDarkMode ? '#303236' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     },
     headerLeft: {
       flexDirection: 'row',
@@ -437,7 +437,7 @@ const createStyles = (isDarkMode) =>
       fontFamily: 'Inter',
       fontSize: 16,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       letterSpacing: -0.2,
     },
     headerSub: {
@@ -450,9 +450,9 @@ const createStyles = (isDarkMode) =>
       width: 32,
       height: 32,
       borderRadius: 6,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -464,7 +464,7 @@ const createStyles = (isDarkMode) =>
       fontFamily: 'Inter',
       fontSize: 10.5,
       fontWeight: '600',
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
       letterSpacing: 0.4,
       marginBottom: 8,
     },
@@ -482,23 +482,23 @@ const createStyles = (isDarkMode) =>
       paddingVertical: 7,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       cursor: 'pointer',
     },
     catPillText: {
       fontFamily: 'Inter',
       fontSize: 12,
       fontWeight: '500',
-      color: isDarkMode ? '#E2E8F0' : '#334155',
+      color: isDarkMode ? '#F2F2F3' : '#334155',
     },
     ratingSection: {
       marginBottom: 16,
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       padding: 12,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     clearRatingText: {
       fontFamily: 'Inter',
@@ -520,7 +520,7 @@ const createStyles = (isDarkMode) =>
       fontFamily: 'Inter',
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#FBBF24' : '#D97706',
+      color: isDarkMode ? '#F5B942' : '#D97706',
       marginLeft: 6,
     },
     txSection: {
@@ -535,7 +535,7 @@ const createStyles = (isDarkMode) =>
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 5,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
     },
     txTabActive: {
       backgroundColor: '#EA580C',
@@ -544,7 +544,7 @@ const createStyles = (isDarkMode) =>
       fontFamily: 'Inter',
       fontSize: 11.5,
       fontWeight: '500',
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
     },
     txTabTextActive: {
       color: '#FFFFFF',
@@ -552,7 +552,7 @@ const createStyles = (isDarkMode) =>
     },
     selectorWrap: {
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       borderRadius: 6,
       overflow: 'hidden',
     },
@@ -562,8 +562,8 @@ const createStyles = (isDarkMode) =>
       gap: 10,
       padding: 10,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
-      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      borderBottomColor: isDarkMode ? '#303236' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
     },
     itemPickRowSelected: {
       backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
@@ -572,7 +572,7 @@ const createStyles = (isDarkMode) =>
       fontFamily: 'Inter',
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     itemPickSub: {
       fontFamily: 'Inter',
@@ -583,13 +583,13 @@ const createStyles = (isDarkMode) =>
       fontFamily: 'Inter',
       fontSize: 10.5,
       fontWeight: '600',
-      color: isDarkMode ? '#34D399' : '#059669',
+      color: isDarkMode ? '#00C98D' : '#059669',
     },
     textArea: {
       fontFamily: 'Inter',
       fontSize: 12.5,
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       borderRadius: 8,
       borderWidth: 1,
       borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
@@ -606,22 +606,22 @@ const createStyles = (isDarkMode) =>
       paddingHorizontal: 20,
       paddingVertical: 14,
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? '#282D34' : '#E2E8F0',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderTopColor: isDarkMode ? '#303236' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     },
     cancelBtn: {
       paddingHorizontal: 16,
       paddingVertical: 9,
       borderRadius: 6,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
     },
     cancelBtnText: {
       fontFamily: 'Inter',
       fontSize: 12.5,
       fontWeight: '600',
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
     },
     submitBtn: {
       flexDirection: 'row',

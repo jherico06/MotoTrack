@@ -27,13 +27,23 @@ const AVATAR_COLORS = [
   { bg: '#F0FDFA', text: '#0D9488', border: '#99F6E4' },
 ];
 
-function getAvatarColor(name = '') {
+const DARK_AVATAR_COLORS = [
+  { bg: 'rgba(59, 130, 246, 0.16)', text: '#60A5FA', border: 'rgba(59, 130, 246, 0.30)' },
+  { bg: 'rgba(245, 185, 66, 0.16)', text: '#F5B942', border: 'rgba(245, 185, 66, 0.30)' },
+  { bg: 'rgba(0, 201, 141, 0.16)', text: '#00C98D', border: 'rgba(0, 201, 141, 0.30)' },
+  { bg: 'rgba(168, 85, 247, 0.16)', text: '#C084FC', border: 'rgba(168, 85, 247, 0.30)' },
+  { bg: 'rgba(240, 68, 68, 0.16)', text: '#F87171', border: 'rgba(240, 68, 68, 0.30)' },
+  { bg: '#3A241B', text: '#FF5A00', border: '#8A3D19' },
+];
+
+function getAvatarColor(name = '', isDarkMode = false) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const idx = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx];
+  const palette = isDarkMode ? DARK_AVATAR_COLORS : AVATAR_COLORS;
+  const idx = Math.abs(hash) % palette.length;
+  return palette[idx];
 }
 
 export default function AdminCustomerRatingsReportsPanel({
@@ -305,6 +315,50 @@ export default function AdminCustomerRatingsReportsPanel({
 
   // Status badge styling helper
   const getStatusBadge = (status) => {
+    if (isDarkMode) {
+      switch (status) {
+        case REPORT_STATUSES.NEW:
+          return {
+            bg: 'rgba(245, 185, 66, 0.15)',
+            text: '#F5B942',
+            border: 'rgba(245, 185, 66, 0.30)',
+            dot: '#F5B942',
+            label: 'New',
+          };
+        case REPORT_STATUSES.UNDER_REVIEW:
+          return {
+            bg: 'rgba(59, 130, 246, 0.15)',
+            text: '#60A5FA',
+            border: 'rgba(59, 130, 246, 0.30)',
+            dot: '#3B82F6',
+            label: 'In Review',
+          };
+        case REPORT_STATUSES.RESOLVED:
+          return {
+            bg: 'rgba(0, 201, 141, 0.15)',
+            text: '#00C98D',
+            border: 'rgba(0, 201, 141, 0.30)',
+            dot: '#00C98D',
+            label: 'Resolved',
+          };
+        case REPORT_STATUSES.DISMISSED:
+          return {
+            bg: '#202124',
+            text: '#A1A1AA',
+            border: '#303236',
+            dot: '#71717A',
+            label: 'Dismissed',
+          };
+        default:
+          return {
+            bg: '#202124',
+            text: '#A1A1AA',
+            border: '#303236',
+            dot: '#71717A',
+            label: status || 'New',
+          };
+      }
+    }
     switch (status) {
       case REPORT_STATUSES.NEW:
         return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A', dot: '#F59E0B', label: 'New' };
@@ -348,7 +402,7 @@ export default function AdminCustomerRatingsReportsPanel({
             onPress={handleExportCSV}
             activeOpacity={0.8}
           >
-            <BootstrapIcon name="box-arrow-up-right" size={13} color={isDarkMode ? '#F8FAFC' : '#1E293B'} />
+            <BootstrapIcon name="box-arrow-up-right" size={13} color={isDarkMode ? '#FAFAFA' : '#1E293B'} />
             <Text style={[styles.exportBtnText, isDarkMode && styles.textLight]}>Export</Text>
           </TouchableOpacity>
 
@@ -374,14 +428,31 @@ export default function AdminCustomerRatingsReportsPanel({
           2. PRIORITY NOTIFICATION BANNER (Only displays when real unresolved urgent report exists)
       ────────────────────────────────────────────────────────────── */}
       {stats.urgentReport && (
-        <View style={styles.priorityBanner}>
+        <View
+          style={[
+            styles.priorityBanner,
+            isDarkMode && {
+              backgroundColor: 'rgba(240, 68, 68, 0.10)',
+              borderColor: 'rgba(240, 68, 68, 0.28)',
+            },
+          ]}
+        >
           <View style={styles.priorityBannerLeft}>
-            <View style={styles.priorityWarningIcon}>
-              <BootstrapIcon name="exclamation-triangle-fill" size={17} color="#DC2626" />
+            <View
+              style={[
+                styles.priorityWarningIcon,
+                isDarkMode && { backgroundColor: 'rgba(240, 68, 68, 0.16)' },
+              ]}
+            >
+              <BootstrapIcon
+                name="exclamation-triangle-fill"
+                size={17}
+                color={isDarkMode ? '#F04444' : '#DC2626'}
+              />
             </View>
             <View style={styles.priorityTextWrap}>
               <View style={styles.priorityTitleRow}>
-                <Text style={styles.priorityHeadline}>
+                <Text style={[styles.priorityHeadline, isDarkMode && { color: '#FCA5A5' }]}>
                   {stats.urgentReport.isUrgent
                     ? 'High-priority customer report needs response'
                     : 'Customer issue report needs response'}
@@ -390,7 +461,7 @@ export default function AdminCustomerRatingsReportsPanel({
                   <Text style={styles.urgentSafetyChipText}>NEW REPORT</Text>
                 </View>
               </View>
-              <Text style={styles.priorityDescription}>
+              <Text style={[styles.priorityDescription, isDarkMode && { color: '#A1A1AA' }]}>
                 {stats.urgentReport.customerName} submitted a{' '}
                 {REPORT_CATEGORIES[stats.urgentReport.category?.toUpperCase()]?.label ||
                   stats.urgentReport.category}{' '}
@@ -417,90 +488,196 @@ export default function AdminCustomerRatingsReportsPanel({
         {/* Card 1: Total Feedback */}
         <View style={[styles.summaryCard, isDarkMode && styles.summaryCardDark]}>
           <View style={styles.summaryCardHeader}>
-            <Text style={styles.summaryLabel}>TOTAL FEEDBACK</Text>
-            <View style={[styles.summaryIconBox, { backgroundColor: '#F1F5F9' }]}>
-              <BootstrapIcon name="chat-square-quote-fill" size={15} color="#475569" />
+            <Text style={[styles.summaryLabel, isDarkMode && { color: '#A1A1AA' }]}>Total feedback</Text>
+            <View
+              style={[
+                styles.headerPillBadge,
+                {
+                  backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
+                  borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+                },
+              ]}
+            >
+              <Text style={[styles.headerPillText, { color: isDarkMode ? '#A1A1AA' : '#52525B' }]}>
+                {stats.totalRatings} ratings · {stats.reportsCount} reports
+              </Text>
             </View>
           </View>
-          <Text style={[styles.summaryValue, styles.tabularNums, isDarkMode && styles.textLight]}>
-            {stats.total}
-          </Text>
-          <View style={styles.summarySubRow}>
-            <Text style={styles.summarySubText}>
-              {stats.totalRatings} ratings · {stats.reportsCount} reports
+          <View style={styles.summaryValueBlock}>
+            <Text style={[styles.summaryValue, styles.tabularNums, isDarkMode && styles.textLight]}>
+              {stats.total}
             </Text>
+            <Text style={[styles.summarySubText, isDarkMode && { color: '#71717A' }]}>
+              All customer ratings & reports
+            </Text>
+          </View>
+          <View style={[styles.summaryTrack, isDarkMode && { backgroundColor: '#292B2F' }]}>
+            <View
+              style={[
+                styles.summaryTrackFill,
+                { width: stats.total > 0 ? '78%' : '18%', backgroundColor: isDarkMode ? '#FF5A00' : '#EA580C' },
+              ]}
+            />
           </View>
         </View>
 
         {/* Card 2: Average Rating */}
         <View style={[styles.summaryCard, isDarkMode && styles.summaryCardDark]}>
           <View style={styles.summaryCardHeader}>
-            <Text style={styles.summaryLabel}>AVERAGE RATING</Text>
-            <View style={[styles.summaryIconBox, { backgroundColor: '#FFFBEB' }]}>
-              <BootstrapIcon name="star-fill" size={15} color="#F59E0B" />
-            </View>
-          </View>
-          <View style={styles.ratingValRow}>
-            <Text style={[styles.summaryValue, styles.tabularNums, isDarkMode && styles.textLight]}>
-              {stats.averageRating > 0 ? Number(stats.averageRating).toFixed(1) : '0.0'}
-            </Text>
-            <BootstrapIcon name="star-fill" size={16} color="#F59E0B" style={{ marginTop: 6 }} />
-          </View>
-          <View style={styles.summarySubRow}>
-            <View style={styles.positiveBadge}>
-              <BootstrapIcon name="star" size={12} color="#047857" />
-              <Text style={styles.positiveBadgeText}>
-                {stats.ratingCount > 0 ? `Based on ${stats.ratingCount} reviews` : 'No reviews yet'}
+            <Text style={[styles.summaryLabel, isDarkMode && { color: '#A1A1AA' }]}>Average rating</Text>
+            <View
+              style={[
+                styles.headerPillBadge,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                  borderColor: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
+                },
+              ]}
+            >
+              <Text style={[styles.headerPillText, { color: isDarkMode ? '#00C98D' : '#047857' }]}>
+                {stats.ratingCount > 0 ? `${stats.ratingCount} reviews` : 'No reviews'}
               </Text>
             </View>
+          </View>
+          <View style={styles.summaryValueBlock}>
+            <View style={styles.ratingValRow}>
+              <Text style={[styles.summaryValue, styles.tabularNums, isDarkMode && styles.textLight]}>
+                {stats.averageRating > 0 ? Number(stats.averageRating).toFixed(1) : '0.0'}
+              </Text>
+              <BootstrapIcon
+                name="star-fill"
+                size={16}
+                color={isDarkMode ? '#F5B942' : '#F59E0B'}
+              />
+            </View>
+            <Text style={[styles.summarySubText, isDarkMode && { color: '#71717A' }]}>
+              Out of 5.0 satisfaction score
+            </Text>
+          </View>
+          <View style={[styles.summaryTrack, isDarkMode && { backgroundColor: '#292B2F' }]}>
+            <View
+              style={[
+                styles.summaryTrackFill,
+                {
+                  width: `${Math.min(100, Math.max(12, Math.round(((Number(stats.averageRating) || 0) / 5) * 100)))}%`,
+                  backgroundColor: isDarkMode ? '#F5B942' : '#F59E0B',
+                },
+              ]}
+            />
           </View>
         </View>
 
         {/* Card 3: Action Required */}
         <View style={[styles.summaryCard, isDarkMode && styles.summaryCardDark]}>
           <View style={styles.summaryCardHeader}>
-            <Text style={styles.summaryLabel}>ACTION REQUIRED</Text>
-            <View style={[styles.summaryIconBox, { backgroundColor: '#FEF2F2' }]}>
-              <BootstrapIcon name="exclamation-circle-fill" size={15} color="#DC2626" />
-            </View>
-          </View>
-          <Text
-            style={[
-              styles.summaryValue,
-              styles.tabularNums,
-              { color: stats.actionRequiredCount > 0 ? '#DC2626' : '#0F172A' },
-            ]}
-          >
-            {stats.actionRequiredCount}
-          </Text>
-          <View style={styles.summarySubRow}>
-            <View style={stats.actionRequiredCount > 0 ? styles.urgentBadge : styles.resolvedBadge}>
-              <Text style={stats.actionRequiredCount > 0 ? styles.urgentBadgeText : styles.resolvedBadgeText}>
+            <Text style={[styles.summaryLabel, isDarkMode && { color: '#A1A1AA' }]}>Action required</Text>
+            <View
+              style={[
+                styles.headerPillBadge,
+                stats.actionRequiredCount > 0
+                  ? {
+                      backgroundColor: isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FEF3C7',
+                      borderColor: isDarkMode ? 'rgba(245, 185, 66, 0.28)' : '#FDE68A',
+                    }
+                  : {
+                      backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                      borderColor: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
+                    },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.headerPillText,
+                  {
+                    color:
+                      stats.actionRequiredCount > 0
+                        ? isDarkMode
+                          ? '#F5B942'
+                          : '#B45309'
+                        : isDarkMode
+                          ? '#00C98D'
+                          : '#047857',
+                  },
+                ]}
+              >
                 {stats.actionRequiredCount > 0
-                  ? `${stats.newCount} new · ${stats.underReviewCount} in review`
-                  : 'All reviews & reports resolved'}
+                  ? `${stats.newCount} new · ${stats.underReviewCount} review`
+                  : 'All resolved'}
               </Text>
             </View>
+          </View>
+          <View style={styles.summaryValueBlock}>
+            <Text
+              style={[
+                styles.summaryValue,
+                styles.tabularNums,
+                {
+                  color:
+                    stats.actionRequiredCount > 0
+                      ? isDarkMode
+                        ? '#F04444'
+                        : '#DC2626'
+                      : isDarkMode
+                        ? '#F5F5F5'
+                        : '#18181B',
+                },
+              ]}
+            >
+              {stats.actionRequiredCount}
+            </Text>
+            <Text style={[styles.summarySubText, isDarkMode && { color: '#71717A' }]}>
+              {stats.actionRequiredCount > 0 ? 'Pending triage & follow-up' : 'Queue cleared'}
+            </Text>
+          </View>
+          <View style={[styles.summaryTrack, isDarkMode && { backgroundColor: '#292B2F' }]}>
+            <View
+              style={[
+                styles.summaryTrackFill,
+                {
+                  width: stats.actionRequiredCount > 0 ? '68%' : '16%',
+                  backgroundColor: stats.actionRequiredCount > 0 ? (isDarkMode ? '#F04444' : '#DC2626') : '#00C98D',
+                },
+              ]}
+            />
           </View>
         </View>
 
         {/* Card 4: Resolved */}
         <View style={[styles.summaryCard, isDarkMode && styles.summaryCardDark]}>
           <View style={styles.summaryCardHeader}>
-            <Text style={styles.summaryLabel}>RESOLVED</Text>
-            <View style={[styles.summaryIconBox, { backgroundColor: '#ECFDF5' }]}>
-              <BootstrapIcon name="check-circle-fill" size={15} color="#10B981" />
-            </View>
-          </View>
-          <Text style={[styles.summaryValue, styles.tabularNums, isDarkMode && styles.textLight]}>
-            {stats.resolvedCount}
-          </Text>
-          <View style={styles.summarySubRow}>
-            <View style={styles.resolvedBadge}>
-              <Text style={styles.resolvedBadgeText}>
-                {stats.total > 0 ? `${stats.resolvedRate}% resolution rate` : '100% resolution rate'}
+            <Text style={[styles.summaryLabel, isDarkMode && { color: '#A1A1AA' }]}>Resolved</Text>
+            <View
+              style={[
+                styles.headerPillBadge,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                  borderColor: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
+                },
+              ]}
+            >
+              <Text style={[styles.headerPillText, { color: isDarkMode ? '#00C98D' : '#047857' }]}>
+                {stats.total > 0 ? `${stats.resolvedRate}% rate` : '100% rate'}
               </Text>
             </View>
+          </View>
+          <View style={styles.summaryValueBlock}>
+            <Text style={[styles.summaryValue, styles.tabularNums, isDarkMode && styles.textLight]}>
+              {stats.resolvedCount}
+            </Text>
+            <Text style={[styles.summarySubText, isDarkMode && { color: '#71717A' }]}>
+              Closed & responded cases
+            </Text>
+          </View>
+          <View style={[styles.summaryTrack, isDarkMode && { backgroundColor: '#292B2F' }]}>
+            <View
+              style={[
+                styles.summaryTrackFill,
+                {
+                  width: `${Math.min(100, Math.max(14, Number(stats.resolvedRate) || 0))}%`,
+                  backgroundColor: isDarkMode ? '#00C98D' : '#10B981',
+                },
+              ]}
+            />
           </View>
         </View>
       </View>
@@ -513,15 +690,22 @@ export default function AdminCustomerRatingsReportsPanel({
         <View style={styles.queueHeaderRow}>
           <View>
             <Text style={[styles.queueTitle, isDarkMode && styles.textLight]}>Review Queue</Text>
-            <Text style={styles.queueSubtitle}>
+            <Text style={[styles.queueSubtitle, isDarkMode && { color: '#A1A1AA' }]}>
               Monitor, triage, and respond to incoming customer reviews and incident reports.
             </Text>
           </View>
 
           {/* Updated just now indicator */}
-          <View style={styles.updatedBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.updatedBadgeText}>Updated just now</Text>
+          <View
+            style={[
+              styles.updatedBadge,
+              isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
+            ]}
+          >
+            <View style={[styles.liveDot, isDarkMode && { backgroundColor: '#00C98D' }]} />
+            <Text style={[styles.updatedBadgeText, isDarkMode && { color: '#A1A1AA' }]}>
+              Updated just now
+            </Text>
           </View>
         </View>
 
@@ -529,17 +713,17 @@ export default function AdminCustomerRatingsReportsPanel({
         <View style={styles.queueToolbar}>
           {/* Search Field */}
           <View style={[styles.searchBox, isDarkMode && styles.searchBoxDark]}>
-            <BootstrapIcon name="search" size={14} color="#64748B" />
+            <BootstrapIcon name="search" size={14} color={isDarkMode ? '#71717A' : '#64748B'} />
             <TextInput
-              style={[styles.searchInput, isDarkMode && styles.textLight]}
+              style={[styles.searchInput, isDarkMode && { color: '#F2F2F3' }]}
               placeholder="Search customer, message, or order ID"
-              placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+              placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery ? (
               <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-                <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
+                <BootstrapIcon name="x-circle-fill" size={14} color={isDarkMode ? '#71717A' : '#94A3B8'} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -555,19 +739,38 @@ export default function AdminCustomerRatingsReportsPanel({
               return (
                 <TouchableOpacity
                   key={seg.id}
-                  style={[styles.segmentedBtn, active && styles.segmentedBtnActive]}
+                  style={[
+                    styles.segmentedBtn,
+                    active && (isDarkMode ? styles.segmentedBtnActiveDark : styles.segmentedBtnActive),
+                  ]}
                   onPress={() => setFilterType(seg.id)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.segmentedBtnText, active && styles.segmentedBtnTextActive]}>
+                  <Text
+                    style={[
+                      styles.segmentedBtnText,
+                      isDarkMode && { color: '#A1A1AA' },
+                      active && (isDarkMode ? { color: '#F5F5F5', fontWeight: '700' } : styles.segmentedBtnTextActive),
+                    ]}
+                  >
                     {seg.label}
                   </Text>
-                  <View style={[styles.segmentedCountBadge, active && styles.segmentedCountBadgeActive]}>
+                  <View
+                    style={[
+                      styles.segmentedCountBadge,
+                      isDarkMode && { backgroundColor: '#191A1D' },
+                      active &&
+                        (isDarkMode
+                          ? { backgroundColor: '#3A241B', borderWidth: 1, borderColor: '#8A3D19' }
+                          : styles.segmentedCountBadgeActive),
+                    ]}
+                  >
                     <Text
                       style={[
                         styles.segmentedCountText,
                         styles.tabularNums,
-                        active && styles.segmentedCountTextActive,
+                        isDarkMode && { color: '#A1A1AA' },
+                        active && (isDarkMode ? { color: '#FF5A00' } : styles.segmentedCountTextActive),
                       ]}
                     >
                       {seg.count}
@@ -582,8 +785,11 @@ export default function AdminCustomerRatingsReportsPanel({
           <TouchableOpacity
             style={[
               styles.moreFiltersBtn,
-              showMoreFilters && styles.moreFiltersBtnActive,
               isDarkMode && styles.moreFiltersBtnDark,
+              showMoreFilters &&
+                (isDarkMode
+                  ? { borderColor: '#8A3D19', backgroundColor: '#3A241B' }
+                  : styles.moreFiltersBtnActive),
             ]}
             onPress={() => setShowMoreFilters(!showMoreFilters)}
             activeOpacity={0.8}
@@ -591,13 +797,13 @@ export default function AdminCustomerRatingsReportsPanel({
             <BootstrapIcon
               name="sliders"
               size={13}
-              color={showMoreFilters ? '#EA580C' : isDarkMode ? '#CBD5E1' : '#475569'}
+              color={showMoreFilters ? '#FF5A00' : isDarkMode ? '#A1A1AA' : '#475569'}
             />
             <Text
               style={[
                 styles.moreFiltersBtnText,
-                showMoreFilters && { color: '#EA580C' },
-                isDarkMode && !showMoreFilters && styles.textLight,
+                isDarkMode && { color: '#F2F2F3' },
+                showMoreFilters && { color: '#FF5A00' },
               ]}
             >
               More filters
@@ -605,7 +811,7 @@ export default function AdminCustomerRatingsReportsPanel({
             <BootstrapIcon
               name={showMoreFilters ? 'chevron-up' : 'chevron-down'}
               size={11}
-              color={showMoreFilters ? '#EA580C' : '#94A3B8'}
+              color={showMoreFilters ? '#FF5A00' : isDarkMode ? '#71717A' : '#94A3B8'}
             />
           </TouchableOpacity>
         </View>
@@ -614,23 +820,23 @@ export default function AdminCustomerRatingsReportsPanel({
         {showMoreFilters && (
           <View style={[styles.extendedFiltersPanel, isDarkMode && styles.extendedFiltersPanelDark]}>
             <View style={styles.extFilterGroup}>
-              <Text style={styles.extFilterLabel}>STATUS:</Text>
+              <Text style={[styles.extFilterLabel, isDarkMode && { color: '#A1A1AA' }]}>STATUS:</Text>
               <View style={styles.extPillRow}>
                 {['all', 'New', 'Under Review', 'Resolved', 'Dismissed'].map((st) => (
                   <TouchableOpacity
                     key={st}
                     style={[
                       styles.extPill,
-                      statusFilter === st && styles.extPillActive,
                       isDarkMode && styles.extPillDark,
+                      statusFilter === st && styles.extPillActive,
                     ]}
                     onPress={() => setStatusFilter(st)}
                   >
                     <Text
                       style={[
                         styles.extPillText,
+                        isDarkMode && { color: '#A1A1AA' },
                         statusFilter === st && styles.extPillTextActive,
-                        isDarkMode && styles.textLight,
                       ]}
                     >
                       {st === 'all' ? 'All Statuses' : st === 'Under Review' ? 'In Review' : st}
@@ -641,7 +847,7 @@ export default function AdminCustomerRatingsReportsPanel({
             </View>
 
             <View style={styles.extFilterGroup}>
-              <Text style={styles.extFilterLabel}>SORT BY:</Text>
+              <Text style={[styles.extFilterLabel, isDarkMode && { color: '#A1A1AA' }]}>SORT BY:</Text>
               <View style={styles.extPillRow}>
                 {[
                   { id: 'newest', label: 'Newest' },
@@ -653,16 +859,16 @@ export default function AdminCustomerRatingsReportsPanel({
                     key={s.id}
                     style={[
                       styles.extPill,
-                      sortBy === s.id && styles.extPillActive,
                       isDarkMode && styles.extPillDark,
+                      sortBy === s.id && styles.extPillActive,
                     ]}
                     onPress={() => setSortBy(s.id)}
                   >
                     <Text
                       style={[
                         styles.extPillText,
+                        isDarkMode && { color: '#A1A1AA' },
                         sortBy === s.id && styles.extPillTextActive,
-                        isDarkMode && styles.textLight,
                       ]}
                     >
                       {s.label}
@@ -672,8 +878,8 @@ export default function AdminCustomerRatingsReportsPanel({
 
                 {isFiltered && (
                   <TouchableOpacity style={styles.resetBtn} onPress={handleClearFilters}>
-                    <BootstrapIcon name="arrow-counterclockwise" size={11} color="#DC2626" />
-                    <Text style={styles.resetBtnText}>Reset filters</Text>
+                    <BootstrapIcon name="arrow-counterclockwise" size={11} color={isDarkMode ? '#F04444' : '#DC2626'} />
+                    <Text style={[styles.resetBtnText, isDarkMode && { color: '#F04444' }]}>Reset filters</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -686,23 +892,33 @@ export default function AdminCustomerRatingsReportsPanel({
         ────────────────────────────────────────────────────────────── */}
         {isLoading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color="#EA580C" />
-            <Text style={styles.loadingText}>Loading customer ratings and reports...</Text>
+            <ActivityIndicator size="large" color="#FF5A00" />
+            <Text style={[styles.loadingText, isDarkMode && { color: '#A1A1AA' }]}>
+              Loading customer ratings and reports...
+            </Text>
           </View>
         ) : submissions.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <BootstrapIcon name="inbox" size={36} color="#CBD5E1" />
+            <BootstrapIcon name="inbox" size={36} color={isDarkMode ? '#52525B' : '#CBD5E1'} />
             <Text style={[styles.emptyTitle, isDarkMode && styles.textLight]}>
               {isFiltered ? 'No matching submissions found' : 'No customer feedback yet'}
             </Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptySubtitle, isDarkMode && { color: '#A1A1AA' }]}>
               {isFiltered
                 ? 'Try adjusting your search query or filters.'
                 : 'When customers rate orders or submit problem reports, they will appear here in real time.'}
             </Text>
             {isFiltered && (
-              <TouchableOpacity style={styles.emptyActionBtn} onPress={handleClearFilters}>
-                <Text style={styles.emptyActionBtnText}>Clear all filters</Text>
+              <TouchableOpacity
+                style={[
+                  styles.emptyActionBtn,
+                  isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+                ]}
+                onPress={handleClearFilters}
+              >
+                <Text style={[styles.emptyActionBtnText, isDarkMode && { color: '#F2F2F3' }]}>
+                  Clear all filters
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -710,7 +926,7 @@ export default function AdminCustomerRatingsReportsPanel({
           /* ── MOBILE STACKED CARDS VIEW ── */
           <View style={styles.stackedCardsContainer}>
             {submissions.map((item) => {
-              const avatarStyle = getAvatarColor(item.customerName);
+              const avatarStyle = getAvatarColor(item.customerName, isDarkMode);
               const statusStyle = getStatusBadge(item.status);
               const isRating = item.submissionType === 'rating_review';
               const isUrgent = Boolean(item.isUrgent);
@@ -723,8 +939,11 @@ export default function AdminCustomerRatingsReportsPanel({
                   key={item.id}
                   style={[
                     styles.stackedCard,
-                    isUrgent && styles.urgentCardHighlight,
                     isDarkMode && styles.stackedCardDark,
+                    isUrgent &&
+                      (isDarkMode
+                        ? { borderLeftColor: '#F04444', backgroundColor: 'rgba(240, 68, 68, 0.06)' }
+                        : styles.urgentCardHighlight),
                   ]}
                   onPress={() => handleOpenItem(item)}
                   activeOpacity={0.88}
@@ -748,13 +967,26 @@ export default function AdminCustomerRatingsReportsPanel({
                             {item.customerName}
                           </Text>
                           {item.isVerified && (
-                            <View style={styles.verifiedBadge}>
-                              <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
-                              <Text style={styles.verifiedBadgeText}>Verified</Text>
+                            <View
+                              style={[
+                                styles.verifiedBadge,
+                                isDarkMode && { backgroundColor: 'rgba(0, 201, 141, 0.14)' },
+                              ]}
+                            >
+                              <BootstrapIcon
+                                name="check-circle-fill"
+                                size={11}
+                                color={isDarkMode ? '#00C98D' : '#059669'}
+                              />
+                              <Text style={[styles.verifiedBadgeText, isDarkMode && { color: '#00C98D' }]}>
+                                Verified
+                              </Text>
                             </View>
                           )}
                         </View>
-                        <Text style={styles.submissionDate}>{formatDate(item.createdAt)}</Text>
+                        <Text style={[styles.submissionDate, isDarkMode && { color: '#71717A' }]}>
+                          {formatDate(item.createdAt)}
+                        </Text>
                       </View>
                     </View>
 
@@ -774,9 +1006,23 @@ export default function AdminCustomerRatingsReportsPanel({
                   {/* Type & Urgency Alert Bar */}
                   <View style={styles.cardTypeRow}>
                     {isRating ? (
-                      <View style={styles.ratingScorePill}>
-                        <BootstrapIcon name="star-fill" size={12} color="#D97706" />
-                        <Text style={[styles.ratingScoreText, styles.tabularNums]}>
+                      <View
+                        style={[
+                          styles.ratingScorePill,
+                          isDarkMode && {
+                            backgroundColor: 'rgba(245, 185, 66, 0.14)',
+                            borderColor: 'rgba(245, 185, 66, 0.28)',
+                          },
+                        ]}
+                      >
+                        <BootstrapIcon name="star-fill" size={12} color={isDarkMode ? '#F5B942' : '#D97706'} />
+                        <Text
+                          style={[
+                            styles.ratingScoreText,
+                            styles.tabularNums,
+                            isDarkMode && { color: '#F5B942' },
+                          ]}
+                        >
                           {Number(item.rating || 5.0).toFixed(1)} Rating
                         </Text>
                       </View>
@@ -784,42 +1030,64 @@ export default function AdminCustomerRatingsReportsPanel({
                       <View
                         style={[
                           styles.reportBadge,
-                          isUrgent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+                          isDarkMode && { backgroundColor: '#3A241B', borderColor: '#8A3D19' },
+                          isUrgent &&
+                            (isDarkMode
+                              ? { backgroundColor: 'rgba(240, 68, 68, 0.15)', borderColor: 'rgba(240, 68, 68, 0.32)' }
+                              : { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }),
                         ]}
                       >
                         <BootstrapIcon
                           name={isUrgent ? 'shield-exclamation' : 'flag-fill'}
                           size={11}
-                          color={isUrgent ? '#DC2626' : '#EA580C'}
+                          color={isUrgent ? (isDarkMode ? '#F04444' : '#DC2626') : '#FF5A00'}
                         />
-                        <Text style={[styles.reportBadgeText, isUrgent && { color: '#DC2626' }]}>
+                        <Text
+                          style={[
+                            styles.reportBadgeText,
+                            isDarkMode && { color: '#FF5A00' },
+                            isUrgent && { color: isDarkMode ? '#F04444' : '#DC2626' },
+                          ]}
+                        >
                           {isUrgent ? 'Urgent Safety Report' : 'Customer Report'}
                         </Text>
                       </View>
                     )}
 
-                    <View style={styles.categoryChip}>
-                      <Text style={styles.categoryChipText}>{catObj.label}</Text>
+                    <View
+                      style={[
+                        styles.categoryChip,
+                        isDarkMode && { backgroundColor: '#292B2F', borderWidth: 1, borderColor: '#303236' },
+                      ]}
+                    >
+                      <Text style={[styles.categoryChipText, isDarkMode && { color: '#A1A1AA' }]}>
+                        {catObj.label}
+                      </Text>
                     </View>
                   </View>
 
                   {/* Message Preview */}
-                  <Text style={[styles.cardMessagePreview, isDarkMode && styles.textLight]} numberOfLines={2}>
+                  <Text style={[styles.cardMessagePreview, isDarkMode && { color: '#F2F2F3' }]} numberOfLines={2}>
                     {item.message}
                   </Text>
 
                   {/* Bottom Footer: Reference & Action */}
-                  <View style={styles.cardBottomRow}>
-                    <View style={styles.referenceChip}>
-                      <BootstrapIcon name="hash" size={12} color="#64748B" />
-                      <Text style={styles.referenceChipText}>
+                  <View style={[styles.cardBottomRow, isDarkMode && { borderTopColor: '#292B2F' }]}>
+                    <View
+                      style={[
+                        styles.referenceChip,
+                        isDarkMode && { backgroundColor: '#292B2F', borderColor: '#303236' },
+                      ]}
+                    >
+                      <BootstrapIcon name="hash" size={12} color={isDarkMode ? '#71717A' : '#64748B'} />
+                      <Text style={[styles.referenceChipText, isDarkMode && { color: '#A1A1AA' }]}>
                         {item.transactionId || item.transactionRef || 'N/A'}
                       </Text>
                     </View>
 
                     <View style={styles.viewActionLink}>
                       <Text style={styles.viewActionLinkText}>Review</Text>
-                      <BootstrapIcon name="arrow-right" size={12} color="#EA580C" />
+                      <BootstrapIcon name="arrow-right" size={12} color="#FF5A00" />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -828,20 +1096,20 @@ export default function AdminCustomerRatingsReportsPanel({
           </View>
         ) : (
           /* ── DESKTOP TABLE VIEW ── */
-          <View style={styles.tableWrapper}>
+          <View style={[styles.tableWrapper, isDarkMode && { borderColor: '#303236' }]}>
             {/* Table Header */}
             <View style={[styles.tableHeaderRow, isDarkMode && styles.tableHeaderRowDark]}>
-              <Text style={[styles.thCell, { flex: 2.2 }]}>CUSTOMER</Text>
-              <Text style={[styles.thCell, { flex: 1.4 }]}>TYPE</Text>
-              <Text style={[styles.thCell, { flex: 3.8 }]}>MESSAGE & REFERENCE</Text>
-              <Text style={[styles.thCell, { flex: 1.3 }]}>DATE</Text>
-              <Text style={[styles.thCell, { flex: 1.3 }]}>STATUS</Text>
-              <Text style={[styles.thCell, { flex: 1.0, textAlign: 'right' }]}>ACTION</Text>
+              <Text style={[styles.thCell, isDarkMode && { color: '#A1A1AA' }, { flex: 2.2 }]}>CUSTOMER</Text>
+              <Text style={[styles.thCell, isDarkMode && { color: '#A1A1AA' }, { flex: 1.4 }]}>TYPE</Text>
+              <Text style={[styles.thCell, isDarkMode && { color: '#A1A1AA' }, { flex: 3.8 }]}>MESSAGE & REFERENCE</Text>
+              <Text style={[styles.thCell, isDarkMode && { color: '#A1A1AA' }, { flex: 1.3 }]}>DATE</Text>
+              <Text style={[styles.thCell, isDarkMode && { color: '#A1A1AA' }, { flex: 1.3 }]}>STATUS</Text>
+              <Text style={[styles.thCell, isDarkMode && { color: '#A1A1AA' }, { flex: 1.0, textAlign: 'right' }]}>ACTION</Text>
             </View>
 
             {/* Table Body Rows */}
             {submissions.map((item, idx) => {
-              const avatarStyle = getAvatarColor(item.customerName);
+              const avatarStyle = getAvatarColor(item.customerName, isDarkMode);
               const statusStyle = getStatusBadge(item.status);
               const isRating = item.submissionType === 'rating_review';
               const isUrgent = Boolean(item.isUrgent);
@@ -854,9 +1122,17 @@ export default function AdminCustomerRatingsReportsPanel({
                   key={item.id}
                   style={[
                     styles.tableRow,
-                    idx % 2 === 1 && styles.tableRowAlt,
-                    isUrgent && styles.tableRowUrgent,
+                    !isDarkMode && idx % 2 === 1 && styles.tableRowAlt,
                     isDarkMode && styles.tableRowDark,
+                    isDarkMode && idx % 2 === 1 && { backgroundColor: '#1E1F23' },
+                    isUrgent &&
+                      (isDarkMode
+                        ? {
+                            backgroundColor: 'rgba(240, 68, 68, 0.06)',
+                            borderLeftWidth: 3,
+                            borderLeftColor: '#F04444',
+                          }
+                        : styles.tableRowUrgent),
                   ]}
                   onPress={() => handleOpenItem(item)}
                   activeOpacity={0.8}
@@ -880,7 +1156,7 @@ export default function AdminCustomerRatingsReportsPanel({
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text
-                        style={[styles.rowCustomerName, isDarkMode && styles.textLight]}
+                        style={[styles.rowCustomerName, isDarkMode && { color: '#F2F2F3' }]}
                         numberOfLines={1}
                       >
                         {item.customerName}
@@ -888,11 +1164,19 @@ export default function AdminCustomerRatingsReportsPanel({
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                         {item.isVerified ? (
                           <View style={styles.verifiedRow}>
-                            <BootstrapIcon name="patch-check-fill" size={11} color="#059669" />
-                            <Text style={styles.verifiedRowText}>Verified</Text>
+                            <BootstrapIcon
+                              name="patch-check-fill"
+                              size={11}
+                              color={isDarkMode ? '#00C98D' : '#059669'}
+                            />
+                            <Text style={[styles.verifiedRowText, isDarkMode && { color: '#00C98D' }]}>
+                              Verified
+                            </Text>
                           </View>
                         ) : (
-                          <Text style={styles.unverifiedRowText}>Customer</Text>
+                          <Text style={[styles.unverifiedRowText, isDarkMode && { color: '#71717A' }]}>
+                            Customer
+                          </Text>
                         )}
                       </View>
                     </View>
@@ -901,9 +1185,23 @@ export default function AdminCustomerRatingsReportsPanel({
                   {/* Column 2: Type */}
                   <View style={[styles.tdCell, { flex: 1.4 }]}>
                     {isRating ? (
-                      <View style={styles.ratingScorePill}>
-                        <BootstrapIcon name="star-fill" size={11} color="#D97706" />
-                        <Text style={[styles.ratingScoreText, styles.tabularNums]}>
+                      <View
+                        style={[
+                          styles.ratingScorePill,
+                          isDarkMode && {
+                            backgroundColor: 'rgba(245, 185, 66, 0.14)',
+                            borderColor: 'rgba(245, 185, 66, 0.28)',
+                          },
+                        ]}
+                      >
+                        <BootstrapIcon name="star-fill" size={11} color={isDarkMode ? '#F5B942' : '#D97706'} />
+                        <Text
+                          style={[
+                            styles.ratingScoreText,
+                            styles.tabularNums,
+                            isDarkMode && { color: '#F5B942' },
+                          ]}
+                        >
                           {Number(item.rating || 5.0).toFixed(1)} Rating
                         </Text>
                       </View>
@@ -911,15 +1209,25 @@ export default function AdminCustomerRatingsReportsPanel({
                       <View
                         style={[
                           styles.reportBadge,
-                          isUrgent && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+                          isDarkMode && { backgroundColor: '#3A241B', borderColor: '#8A3D19' },
+                          isUrgent &&
+                            (isDarkMode
+                              ? { backgroundColor: 'rgba(240, 68, 68, 0.15)', borderColor: 'rgba(240, 68, 68, 0.32)' }
+                              : { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }),
                         ]}
                       >
                         <BootstrapIcon
                           name={isUrgent ? 'shield-exclamation' : 'flag-fill'}
                           size={10}
-                          color={isUrgent ? '#DC2626' : '#EA580C'}
+                          color={isUrgent ? (isDarkMode ? '#F04444' : '#DC2626') : '#FF5A00'}
                         />
-                        <Text style={[styles.reportBadgeText, isUrgent && { color: '#DC2626' }]}>
+                        <Text
+                          style={[
+                            styles.reportBadgeText,
+                            isDarkMode && { color: '#FF5A00' },
+                            isUrgent && { color: isDarkMode ? '#F04444' : '#DC2626' },
+                          ]}
+                        >
                           {isUrgent ? 'Urgent Report' : 'Report'}
                         </Text>
                       </View>
@@ -928,18 +1236,32 @@ export default function AdminCustomerRatingsReportsPanel({
 
                   {/* Column 3: Message & Reference */}
                   <View style={[styles.tdCell, { flex: 3.8 }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <View style={styles.categoryChip}>
-                        <Text style={styles.categoryChipText}>{catObj.label}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <View
+                        style={[
+                          styles.categoryChip,
+                          isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+                        ]}
+                      >
+                        <Text style={[styles.categoryChipText, isDarkMode && { color: '#A1A1AA' }]}>
+                          {catObj.label}
+                        </Text>
                       </View>
                       {item.transactionId && (
-                        <View style={styles.referenceChip}>
-                          <Text style={styles.referenceChipText}>{item.transactionId}</Text>
+                        <View
+                          style={[
+                            styles.referenceChip,
+                            isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
+                          ]}
+                        >
+                          <Text style={[styles.referenceChipText, isDarkMode && { color: '#A1A1AA' }]}>
+                            {item.transactionId}
+                          </Text>
                         </View>
                       )}
                     </View>
                     <Text
-                      style={[styles.tableMessagePreview, isDarkMode && styles.textLight]}
+                      style={[styles.tableMessagePreview, isDarkMode && { color: '#A1A1AA' }]}
                       numberOfLines={2}
                     >
                       {item.message}
@@ -948,7 +1270,9 @@ export default function AdminCustomerRatingsReportsPanel({
 
                   {/* Column 4: Date */}
                   <View style={[styles.tdCell, { flex: 1.3 }]}>
-                    <Text style={styles.rowDateText}>{formatDate(item.createdAt)}</Text>
+                    <Text style={[styles.rowDateText, isDarkMode && { color: '#A1A1AA' }]}>
+                      {formatDate(item.createdAt)}
+                    </Text>
                   </View>
 
                   {/* Column 5: Status */}
@@ -968,9 +1292,16 @@ export default function AdminCustomerRatingsReportsPanel({
 
                   {/* Column 6: Action */}
                   <View style={[styles.tdCell, { flex: 1.0, alignItems: 'flex-end' }]}>
-                    <View style={styles.rowActionButton}>
-                      <Text style={styles.rowActionButtonText}>View</Text>
-                      <BootstrapIcon name="chevron-right" size={11} color="#64748B" />
+                    <View
+                      style={[
+                        styles.rowActionButton,
+                        isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
+                      ]}
+                    >
+                      <Text style={[styles.rowActionButtonText, isDarkMode && { color: '#F2F2F3' }]}>
+                        View
+                      </Text>
+                      <BootstrapIcon name="chevron-right" size={11} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -995,24 +1326,41 @@ export default function AdminCustomerRatingsReportsPanel({
           {/* Drawer Body Container */}
           <View style={[styles.drawerContent, isDarkMode && styles.drawerContentDark]}>
             {/* Drawer Header */}
-            <View style={styles.drawerHeader}>
+            <View
+              style={[
+                styles.drawerHeader,
+                isDarkMode && { backgroundColor: '#191A1D', borderBottomColor: '#303236' },
+              ]}
+            >
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={[styles.drawerTitle, isDarkMode && styles.textLight]}>Feedback Details</Text>
-                  <View style={styles.drawerRefPill}>
-                    <Text style={styles.drawerRefPillText}>
+                  <View
+                    style={[
+                      styles.drawerRefPill,
+                      isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+                    ]}
+                  >
+                    <Text style={[styles.drawerRefPillText, isDarkMode && { color: '#A1A1AA' }]}>
                       {selectedItem.transactionId || selectedItem.id}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.drawerSubtitle}>
+                <Text style={[styles.drawerSubtitle, isDarkMode && { color: '#A1A1AA' }]}>
                   Submitted {formatDate(selectedItem.createdAt)} ·{' '}
                   {selectedItem.submissionType === 'rating_review' ? 'Customer Review' : 'Incident Report'}
                 </Text>
               </View>
 
-              <TouchableOpacity style={styles.drawerCloseBtn} onPress={handleCloseDrawer} activeOpacity={0.7}>
-                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+              <TouchableOpacity
+                style={[
+                  styles.drawerCloseBtn,
+                  isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+                ]}
+                onPress={handleCloseDrawer}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
@@ -1020,14 +1368,26 @@ export default function AdminCustomerRatingsReportsPanel({
             <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerScrollInner}>
               {/* Urgency Alert Notice (if urgent report) */}
               {selectedItem.isUrgent && (
-                <View style={styles.drawerUrgentBox}>
+                <View
+                  style={[
+                    styles.drawerUrgentBox,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(240, 68, 68, 0.12)',
+                      borderColor: 'rgba(240, 68, 68, 0.30)',
+                    },
+                  ]}
+                >
                   <View style={styles.drawerUrgentHeader}>
-                    <BootstrapIcon name="shield-fill-exclamation" size={17} color="#DC2626" />
-                    <Text style={styles.drawerUrgentTitle}>
+                    <BootstrapIcon
+                      name="shield-fill-exclamation"
+                      size={17}
+                      color={isDarkMode ? '#F04444' : '#DC2626'}
+                    />
+                    <Text style={[styles.drawerUrgentTitle, isDarkMode && { color: '#F04444' }]}>
                       {selectedItem.urgencyTitle || 'HIGH-PRIORITY REPORT · ATTENTION REQUIRED'}
                     </Text>
                   </View>
-                  <Text style={styles.drawerUrgentDesc}>
+                  <Text style={[styles.drawerUrgentDesc, isDarkMode && { color: '#FCA5A5' }]}>
                     {selectedItem.urgencyReason ||
                       'This customer report was flagged for immediate attention. Please review the details below and coordinate response or resolution.'}
                   </Text>
@@ -1036,10 +1396,12 @@ export default function AdminCustomerRatingsReportsPanel({
 
               {/* Section 1: Customer Information */}
               <View style={[styles.drawerSectionCard, isDarkMode && styles.drawerSectionCardDark]}>
-                <Text style={styles.drawerSectionHeading}>CUSTOMER INFORMATION</Text>
+                <Text style={[styles.drawerSectionHeading, isDarkMode && { color: '#A1A1AA' }]}>
+                  CUSTOMER INFORMATION
+                </Text>
                 <View style={styles.drawerCustomerRow}>
                   {(() => {
-                    const avatarStyle = getAvatarColor(selectedItem.customerName);
+                    const avatarStyle = getAvatarColor(selectedItem.customerName, isDarkMode);
                     return (
                       <View
                         style={[
@@ -1060,13 +1422,24 @@ export default function AdminCustomerRatingsReportsPanel({
                         {selectedItem.customerName}
                       </Text>
                       {selectedItem.isVerified && (
-                        <View style={styles.verifiedBadge}>
-                          <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
-                          <Text style={styles.verifiedBadgeText}>Verified Rider</Text>
+                        <View
+                          style={[
+                            styles.verifiedBadge,
+                            isDarkMode && { backgroundColor: 'rgba(0, 201, 141, 0.14)' },
+                          ]}
+                        >
+                          <BootstrapIcon
+                            name="check-circle-fill"
+                            size={11}
+                            color={isDarkMode ? '#00C98D' : '#059669'}
+                          />
+                          <Text style={[styles.verifiedBadgeText, isDarkMode && { color: '#00C98D' }]}>
+                            Verified Rider
+                          </Text>
                         </View>
                       )}
                     </View>
-                    <Text style={styles.drawerCustomerEmail}>
+                    <Text style={[styles.drawerCustomerEmail, isDarkMode && { color: '#A1A1AA' }]}>
                       {selectedItem.customerEmail || 'Verified phone account'}
                     </Text>
                   </View>
@@ -1083,17 +1456,38 @@ export default function AdminCustomerRatingsReportsPanel({
                     marginBottom: 12,
                   }}
                 >
-                  <Text style={styles.drawerSectionHeading}>CUSTOMER FEEDBACK</Text>
+                  <Text style={[styles.drawerSectionHeading, isDarkMode && { color: '#A1A1AA' }]}>
+                    CUSTOMER FEEDBACK
+                  </Text>
                   {selectedItem.submissionType === 'rating_review' ? (
-                    <View style={styles.drawerRatingBadge}>
-                      <BootstrapIcon name="star-fill" size={13} color="#D97706" />
-                      <Text style={[styles.drawerRatingScore, styles.tabularNums]}>
+                    <View
+                      style={[
+                        styles.drawerRatingBadge,
+                        isDarkMode && {
+                          backgroundColor: 'rgba(245, 185, 66, 0.14)',
+                          borderColor: 'rgba(245, 185, 66, 0.28)',
+                        },
+                      ]}
+                    >
+                      <BootstrapIcon name="star-fill" size={13} color={isDarkMode ? '#F5B942' : '#D97706'} />
+                      <Text
+                        style={[
+                          styles.drawerRatingScore,
+                          styles.tabularNums,
+                          isDarkMode && { color: '#F5B942' },
+                        ]}
+                      >
                         {Number(selectedItem.rating || 5.0).toFixed(1)} / 5.0
                       </Text>
                     </View>
                   ) : (
-                    <View style={styles.categoryChip}>
-                      <Text style={styles.categoryChipText}>
+                    <View
+                      style={[
+                        styles.categoryChip,
+                        isDarkMode && { backgroundColor: '#292B2F', borderWidth: 1, borderColor: '#303236' },
+                      ]}
+                    >
+                      <Text style={[styles.categoryChipText, isDarkMode && { color: '#A1A1AA' }]}>
                         {REPORT_CATEGORIES[selectedItem.category?.toUpperCase()]?.label ||
                           selectedItem.category}
                       </Text>
@@ -1103,23 +1497,32 @@ export default function AdminCustomerRatingsReportsPanel({
 
                 {/* Readable Customer Message */}
                 <View style={[styles.drawerMessageBox, isDarkMode && styles.drawerMessageBoxDark]}>
-                  <Text style={[styles.drawerMessageText, isDarkMode && styles.textLight]}>
+                  <Text style={[styles.drawerMessageText, isDarkMode && { color: '#F2F2F3' }]}>
                     "{selectedItem.message}"
                   </Text>
                 </View>
 
                 {/* Related Transaction Information */}
                 {(selectedItem.transactionId || selectedItem.transactionRef) && (
-                  <View style={styles.drawerTxBox}>
-                    <Text style={styles.drawerTxLabel}>RELATED TRANSACTION</Text>
+                  <View style={[styles.drawerTxBox, isDarkMode && { borderTopColor: '#292B2F' }]}>
+                    <Text style={[styles.drawerTxLabel, isDarkMode && { color: '#71717A' }]}>
+                      RELATED TRANSACTION
+                    </Text>
                     <View style={styles.drawerTxRow}>
-                      <BootstrapIcon name="receipt" size={14} color="#64748B" />
-                      <Text style={styles.drawerTxValue}>
+                      <BootstrapIcon name="receipt" size={14} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
+                      <Text style={[styles.drawerTxValue, isDarkMode && { color: '#F2F2F3' }]}>
                         {selectedItem.transactionRef || selectedItem.transactionId}
                       </Text>
                       {selectedItem.transactionStatus && (
-                        <View style={styles.txStatusPill}>
-                          <Text style={styles.txStatusPillText}>{selectedItem.transactionStatus}</Text>
+                        <View
+                          style={[
+                            styles.txStatusPill,
+                            isDarkMode && { backgroundColor: 'rgba(0, 201, 141, 0.14)' },
+                          ]}
+                        >
+                          <Text style={[styles.txStatusPillText, isDarkMode && { color: '#00C98D' }]}>
+                            {selectedItem.transactionStatus}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -1129,7 +1532,9 @@ export default function AdminCustomerRatingsReportsPanel({
 
               {/* Section 3: Activity Timeline */}
               <View style={[styles.drawerSectionCard, isDarkMode && styles.drawerSectionCardDark]}>
-                <Text style={styles.drawerSectionHeading}>ACTIVITY TIMELINE</Text>
+                <Text style={[styles.drawerSectionHeading, isDarkMode && { color: '#A1A1AA' }]}>
+                  ACTIVITY TIMELINE
+                </Text>
                 <View style={styles.timelineList}>
                   {selectedItem.timeline && selectedItem.timeline.length > 0 ? (
                     selectedItem.timeline.map((step, sIdx) => (
@@ -1137,7 +1542,12 @@ export default function AdminCustomerRatingsReportsPanel({
                         <View style={styles.timelineLineWrap}>
                           <View style={styles.timelineDot} />
                           {sIdx < selectedItem.timeline.length - 1 && (
-                            <View style={styles.timelineConnector} />
+                            <View
+                              style={[
+                                styles.timelineConnector,
+                                isDarkMode && { backgroundColor: '#303236' },
+                              ]}
+                            />
                           )}
                         </View>
                         <View style={styles.timelineContent}>
@@ -1145,9 +1555,13 @@ export default function AdminCustomerRatingsReportsPanel({
                             <Text style={[styles.timelineStepTitle, isDarkMode && styles.textLight]}>
                               {step.step}
                             </Text>
-                            <Text style={styles.timelineStepTime}>{step.time}</Text>
+                            <Text style={[styles.timelineStepTime, isDarkMode && { color: '#71717A' }]}>
+                              {step.time}
+                            </Text>
                           </View>
-                          <Text style={styles.timelineStepNote}>{step.note}</Text>
+                          <Text style={[styles.timelineStepNote, isDarkMode && { color: '#A1A1AA' }]}>
+                            {step.note}
+                          </Text>
                         </View>
                       </View>
                     ))
@@ -1161,9 +1575,13 @@ export default function AdminCustomerRatingsReportsPanel({
                           <Text style={[styles.timelineStepTitle, isDarkMode && styles.textLight]}>
                             Feedback Logged
                           </Text>
-                          <Text style={styles.timelineStepTime}>{formatDate(selectedItem.createdAt)}</Text>
+                          <Text style={[styles.timelineStepTime, isDarkMode && { color: '#71717A' }]}>
+                            {formatDate(selectedItem.createdAt)}
+                          </Text>
                         </View>
-                        <Text style={styles.timelineStepNote}>Captured from customer session.</Text>
+                        <Text style={[styles.timelineStepNote, isDarkMode && { color: '#A1A1AA' }]}>
+                          Captured from customer session.
+                        </Text>
                       </View>
                     </View>
                   )}
@@ -1172,10 +1590,12 @@ export default function AdminCustomerRatingsReportsPanel({
 
               {/* Section 4: Admin Review Workflow & Notes */}
               <View style={[styles.drawerSectionCard, isDarkMode && styles.drawerSectionCardDark]}>
-                <Text style={styles.drawerSectionHeading}>ADMIN REVIEW & RESOLUTION</Text>
+                <Text style={[styles.drawerSectionHeading, isDarkMode && { color: '#A1A1AA' }]}>
+                  ADMIN REVIEW & RESOLUTION
+                </Text>
 
                 {/* Status Switcher Buttons */}
-                <Text style={styles.fieldLabel}>Review Status</Text>
+                <Text style={[styles.fieldLabel, isDarkMode && { color: '#F2F2F3' }]}>Review Status</Text>
                 <View style={styles.statusButtonsRow}>
                   {[
                     { id: REPORT_STATUSES.NEW, label: 'New' },
@@ -1190,17 +1610,22 @@ export default function AdminCustomerRatingsReportsPanel({
                         key={btn.id}
                         style={[
                           styles.statusOptionBtn,
+                          isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
                           isSel && { backgroundColor: bStyle.bg, borderColor: bStyle.border },
                         ]}
                         onPress={() => setDrawerStatus(btn.id)}
                         activeOpacity={0.8}
                       >
                         <View
-                          style={[styles.statusDot, { backgroundColor: isSel ? bStyle.dot : '#CBD5E1' }]}
+                          style={[
+                            styles.statusDot,
+                            { backgroundColor: isSel ? bStyle.dot : isDarkMode ? '#52525B' : '#CBD5E1' },
+                          ]}
                         />
                         <Text
                           style={[
                             styles.statusOptionBtnText,
+                            isDarkMode && { color: '#A1A1AA' },
                             isSel && { color: bStyle.text, fontWeight: '700' },
                           ]}
                         >
@@ -1212,11 +1637,13 @@ export default function AdminCustomerRatingsReportsPanel({
                 </View>
 
                 {/* Internal Admin Notes */}
-                <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Internal Admin Notes</Text>
+                <Text style={[styles.fieldLabel, isDarkMode && { color: '#F2F2F3' }, { marginTop: 14 }]}>
+                  Internal Admin Notes
+                </Text>
                 <TextInput
                   style={[styles.drawerNotesInput, isDarkMode && styles.drawerNotesInputDark]}
                   placeholder="Record investigation findings, customer contact outcomes, or resolution steps..."
-                  placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+                  placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
                   value={drawerNotes}
                   onChangeText={setDrawerNotes}
                   multiline
@@ -1256,11 +1683,16 @@ export default function AdminCustomerRatingsReportsPanel({
                   )}
 
                   <TouchableOpacity
-                    style={styles.drawerCancelBtn}
+                    style={[
+                      styles.drawerCancelBtn,
+                      isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
+                    ]}
                     onPress={handleCloseDrawer}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.drawerCancelBtnText}>Done</Text>
+                    <Text style={[styles.drawerCancelBtnText, isDarkMode && { color: '#F2F2F3' }]}>
+                      Done
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1283,10 +1715,10 @@ const styles = StyleSheet.create({
     minHeight: '100%',
   },
   containerDark: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#18181B',
   },
   textLight: {
-    color: '#F8FAFC !important',
+    color: '#F5F5F5',
   },
   tabularNums: {
     fontVariant: ['tabular-nums'],
@@ -1347,8 +1779,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   exportBtnDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#303236',
   },
   exportBtnText: {
     fontSize: 13,
@@ -1359,12 +1791,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FF5A00',
     borderRadius: 8,
     paddingVertical: 9,
     paddingHorizontal: 16,
     cursor: 'pointer',
-    shadowColor: '#EA580C',
+    shadowColor: '#FF5A00',
     shadowOpacity: 0.25,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -1468,29 +1900,42 @@ const styles = StyleSheet.create({
     minWidth: 220,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 18,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 20,
+    justifyContent: 'space-between',
     shadowColor: '#000000',
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
   },
   summaryCardDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
   },
   summaryCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    gap: 8,
   },
   summaryLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#71717A',
+  },
+  headerPillBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  headerPillText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 0.6,
+    fontWeight: '600',
+  },
+  summaryValueBlock: {
+    marginVertical: 12,
   },
   summaryIconBox: {
     width: 28,
@@ -1500,14 +1945,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   summaryValue: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: '#0F172A',
-    letterSpacing: -0.8,
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#18181B',
+    letterSpacing: -0.6,
   },
   ratingValRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: 6,
   },
   summarySubRow: {
@@ -1517,8 +1962,20 @@ const styles = StyleSheet.create({
   },
   summarySubText: {
     fontSize: 12,
-    fontWeight: '500',
-    color: '#64748B',
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 3,
+  },
+  summaryTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#F4F4F5',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  summaryTrackFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   positiveBadge: {
     flexDirection: 'row',
@@ -1569,8 +2026,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   reviewQueueCardDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
   },
   queueHeaderRow: {
     flexDirection: 'row',
@@ -1635,8 +2092,8 @@ const styles = StyleSheet.create({
     height: 38,
   },
   searchBoxDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
   },
   searchInput: {
     flex: 1,
@@ -1651,7 +2108,9 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   segmentedGroupDark: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#202124',
+    borderWidth: 1,
+    borderColor: '#303236',
   },
   segmentedBtn: {
     flexDirection: 'row',
@@ -1668,6 +2127,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
+  },
+  segmentedBtnActiveDark: {
+    backgroundColor: '#292B2F',
+    borderWidth: 1,
+    borderColor: '#3A3B40',
   },
   segmentedBtnText: {
     fontSize: 12,
@@ -1708,11 +2172,11 @@ const styles = StyleSheet.create({
     cursor: 'pointer',
   },
   moreFiltersBtnDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#303236',
   },
   moreFiltersBtnActive: {
-    borderColor: '#EA580C',
+    borderColor: '#FF5A00',
     backgroundColor: '#FFF7ED',
   },
   moreFiltersBtnText: {
@@ -1732,8 +2196,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   extendedFiltersPanelDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#303236',
   },
   extFilterGroup: {
     flexDirection: 'row',
@@ -1764,12 +2228,12 @@ const styles = StyleSheet.create({
     cursor: 'pointer',
   },
   extPillDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
   },
   extPillActive: {
-    backgroundColor: '#EA580C',
-    borderColor: '#EA580C',
+    backgroundColor: '#FF5A00',
+    borderColor: '#FF5A00',
   },
   extPillText: {
     fontSize: 11,
@@ -1812,8 +2276,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   tableHeaderRowDark: {
-    backgroundColor: '#0F172A',
-    borderBottomColor: '#334155',
+    backgroundColor: '#202124',
+    borderBottomColor: '#303236',
   },
   thCell: {
     fontSize: 11,
@@ -1841,8 +2305,8 @@ const styles = StyleSheet.create({
     borderLeftColor: '#DC2626',
   },
   tableRowDark: {
-    backgroundColor: '#1E293B',
-    borderBottomColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderBottomColor: '#292B2F',
   },
   tdCell: {
     paddingRight: 10,
@@ -2002,8 +2466,8 @@ const styles = StyleSheet.create({
     cursor: 'pointer',
   },
   stackedCardDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
   },
   urgentCardHighlight: {
     borderLeftWidth: 3,
@@ -2143,8 +2607,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   drawerContentDark: {
-    backgroundColor: '#1E293B',
-    borderLeftColor: '#334155',
+    backgroundColor: '#18181B',
+    borderLeftColor: '#303236',
   },
   drawerHeader: {
     flexDirection: 'row',
@@ -2228,8 +2692,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   drawerSectionCardDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
   },
   drawerSectionHeading: {
     fontSize: 11,
@@ -2290,8 +2754,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   drawerMessageBoxDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#303236',
   },
   drawerMessageText: {
     fontSize: 13,
@@ -2425,8 +2889,9 @@ const styles = StyleSheet.create({
     outlineStyle: 'none',
   },
   drawerNotesInputDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
+    color: '#F2F2F3',
   },
   drawerActionsRow: {
     flexDirection: 'row',
@@ -2439,7 +2904,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FF5A00',
     borderRadius: 8,
     paddingVertical: 9,
     paddingHorizontal: 16,

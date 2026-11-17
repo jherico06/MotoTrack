@@ -51,7 +51,7 @@ import {
   ProductCardSkeleton,
   CustomerMobileNavDrawer,
 } from '../../../components/common';
-import HeroBanner from '../../../components/shop/HeroBanner.jsx';
+import HeroBanner from '../../../components/web/HeroBanner.jsx';
 import CategoryIcon from '../../../components/shop/CategoryIcon.jsx';
 import { useWebSavedWishlistCount } from '../../../components/web/useWebSavedWishlistCount.js';
 import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
@@ -82,6 +82,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
   const isDesktop = windowWidth >= 1024;
+  const isWideDesktop = windowWidth >= 1440;
+  const isUltraWide = windowWidth >= 1840;
+  const desktopSidePadding = isUltraWide ? 56 : isWideDesktop ? 40 : 24;
   const { currentUser, logout, setRedirectReason } = useAuth();
   const {
     cart,
@@ -805,18 +808,22 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
     }
   };
 
-  // Balanced grid columns: 5 on desktop (>=1150px), 4 on laptop, 3 on tablet, 2 on mobile, 1 on small screens
+  // Responsive grid columns scaling cleanly through 1080p / 2K / 4K desktops
   const numColumns =
-    windowWidth >= 1150
-      ? 5
-      : windowWidth >= 920
-        ? 4
-        : windowWidth >= 680
-          ? 3
-          : windowWidth < 360
-            ? 1
-            : 2;
-  const gapSize = windowWidth < 480 ? 10 : windowWidth < 1024 ? 12 : 14;
+    windowWidth >= 2160
+      ? 7
+      : windowWidth >= 1600
+        ? 6
+        : windowWidth >= 1150
+          ? 5
+          : windowWidth >= 920
+            ? 4
+            : windowWidth >= 680
+              ? 3
+              : windowWidth < 360
+                ? 1
+                : 2;
+  const gapSize = isUltraWide ? 18 : isWideDesktop ? 16 : windowWidth < 480 ? 10 : windowWidth < 1024 ? 12 : 14;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
@@ -851,6 +858,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         <View
           style={[
             webStyles.headerInner,
+            isDesktop && { paddingHorizontal: desktopSidePadding },
+            isWideDesktop && { minHeight: 72, paddingVertical: 14 },
             isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
             windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
             windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
@@ -1146,6 +1155,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       <View
         style={[
           webStyles.maxContainer,
+          isDesktop && { paddingHorizontal: desktopSidePadding, paddingTop: isWideDesktop ? 28 : 24 },
           isTablet && { paddingHorizontal: 20, paddingTop: 18 },
           windowWidth < 480 && { paddingHorizontal: 12, paddingTop: 14 },
           windowWidth < 768 && { paddingHorizontal: 16, paddingTop: 18 },
@@ -1278,7 +1288,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                     isTablet && { paddingHorizontal: 10, paddingVertical: 7, minHeight: 36 },
                     isMobileMode && { width: '100%', justifyContent: 'space-between' },
                     {
-                      borderColor: activeBike ? '#FF5A0A' : (isDarkMode ? '#334155' : '#E2E8F0'),
+                      borderColor: activeBike ? '#FF5A0A' : (isDarkMode ? '#3A3B40' : '#E2E8F0'),
                       backgroundColor: activeBike
                         ? (isDarkMode ? '#251D18' : '#FFF9F5')
                         : (isDarkMode ? '#1C2229' : '#FFFFFF'),
@@ -1450,7 +1460,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                           borderColor: '#FF5A0A',
                         }
                       : {
-                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                          borderColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                           backgroundColor: isDarkMode ? '#1C2229' : '#FFFFFF',
                         },
                     isMobileMode && {
@@ -1472,7 +1482,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                       webStyles.categoryDropdownBtnText,
                       compatOnly
                         ? { color: '#FFFFFF', fontWeight: '800' }
-                        : { color: isDarkMode ? '#E2E8F0' : '#475569', fontWeight: '700' },
+                        : { color: isDarkMode ? '#F2F2F3' : '#475569', fontWeight: '700' },
                       { fontSize: isTablet ? 12 : 12.5 },
                     ]}
                   >
@@ -1670,8 +1680,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   ? isDarkMode
                     ? '#FFFFFF'
                     : '#0F172A'
-                  : isDarkMode
-                  ? '#94A3B8'
+                  : isDarkMode ? '#A1A1AA'
                   : '#475569';
 
                 return (
@@ -1767,7 +1776,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               </Text>
               <Text
                 style={{
-                  fontSize: isTablet ? 22 : isMobile ? 20 : 26,
+                  fontSize: isUltraWide ? 30 : isWideDesktop ? 28 : isTablet ? 22 : isMobile ? 20 : 26,
                   fontWeight: '900',
                   color: isDarkMode ? '#FFFFFF' : '#111827',
                   letterSpacing: -0.5,
@@ -1960,7 +1969,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                         <BootstrapIcon
                           name={isFav ? 'bookmark-fill' : 'bookmark'}
                           size={13}
-                          color={isFav ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isFav ? '#EA580C' : isDarkMode ? '#A1A1AA' : '#64748B'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -2022,7 +2031,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                           </View>
                         ) : (
                           <View style={webStyles.ratingMinimal}>
-                            <BootstrapIcon name="star" size={9.5} color={isDarkMode ? '#64748B' : '#94A3B8'} />
+                            <BootstrapIcon name="star" size={9.5} color={isDarkMode ? '#71717A' : '#94A3B8'} />
                             <Text style={[webStyles.unratedMinimalText, isDarkMode && { color: '#94A3B8' }]}>
                               No ratings yet
                             </Text>
@@ -2249,7 +2258,13 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
 
         {/* ─── 8. FULL-WIDTH DARK CHARCOAL FOOTER (Flush with viewport & Admin-Editable) ─── */}
         <View style={webStyles.desktopFooter}>
-          <View style={[webStyles.footerInner, windowWidth < 480 && { paddingHorizontal: 16, paddingTop: 36, paddingBottom: 24 }]}>
+          <View
+            style={[
+              webStyles.footerInner,
+              isDesktop && { paddingHorizontal: desktopSidePadding },
+              windowWidth < 480 && { paddingHorizontal: 16, paddingTop: 36, paddingBottom: 24 },
+            ]}
+          >
             <View style={[webStyles.footerColumnsRow, windowWidth < 640 && { gap: 24 }]}>
               {/* Column 1: Brand Info & Tagline */}
               <View style={webStyles.footerBrandCol}>

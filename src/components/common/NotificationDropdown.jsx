@@ -78,7 +78,7 @@ function getCategoryInfo(item, isDark = false) {
       label: 'BOOKING',
       icon: 'calendar-check',
       bg: isDark ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7',
-      color: isDark ? '#FBBF24' : '#D97706',
+      color: isDark ? '#F5B942' : '#D97706',
     };
   }
   if (cat.includes('order') || cat.includes('dispatch') || cat.includes('ship')) {
@@ -102,7 +102,7 @@ function getCategoryInfo(item, isDark = false) {
       label: 'IMPORTANT',
       icon: 'exclamation-triangle-fill',
       bg: isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2',
-      color: isDark ? '#F87171' : '#DC2626',
+      color: isDark ? '#F04444' : '#DC2626',
     };
   }
   if (cat.includes('promo') || cat.includes('discount')) {
@@ -117,7 +117,7 @@ function getCategoryInfo(item, isDark = false) {
     label: item.categoryLabel || item.type?.toUpperCase() || 'STUDIO NOTICE',
     icon: 'bell-fill',
     bg: isDark ? 'rgba(52, 211, 153, 0.14)' : '#F5F4F0',
-    color: isDark ? '#34D399' : '#856839',
+    color: isDark ? '#00C98D' : '#856839',
   };
 }
 

@@ -145,11 +145,11 @@ export default function AdminRescheduleModal({
     }
   };
 
-  const bgCard = isDarkMode ? '#1E2227' : '#FFFFFF';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const bgCard = isDarkMode ? '#202124' : '#FFFFFF';
+  const textPrimary = isDarkMode ? '#FAFAFA' : '#0F172A';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
   const borderCol = isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0';
-  const inputBg = isDarkMode ? '#0F172A' : '#F8FAFC';
+  const inputBg = isDarkMode ? '#191A1D' : '#F8FAFC';
 
   const isPending = request.status === RESCHEDULE_STATUS.PENDING_REVIEW || request.status === RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED;
 
@@ -190,7 +190,7 @@ export default function AdminRescheduleModal({
               paddingVertical: 16,
               borderBottomWidth: 1,
               borderBottomColor: borderCol,
-              backgroundColor: isDarkMode ? '#15191E' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FAFAFA',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -272,7 +272,7 @@ export default function AdminRescheduleModal({
                 gap: 8,
                 borderBottomWidth: 1,
                 borderBottomColor: borderCol,
-                backgroundColor: isDarkMode ? '#191E24' : '#F1F5F9',
+                backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
               }}
             >
               <TouchableOpacity
@@ -281,7 +281,7 @@ export default function AdminRescheduleModal({
                   paddingHorizontal: 14,
                   paddingVertical: 6,
                   borderRadius: 8,
-                  backgroundColor: activeActionTab === 'review' ? (isDarkMode ? '#242B33' : '#FFFFFF') : 'transparent',
+                  backgroundColor: activeActionTab === 'review' ? (isDarkMode ? '#202124' : '#FFFFFF') : 'transparent',
                   cursor: 'pointer',
                 }}
               >
@@ -302,7 +302,7 @@ export default function AdminRescheduleModal({
                   paddingHorizontal: 14,
                   paddingVertical: 6,
                   borderRadius: 8,
-                  backgroundColor: activeActionTab === 'suggest_alternative' ? (isDarkMode ? '#242B33' : '#FFFFFF') : 'transparent',
+                  backgroundColor: activeActionTab === 'suggest_alternative' ? (isDarkMode ? '#202124' : '#FFFFFF') : 'transparent',
                   cursor: 'pointer',
                 }}
               >
@@ -323,7 +323,7 @@ export default function AdminRescheduleModal({
                   paddingHorizontal: 14,
                   paddingVertical: 6,
                   borderRadius: 8,
-                  backgroundColor: activeActionTab === 'reject' ? (isDarkMode ? '#242B33' : '#FFFFFF') : 'transparent',
+                  backgroundColor: activeActionTab === 'reject' ? (isDarkMode ? '#202124' : '#FFFFFF') : 'transparent',
                   cursor: 'pointer',
                 }}
               >
@@ -353,7 +353,7 @@ export default function AdminRescheduleModal({
                 style={{
                   flex: 1,
                   minWidth: 280,
-                  backgroundColor: isDarkMode ? '#15191E' : '#F8FAFC',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
                   borderRadius: 14,
                   padding: 14,
                   borderWidth: 1,
@@ -452,7 +452,7 @@ export default function AdminRescheduleModal({
                   style={{
                     fontSize: 12.5,
                     fontWeight: '700',
-                    color: requestedValidation.available ? (isDarkMode ? '#34D399' : '#065F46') : '#DC2626',
+                    color: requestedValidation.available ? (isDarkMode ? '#00C98D' : '#065F46') : '#DC2626',
                   }}
                 >
                   Availability Validation: {requestedValidation.available ? 'PASSED — Slot Confirmed Available' : 'CONFLICT DETECTED'}
@@ -720,7 +720,7 @@ export default function AdminRescheduleModal({
               paddingVertical: 14,
               borderTopWidth: 1,
               borderTopColor: borderCol,
-              backgroundColor: isDarkMode ? '#15191E' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FAFAFA',
             }}
           >
             <TouchableOpacity

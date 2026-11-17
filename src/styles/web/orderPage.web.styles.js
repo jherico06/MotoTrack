@@ -18,7 +18,7 @@ export const orderWebStyles = StyleSheet.create({
     minHeight: 67,
   },
   headerInner: {
-    maxWidth: 1360,
+    maxWidth: '100%',
     marginHorizontal: 'auto',
     width: '100%',
     paddingHorizontal: 24,
@@ -106,7 +106,7 @@ export const orderWebStyles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   maxContainer: {
-    maxWidth: 1360,
+    maxWidth: '100%',
     marginHorizontal: 'auto',
     width: '100%',
   },

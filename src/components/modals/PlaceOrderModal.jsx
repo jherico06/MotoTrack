@@ -36,13 +36,13 @@ export default function PlaceOrderModal({
   const { isDarkMode: themeDark } = useTheme();
   const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
 
-  const sheetBg = isDarkMode ? '#1C2025' : '#FFFFFF';
-  const subBg = isDarkMode ? '#181B1F' : '#F8FAFC';
-  const elevatedBg = isDarkMode ? '#252A30' : '#F1F5F9';
-  const borderCol = isDarkMode ? '#282D34' : '#E2E8F0';
+  const sheetBg = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const subBg = isDarkMode ? '#18181B' : '#F8FAFC';
+  const elevatedBg = isDarkMode ? '#202124' : '#F1F5F9';
+  const borderCol = isDarkMode ? '#303236' : '#E2E8F0';
   const controlBorderCol = isDarkMode ? '#333A42' : '#CBD5E1';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
   const brandAccent = isDarkMode ? '#FB923C' : '#EA580C';
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
   const colorEntries = useMemo(() => getProductColorEntries(product), [product]);
@@ -307,7 +307,7 @@ export default function PlaceOrderModal({
                             style={{
                               fontSize: 10,
                               fontWeight: '700',
-                              color: isDarkMode ? '#F87171' : '#DC2626',
+                              color: isDarkMode ? '#F04444' : '#DC2626',
                             }}
                           >
                             Sold Out
@@ -321,7 +321,7 @@ export default function PlaceOrderModal({
                   <Text
                     style={{
                       fontSize: 12,
-                      color: isDarkMode ? '#F87171' : '#DC2626',
+                      color: isDarkMode ? '#F04444' : '#DC2626',
                       marginTop: 6,
                       fontWeight: '600',
                     }}
@@ -391,8 +391,7 @@ export default function PlaceOrderModal({
                             fontWeight: '700',
                             marginTop: 2,
                             color: soldOut
-                              ? isDarkMode
-                                ? '#F87171'
+                              ? isDarkMode ? '#F04444'
                                 : '#DC2626'
                               : active
                                 ? '#FED7AA'
@@ -407,7 +406,7 @@ export default function PlaceOrderModal({
                               fontSize: 10,
                               fontWeight: '600',
                               marginTop: 2,
-                              color: active ? '#FEF3C7' : isDarkMode ? '#FBBF24' : '#B45309',
+                              color: active ? '#FEF3C7' : isDarkMode ? '#F5B942' : '#B45309',
                             }}
                           >
                             Only {units} left
@@ -421,7 +420,7 @@ export default function PlaceOrderModal({
                   <Text
                     style={{
                       fontSize: 12,
-                      color: isDarkMode ? '#F87171' : '#DC2626',
+                      color: isDarkMode ? '#F04444' : '#DC2626',
                       marginTop: 6,
                       fontWeight: '600',
                     }}
@@ -518,7 +517,7 @@ export default function PlaceOrderModal({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
-                  backgroundColor: canConfirm ? '#EA580C' : isDarkMode ? '#334155' : '#94A3B8',
+                  backgroundColor: canConfirm ? '#EA580C' : isDarkMode ? '#3A3B40' : '#94A3B8',
                   opacity: canConfirm ? 1 : 0.55,
                 },
               ]}

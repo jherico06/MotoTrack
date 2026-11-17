@@ -137,7 +137,7 @@ export default function CartPageWeb({
         if (!alive) return;
         setAvailablePromos(Array.isArray(active) ? active : []);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     productService
       .getProducts()
@@ -146,7 +146,7 @@ export default function CartPageWeb({
         const inStock = list.filter((p) => !isProductSoldOut(p)).slice(0, 5);
         setSuggestedProducts(inStock);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       alive = false;
@@ -172,7 +172,7 @@ export default function CartPageWeb({
             await applyPromo(p.code);
             break;
           }
-        } catch (_e) {}
+        } catch (_e) { }
       }
     })();
     return () => {
@@ -189,7 +189,7 @@ export default function CartPageWeb({
         url.searchParams.set('screen', 'cart');
         window.history.pushState({ cartPage: true }, '', url.pathname + url.search);
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     const handlePopState = () => {
       try {
@@ -197,7 +197,7 @@ export default function CartPageWeb({
         if (u.searchParams.get('screen') !== 'cart') {
           onClose?.();
         }
-      } catch (_e) {}
+      } catch (_e) { }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -215,7 +215,7 @@ export default function CartPageWeb({
           }
           window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
     onClose?.();
   };
@@ -587,7 +587,7 @@ export default function CartPageWeb({
                     <BootstrapIcon
                       name="bookmark"
                       size={14}
-                      color={isDarkMode ? '#F8FAFC' : '#1E293B'}
+                      color={isDarkMode ? '#F2F2F3' : '#1E293B'}
                     />
                     <Text style={cStyles.secondaryExploreBtnText}>
                       View Saved Wishlist{savedWishlistCount > 0 ? ` (${savedWishlistCount})` : ''}
@@ -662,10 +662,10 @@ export default function CartPageWeb({
                           ? Math.round(promoPct)
                           : hasCompareDiscount
                             ? Math.round(
-                                ((Number(product.compare_at_price) - basePrice) /
-                                  Number(product.compare_at_price)) *
-                                  100
-                              )
+                              ((Number(product.compare_at_price) - basePrice) /
+                                Number(product.compare_at_price)) *
+                              100
+                            )
                             : 0;
                       const hasRatings = productHasCustomerRatings(product);
 
@@ -745,7 +745,7 @@ export default function CartPageWeb({
                               <BootstrapIcon
                                 name={isFav ? 'bookmark-fill' : 'bookmark'}
                                 size={13}
-                                color={isFav ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B'}
+                                color={isFav ? '#EA580C' : isDarkMode ? '#A1A1AA' : '#64748B'}
                               />
                             </TouchableOpacity>
                           </View>
@@ -820,7 +820,7 @@ export default function CartPageWeb({
                                   <BootstrapIcon
                                     name="star"
                                     size={9.5}
-                                    color={isDarkMode ? '#64748B' : '#94A3B8'}
+                                    color={isDarkMode ? '#71717A' : '#94A3B8'}
                                   />
                                   <Text
                                     style={[
@@ -914,7 +914,7 @@ export default function CartPageWeb({
                       <BootstrapIcon
                         name="trash3"
                         size={13}
-                        color={isDarkMode ? '#94A3B8' : '#64748B'}
+                        color={isDarkMode ? '#A1A1AA' : '#64748B'}
                       />
                       <Text style={cStyles.clearCartBtnText}>Clear Cart</Text>
                     </TouchableOpacity>
@@ -1030,7 +1030,7 @@ export default function CartPageWeb({
                                 marginTop: 12,
                                 paddingTop: 12,
                                 borderTopWidth: 1,
-                                borderTopColor: isDarkMode ? '#262D35' : '#F1F5F9',
+                                borderTopColor: isDarkMode ? '#202124' : '#F1F5F9',
                               },
                             ]}
                           >
@@ -1050,7 +1050,7 @@ export default function CartPageWeb({
                                   <BootstrapIcon
                                     name="dash"
                                     size={14}
-                                    color={isDarkMode ? '#E2E8F0' : '#0F172A'}
+                                    color={isDarkMode ? '#F2F2F3' : '#0F172A'}
                                   />
                                 </TouchableOpacity>
 
@@ -1066,7 +1066,7 @@ export default function CartPageWeb({
                                   <BootstrapIcon
                                     name="plus"
                                     size={14}
-                                    color={isDarkMode ? '#E2E8F0' : '#0F172A'}
+                                    color={isDarkMode ? '#F2F2F3' : '#0F172A'}
                                   />
                                 </TouchableOpacity>
                               </View>
@@ -1148,8 +1148,8 @@ export default function CartPageWeb({
                       {selectedCartItems.length === 0
                         ? '₱0.00'
                         : formatPhpAmount(
-                            isFreeShipping ? shippingRate : selectedShippingFee
-                          )}
+                          isFreeShipping ? shippingRate : selectedShippingFee
+                        )}
                     </Text>
                   </View>
 
@@ -1231,13 +1231,13 @@ function createCartPageStyles(isDark = false) {
       backgroundColor: isDark ? '#11151A' : '#F3F4F6',
       ...(Platform.OS === 'web'
         ? {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 900,
-          }
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 900,
+        }
         : {}),
     },
     scrollContent: {
@@ -1246,7 +1246,7 @@ function createCartPageStyles(isDark = false) {
       paddingHorizontal: 0,
     },
     headerWrapper: {
-      backgroundColor: isDark ? '#181B1F' : '#1E2227',
+      backgroundColor: isDark ? '#18181B' : '#1E2227',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       position: 'sticky',
@@ -1267,7 +1267,7 @@ function createCartPageStyles(isDark = false) {
       boxSizing: 'border-box',
     },
     headerInner: {
-      maxWidth: 1360,
+      maxWidth: '100%',
       marginHorizontal: 'auto',
       width: '100%',
       paddingHorizontal: 24,
@@ -1395,7 +1395,7 @@ function createCartPageStyles(isDark = false) {
       whiteSpace: 'nowrap',
     },
     maxContainer: {
-      maxWidth: 1360,
+      maxWidth: '100%',
       marginHorizontal: 'auto',
       width: '100%',
       paddingHorizontal: 24,
@@ -1416,15 +1416,15 @@ function createCartPageStyles(isDark = false) {
       paddingVertical: 6,
       paddingHorizontal: 12,
       borderRadius: 8,
-      backgroundColor: isDark ? '#1C2127' : '#FFFFFF',
+      backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
       borderWidth: 1,
-      borderColor: isDark ? '#2B323B' : '#E2E8F0',
+      borderColor: isDark ? '#303236' : '#E2E8F0',
       cursor: 'pointer',
     },
     backToShopText: {
       fontSize: 12.5,
       fontWeight: '600',
-      color: isDark ? '#E2E8F0' : '#334155',
+      color: isDark ? '#F2F2F3' : '#334155',
     },
     breadcrumbTrail: {
       flexDirection: 'row',
@@ -1439,7 +1439,7 @@ function createCartPageStyles(isDark = false) {
     breadcrumbActive: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     pageHeaderRow: {
       flexDirection: 'row',
@@ -1464,13 +1464,13 @@ function createCartPageStyles(isDark = false) {
       fontWeight: '700',
       lineHeight: 26,
       letterSpacing: -0.25,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     pageSub: {
       fontSize: 13,
       fontWeight: '400',
       lineHeight: 18,
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
       marginTop: 2,
       fontVariant: ['tabular-nums'],
     },
@@ -1487,9 +1487,9 @@ function createCartPageStyles(isDark = false) {
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 8,
-      backgroundColor: isDark ? '#1C2127' : '#FFFFFF',
+      backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
       borderWidth: 1,
-      borderColor: isDark ? '#2B323B' : '#E2E8F0',
+      borderColor: isDark ? '#303236' : '#E2E8F0',
       cursor: 'pointer',
     },
     clearCartBtn: {
@@ -1505,7 +1505,7 @@ function createCartPageStyles(isDark = false) {
     clearCartBtnText: {
       fontSize: 12.5,
       fontWeight: '500',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
     },
     emptyStateCard: {
       backgroundColor: 'transparent',
@@ -1530,14 +1530,14 @@ function createCartPageStyles(isDark = false) {
       fontSize: 16,
       fontWeight: '600',
       lineHeight: 22,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       marginBottom: 6,
     },
     emptySub: {
       fontSize: 13,
       fontWeight: '400',
       lineHeight: 19,
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
       textAlign: 'center',
       maxWidth: 440,
       marginBottom: 22,
@@ -1580,7 +1580,7 @@ function createCartPageStyles(isDark = false) {
     secondaryExploreBtnText: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDark ? '#F8FAFC' : '#1E293B',
+      color: isDark ? '#F2F2F3' : '#1E293B',
     },
     emptyTrustRow: {
       flexDirection: 'row',
@@ -1590,7 +1590,7 @@ function createCartPageStyles(isDark = false) {
       flexWrap: 'wrap',
       paddingTop: 20,
       borderTopWidth: 1,
-      borderTopColor: isDark ? '#262D35' : '#F1F5F9',
+      borderTopColor: isDark ? '#202124' : '#F1F5F9',
       width: '100%',
       maxWidth: 640,
     },
@@ -1602,7 +1602,7 @@ function createCartPageStyles(isDark = false) {
     emptyTrustText: {
       fontSize: 12,
       fontWeight: '500',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
     },
     suggestedSection: {
       marginTop: 4,
@@ -1619,12 +1619,12 @@ function createCartPageStyles(isDark = false) {
       fontSize: 16,
       fontWeight: '600',
       lineHeight: 22,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     sectionSubText: {
       fontSize: 12,
       fontWeight: '400',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
       marginTop: 2,
     },
     suggestedGrid: {
@@ -1636,7 +1636,7 @@ function createCartPageStyles(isDark = false) {
       backgroundColor: isDark ? '#181C22' : '#FFFFFF',
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDark ? '#262D35' : '#E2E8F0',
+      borderColor: isDark ? '#202124' : '#E2E8F0',
       overflow: 'hidden',
     },
     suggestedThumbWrap: {
@@ -1663,7 +1663,7 @@ function createCartPageStyles(isDark = false) {
       fontSize: 13.5,
       fontWeight: '600',
       lineHeight: 19,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       marginBottom: 6,
     },
     suggestedPrice: {
@@ -1705,7 +1705,7 @@ function createCartPageStyles(isDark = false) {
       backgroundColor: isDark ? '#181C22' : '#FFFFFF',
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: isDark ? '#262D35' : '#E2E8F0',
+      borderColor: isDark ? '#202124' : '#E2E8F0',
       paddingHorizontal: 18,
       paddingVertical: 12,
       marginBottom: 12,
@@ -1733,18 +1733,18 @@ function createCartPageStyles(isDark = false) {
     selectAllLabel: {
       fontSize: 13.5,
       fontWeight: '600',
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     selectedCountText: {
       fontSize: 12.5,
       fontWeight: '500',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
       fontVariant: ['tabular-nums'],
     },
     toolbarDivider: {
       width: 1,
       height: 14,
-      backgroundColor: isDark ? '#262D35' : '#E2E8F0',
+      backgroundColor: isDark ? '#202124' : '#E2E8F0',
     },
     itemsListStack: {
       gap: 12,
@@ -1753,7 +1753,7 @@ function createCartPageStyles(isDark = false) {
       backgroundColor: isDark ? '#181C22' : '#FFFFFF',
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: isDark ? '#262D35' : '#E2E8F0',
+      borderColor: isDark ? '#202124' : '#E2E8F0',
       paddingHorizontal: 18,
       paddingVertical: 16,
     },
@@ -1774,7 +1774,7 @@ function createCartPageStyles(isDark = false) {
       borderRadius: 10,
       backgroundColor: isDark ? '#11151A' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDark ? '#262D35' : '#F1F5F9',
+      borderColor: isDark ? '#202124' : '#F1F5F9',
       overflow: 'hidden',
       flexShrink: 0,
     },
@@ -1796,13 +1796,13 @@ function createCartPageStyles(isDark = false) {
       fontWeight: '600',
       letterSpacing: 0.4,
       textTransform: 'uppercase',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
     },
     itemTitleText: {
       fontSize: 14.5,
       fontWeight: '600',
       lineHeight: 20,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       marginBottom: 4,
     },
     itemUnitPriceRow: {
@@ -1814,7 +1814,7 @@ function createCartPageStyles(isDark = false) {
     itemUnitPriceText: {
       fontSize: 12.5,
       fontWeight: '400',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
       fontVariant: ['tabular-nums'],
     },
     itemPromoDiscountTag: {
@@ -1831,7 +1831,7 @@ function createCartPageStyles(isDark = false) {
     itemLineTotalText: {
       fontSize: 15,
       fontWeight: '700',
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       fontVariant: ['tabular-nums'],
     },
     itemControlsRow: {
@@ -1844,7 +1844,7 @@ function createCartPageStyles(isDark = false) {
       alignItems: 'center',
       backgroundColor: isDark ? '#11151A' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDark ? '#2B323B' : '#E2E8F0',
+      borderColor: isDark ? '#303236' : '#E2E8F0',
       borderRadius: 8,
       height: 34,
       overflow: 'hidden',
@@ -1861,7 +1861,7 @@ function createCartPageStyles(isDark = false) {
       textAlign: 'center',
       fontSize: 13,
       fontWeight: '600',
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       fontVariant: ['tabular-nums'],
     },
     iconActionBtn: {
@@ -1881,14 +1881,14 @@ function createCartPageStyles(isDark = false) {
       backgroundColor: isDark ? '#181C22' : '#FFFFFF',
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: isDark ? '#262D35' : '#E2E8F0',
+      borderColor: isDark ? '#202124' : '#E2E8F0',
       padding: 22,
     },
     summaryTitle: {
       fontSize: 16,
       fontWeight: '600',
       lineHeight: 22,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       marginBottom: 2,
     },
     promoSection: {
@@ -1898,7 +1898,7 @@ function createCartPageStyles(isDark = false) {
       fontSize: 10.5,
       fontWeight: '600',
       letterSpacing: 0.4,
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
       marginBottom: 8,
     },
     promoChipsWrap: {
@@ -1912,7 +1912,7 @@ function createCartPageStyles(isDark = false) {
       gap: 6,
       backgroundColor: isDark ? '#11151A' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDark ? '#2B323B' : '#CBD5E1',
+      borderColor: isDark ? '#303236' : '#CBD5E1',
       borderRadius: 8,
       paddingHorizontal: 10,
       paddingVertical: 6,
@@ -1925,7 +1925,7 @@ function createCartPageStyles(isDark = false) {
     promoChipText: {
       fontSize: 11.5,
       fontWeight: '500',
-      color: isDark ? '#E2E8F0' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     promoInputBlock: {
       marginBottom: 4,
@@ -1939,14 +1939,14 @@ function createCartPageStyles(isDark = false) {
       height: 40,
       backgroundColor: isDark ? '#11151A' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDark ? '#2B323B' : '#CBD5E1',
+      borderColor: isDark ? '#303236' : '#CBD5E1',
       borderRadius: 8,
       paddingHorizontal: 12,
       fontSize: 13,
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     promoApplyBtn: {
-      backgroundColor: isDark ? '#262D35' : '#1E2227',
+      backgroundColor: isDark ? '#202124' : '#1E2227',
       paddingHorizontal: 16,
       height: 40,
       borderRadius: 8,
@@ -1966,7 +1966,7 @@ function createCartPageStyles(isDark = false) {
     },
     summaryDivider: {
       height: 1,
-      backgroundColor: isDark ? '#262D35' : '#F1F5F9',
+      backgroundColor: isDark ? '#202124' : '#F1F5F9',
       marginVertical: 14,
     },
     summaryLineRow: {
@@ -1978,12 +1978,12 @@ function createCartPageStyles(isDark = false) {
     summaryLineLabel: {
       fontSize: 13,
       fontWeight: '400',
-      color: isDark ? '#94A3B8' : '#64748B',
+      color: isDark ? '#A1A1AA' : '#64748B',
     },
     summaryLineValue: {
       fontSize: 13.5,
       fontWeight: '600',
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
       fontVariant: ['tabular-nums'],
     },
     summaryTotalRow: {
@@ -1995,7 +1995,7 @@ function createCartPageStyles(isDark = false) {
     summaryTotalLabel: {
       fontSize: 15,
       fontWeight: '600',
-      color: isDark ? '#F8FAFC' : '#0F172A',
+      color: isDark ? '#F2F2F3' : '#0F172A',
     },
     summaryTotalValue: {
       fontSize: 20,

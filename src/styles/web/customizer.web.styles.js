@@ -1,6 +1,6 @@
 import { StyleSheet, Platform } from 'react-native';
 
-export const customizerWebStyles = StyleSheet.create({
+const rawStyles = {
   // ─── BASE CANVAS & SCROLL CONTAINER ───
   container: {
     flex: 1,
@@ -16,7 +16,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   maxContainer: {
     width: '100%',
-    maxWidth: 1360,
+    maxWidth: '100%',
     alignSelf: 'center',
     marginHorizontal: 'auto',
     paddingHorizontal: 24,
@@ -46,7 +46,7 @@ export const customizerWebStyles = StyleSheet.create({
     willChange: 'transform',
   },
   headerInner: {
-    maxWidth: 1360,
+    maxWidth: '100%',
     marginHorizontal: 'auto',
     width: '100%',
     boxSizing: 'border-box',
@@ -2017,9 +2017,76 @@ export const customizerWebStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-});
+};
 
+const DARK_BG_MAP = {
+  '#FFFFFF': '#191A1D',
+  '#F8FAFC': '#202124',
+  '#F8F9FA': '#202124',
+  '#FAFAFA': '#202124',
+  '#F1F5F9': '#202124',
+  '#F3F4F6': '#111315',
+  '#FFF7ED': '#3A241B',
+  '#FFEDD5': '#3A241B',
+  '#FEF3C7': 'rgba(245, 185, 66, 0.15)',
+  '#ECFDF5': 'rgba(0, 201, 141, 0.15)',
+  '#EFF6FF': 'rgba(59, 130, 246, 0.15)',
+  '#FEF2F2': 'rgba(240, 68, 68, 0.15)',
+  '#1E2227': '#18181B',
+  '#24272B': '#191A1D',
+  '#18181B': '#191A1D',
+  '#EA580C': '#FF5A00',
+  '#C2410C': '#E95000',
+};
+
+const DARK_BORDER_MAP = {
+  '#E4E4E7': '#303236',
+  '#E2E8F0': '#303236',
+  '#E5E7EB': '#303236',
+  '#CBD5E1': '#3A3B40',
+  '#F1F5F9': '#292B2F',
+  '#EA580C': '#FF5A00',
+};
+
+const DARK_TEXT_MAP = {
+  '#18181B': '#F2F2F3',
+  '#0F172A': '#F5F5F5',
+  '#111827': '#F5F5F5',
+  '#1E293B': '#F2F2F3',
+  '#334155': '#F2F2F3',
+  '#374151': '#A1A1AA',
+  '#475569': '#A1A1AA',
+  '#52525B': '#A1A1AA',
+  '#64748B': '#A1A1AA',
+  '#6B7280': '#A1A1AA',
+  '#94A3B8': '#71717A',
+  '#EA580C': '#FF5A00',
+  '#C2410C': '#FF5A00',
+};
+
+function remapDark(obj) {
+  if (Array.isArray(obj)) return obj.map(remapDark);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    Object.keys(obj).forEach((k) => {
+      const v = obj[k];
+      if (typeof v === 'string') {
+        const upper = v.toUpperCase();
+        if (k === 'backgroundColor') out[k] = DARK_BG_MAP[upper] || v;
+        else if (k.toLowerCase().includes('bordercolor')) out[k] = DARK_BORDER_MAP[upper] || v;
+        else if (k === 'color') out[k] = DARK_TEXT_MAP[upper] || v;
+        else out[k] = v;
+      } else {
+        out[k] = remapDark(v);
+      }
+    });
+    return out;
+  }
+  return obj;
+}
+
+export const customizerWebStyles = StyleSheet.create(rawStyles);
+const darkStyles = StyleSheet.create(remapDark(rawStyles));
+export function getCustomizerWebStyles(isDark = false) { return isDark ? darkStyles : customizerWebStyles; }
 export const customizerStyles = customizerWebStyles;
 export default customizerWebStyles;
-
-

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../../common/BootstrapIcon.jsx';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 
 /**
@@ -43,6 +44,8 @@ export default function CustomerInformationScreen({
   showToast,
   onChangeBike,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -118,10 +121,10 @@ export default function CustomerInformationScreen({
       {/* ── 1. PRIMARY MOTORCYCLE CONFIRMATION CARD ── */}
       <View
         style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
           borderRadius: 14,
           borderWidth: 1,
-          borderColor: '#E2E8F0',
+          borderColor: isDarkMode ? '#303236' : '#E2E8F0',
           padding: 18,
           marginBottom: 20,
           shadowColor: '#000000',
@@ -144,7 +147,7 @@ export default function CustomerInformationScreen({
                 width: 46,
                 height: 46,
                 borderRadius: 12,
-                backgroundColor: '#FFF7ED',
+                backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                 borderWidth: 1,
                 borderColor: '#FFEDD5',
                 alignItems: 'center',
@@ -155,12 +158,12 @@ export default function CustomerInformationScreen({
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <Text style={{ fontSize: 16.5, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 }}>
+                <Text style={{ fontSize: 16.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A', letterSpacing: -0.2 }}>
                   {motoBrand} {motoModel}
                 </Text>
                 <View
                   style={{
-                    backgroundColor: '#ECFDF5',
+                    backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
                     paddingHorizontal: 9,
                     paddingVertical: 2.5,
                     borderRadius: 9999,
@@ -177,10 +180,10 @@ export default function CustomerInformationScreen({
                   </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 3 }}>
-                Displacement: <Text style={{ fontWeight: '600', color: '#0F172A', fontVariant: ['tabular-nums'] }}>{motoCc} CC</Text>
+              <Text style={{ fontSize: 12.5, color: isDarkMode ? '#A1A1AA' : '#64748B', marginTop: 3 }}>
+                Displacement: <Text style={{ fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A', fontVariant: ['tabular-nums'] }}>{motoCc} CC</Text>
                 {'  •  '}
-                Plate Number: <Text style={{ fontWeight: '600', color: '#0F172A' }}>{motoPlate}</Text>
+                Plate Number: <Text style={{ fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>{motoPlate}</Text>
               </Text>
             </View>
           </View>
@@ -188,16 +191,16 @@ export default function CustomerInformationScreen({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <View
               style={{
-                backgroundColor: '#F8FAFC',
+                backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
                 paddingHorizontal: 14,
                 paddingVertical: 7,
                 borderRadius: 8,
                 borderWidth: 1,
-                borderColor: '#E2E8F0',
+                borderColor: isDarkMode ? '#303236' : '#E2E8F0',
               }}
             >
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
-                Package rates calculated for <Text style={{ fontWeight: '700', color: '#0F172A', fontVariant: ['tabular-nums'] }}>{motoCc}cc</Text>
+              <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', fontWeight: '500' }}>
+                Package rates calculated for <Text style={{ fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A', fontVariant: ['tabular-nums'] }}>{motoCc}cc</Text>
               </Text>
             </View>
 
@@ -208,7 +211,7 @@ export default function CustomerInformationScreen({
                   paddingHorizontal: 12,
                   paddingVertical: 7,
                   borderRadius: 8,
-                  backgroundColor: '#FFF7ED',
+                  backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                   borderWidth: 1,
                   borderColor: '#FED7AA',
                   cursor: 'pointer',
@@ -239,10 +242,10 @@ export default function CustomerInformationScreen({
             minWidth: 280,
             maxWidth: '100%',
             width: '100%',
-            backgroundColor: '#FFFFFF',
+            backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
             borderRadius: 14,
             borderWidth: 1,
-            borderColor: '#E2E8F0',
+            borderColor: isDarkMode ? '#303236' : '#E2E8F0',
             padding: 24,
             shadowColor: '#000000',
             shadowOpacity: 0.02,
@@ -252,7 +255,7 @@ export default function CustomerInformationScreen({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 }}>
             <BootstrapIcon name="person-vcard" size={17} color="#EA580C" />
-            <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 15.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A', letterSpacing: -0.2 }}>
               Customer Contact Information
             </Text>
           </View>
@@ -260,19 +263,19 @@ export default function CustomerInformationScreen({
           <View style={{ gap: 16 }}>
             {/* First Name */}
             <View>
-              <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 6 }}>
                 First Name: <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 13.5,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   outlineStyle: 'none',
                 }}
                 placeholder="Enter your first name"
@@ -284,19 +287,19 @@ export default function CustomerInformationScreen({
 
             {/* Last Name */}
             <View>
-              <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 6 }}>
                 Last Name: <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 13.5,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   outlineStyle: 'none',
                 }}
                 placeholder="Enter your last name"
@@ -308,19 +311,19 @@ export default function CustomerInformationScreen({
 
             {/* Mobile Number */}
             <View>
-              <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 6 }}>
                 Mobile Number: <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 13.5,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   fontVariant: ['tabular-nums'],
                   outlineStyle: 'none',
                 }}
@@ -334,19 +337,19 @@ export default function CustomerInformationScreen({
 
             {/* Email */}
             <View>
-              <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 6 }}>
                 Email: <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 13.5,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   outlineStyle: 'none',
                 }}
                 placeholder="rider@example.com"
@@ -360,19 +363,19 @@ export default function CustomerInformationScreen({
 
             {/* Social Media Account (N/A if none) */}
             <View>
-              <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 6 }}>
                 Social Media Account (N/A if none):
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 13.5,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   outlineStyle: 'none',
                 }}
                 placeholder="Facebook Name, Instagram handle, or N/A"
@@ -391,10 +394,10 @@ export default function CustomerInformationScreen({
             minWidth: 280,
             maxWidth: '100%',
             width: '100%',
-            backgroundColor: '#FFFFFF',
+            backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
             borderRadius: 14,
             borderWidth: 1,
-            borderColor: '#E2E8F0',
+            borderColor: isDarkMode ? '#303236' : '#E2E8F0',
             padding: 24,
             shadowColor: '#000000',
             shadowOpacity: 0.02,
@@ -404,7 +407,7 @@ export default function CustomerInformationScreen({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <BootstrapIcon name="tools" size={16} color="#EA580C" />
-            <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 15.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A', letterSpacing: -0.2 }}>
               Motorcycle Symptoms & Concerns (Optional)
             </Text>
           </View>
@@ -412,13 +415,13 @@ export default function CustomerInformationScreen({
           {/* Symptoms Text Area */}
           <TextInput
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
               borderWidth: 1,
-              borderColor: '#CBD5E1',
+              borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
               borderRadius: 8,
               padding: 14,
               fontSize: 13,
-              color: '#0F172A',
+              color: isDarkMode ? '#F2F2F3' : '#0F172A',
               minHeight: 120,
               textAlignVertical: 'top',
               outlineStyle: 'none',
@@ -434,16 +437,16 @@ export default function CustomerInformationScreen({
           />
 
           {/* Photo Attachments */}
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 8 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 8 }}>
             Motorcycle / Issue Photos (Optional, max 3)
           </Text>
 
           <TouchableOpacity
             style={{
-              backgroundColor: '#F8FAFC',
+              backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
               borderRadius: 8,
               borderWidth: 1.5,
-              borderColor: '#CBD5E1',
+              borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
               borderStyle: 'dashed',
               paddingVertical: 16,
               paddingHorizontal: 16,
@@ -457,14 +460,14 @@ export default function CustomerInformationScreen({
             disabled={isUploadingPhoto || motorcyclePhotos.length >= 3}
           >
             <BootstrapIcon name="camera-fill" size={20} color="#EA580C" />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1E293B', marginTop: 4 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#1E293B', marginTop: 4 }}>
               {isUploadingPhoto
                 ? 'Uploading photo...'
                 : motorcyclePhotos.length >= 3
                 ? 'Maximum 3 Photos Attached'
                 : 'Click to Upload Motorcycle or Damage Photo'}
             </Text>
-            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+            <Text style={{ fontSize: 11, color: isDarkMode ? '#71717A' : '#94A3B8', marginTop: 2 }}>
               Supports JPG, PNG up to 10MB
             </Text>
           </TouchableOpacity>
@@ -476,7 +479,7 @@ export default function CustomerInformationScreen({
                 <View key={idx} style={{ position: 'relative' }}>
                   <Image
                     source={{ uri }}
-                    style={{ width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1' }}
+                    style={{ width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1' }}
                   />
                   <TouchableOpacity
                     style={{

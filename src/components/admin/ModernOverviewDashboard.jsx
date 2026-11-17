@@ -612,7 +612,7 @@ export default function ModernOverviewDashboard({
                 style={{
                   flex: 1,
                   height: `${h}%`,
-                  backgroundColor: i >= 4 ? '#EA580C' : isDarkMode ? '#3F3F46' : '#E4E4E7',
+                  backgroundColor: i >= 4 ? '#EA580C' : isDarkMode ? '#3A3B40' : '#E4E4E7',
                   borderRadius: 2,
                 }}
               />
@@ -675,7 +675,7 @@ export default function ModernOverviewDashboard({
             style={{
               height: 3,
               borderRadius: 2,
-              backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+              backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
               overflow: 'hidden',
               marginTop: 22,
             }}
@@ -710,7 +710,7 @@ export default function ModernOverviewDashboard({
             <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textMuted }}>Avg. order</Text>
             <View
               style={{
-                backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
                 paddingHorizontal: 8,
                 paddingVertical: 2.5,
                 borderRadius: 999,
@@ -746,7 +746,7 @@ export default function ModernOverviewDashboard({
             style={{
               height: 3,
               borderRadius: 2,
-              backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+              backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
               overflow: 'hidden',
               marginTop: 22,
             }}
@@ -1005,7 +1005,7 @@ export default function ModernOverviewDashboard({
                             width={ttW}
                             height={ttH}
                             rx="8"
-                            fill={isDarkMode ? '#27272A' : '#18181B'}
+                            fill={isDarkMode ? '#202124' : '#18181B'}
                           />
                           <text
                             x={ttX + ttW / 2}
@@ -1088,7 +1088,7 @@ export default function ModernOverviewDashboard({
               style={{
                 height: 8,
                 borderRadius: 4,
-                backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
                 flexDirection: 'row',
                 overflow: 'hidden',
                 marginBottom: 24,
@@ -1194,7 +1194,7 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
               borderWidth: 1,
               borderColor: theme.borderSubtle,
             }}
@@ -1229,7 +1229,7 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
               borderWidth: 1,
               borderColor: theme.borderSubtle,
             }}
@@ -1264,7 +1264,7 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
               borderWidth: 1,
               borderColor: theme.borderSubtle,
             }}
@@ -1312,7 +1312,7 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
               borderWidth: 1,
               borderColor: theme.borderSubtle,
               cursor: 'pointer',
@@ -1421,7 +1421,7 @@ export default function ModernOverviewDashboard({
                   justifyContent: 'space-between',
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+                  backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
                   borderWidth: 1,
                   borderColor: theme.borderSubtle,
                 }}
@@ -1447,7 +1447,7 @@ export default function ModernOverviewDashboard({
                   justifyContent: 'space-between',
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+                  backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
                   borderWidth: 1,
                   borderColor: theme.borderSubtle,
                 }}
@@ -1473,7 +1473,7 @@ export default function ModernOverviewDashboard({
                   justifyContent: 'space-between',
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+                  backgroundColor: isDarkMode ? '#202124' : '#FAFAFA',
                   borderWidth: 1,
                   borderColor: theme.borderSubtle,
                 }}
@@ -1542,7 +1542,7 @@ export default function ModernOverviewDashboard({
                     style={{
                       height: 5,
                       borderRadius: 2.5,
-                      backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                      backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
                       overflow: 'hidden',
                     }}
                   >
@@ -1613,7 +1613,7 @@ export default function ModernOverviewDashboard({
                     style={{
                       height: 4,
                       borderRadius: 2,
-                      backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                      backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
                       overflow: 'hidden',
                       marginLeft: 22,
                     }}
@@ -1759,7 +1759,7 @@ export default function ModernOverviewDashboard({
                   flexDirection: 'row',
                   paddingHorizontal: 20,
                   paddingVertical: 11,
-                  backgroundColor: isDarkMode ? '#202225' : '#F8F9FA',
+                  backgroundColor: isDarkMode ? '#202124' : '#F8F9FA',
                   borderBottomWidth: 1,
                   borderBottomColor: theme.cardBorder,
                 }}
@@ -1831,11 +1831,11 @@ export default function ModernOverviewDashboard({
                     ? 'Delivery failed'
                     : 'Processing';
 
-                  let statusBg = isDarkMode ? '#27272A' : '#F4F4F5';
+                  let statusBg = isDarkMode ? '#202124' : '#F4F4F5';
                   let statusFg = isDarkMode ? '#A1A1AA' : '#52525B';
                   if (isPending) {
                     statusBg = isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7';
-                    statusFg = isDarkMode ? '#FBBF24' : '#B45309';
+                    statusFg = isDarkMode ? '#F5B942' : '#B45309';
                   } else if (isProcessing || isReady) {
                     statusBg = isDarkMode ? 'rgba(56, 189, 248, 0.15)' : '#EFF6FF';
                     statusFg = isDarkMode ? '#38BDF8' : '#1D4ED8';
@@ -1844,10 +1844,10 @@ export default function ModernOverviewDashboard({
                     statusFg = isDarkMode ? '#C084FC' : '#7E22CE';
                   } else if (isDelivered) {
                     statusBg = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5';
-                    statusFg = isDarkMode ? '#34D399' : '#059669';
+                    statusFg = isDarkMode ? '#00C98D' : '#059669';
                   } else if (isFailed || isCancelled) {
                     statusBg = isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2';
-                    statusFg = isDarkMode ? '#F87171' : '#B91C1C';
+                    statusFg = isDarkMode ? '#F04444' : '#B91C1C';
                   }
 
                   const itemsSummary =
@@ -1936,11 +1936,9 @@ export default function ModernOverviewDashboard({
                               fontSize: 11,
                               fontWeight: '600',
                               color: isInStore
-                                ? isDarkMode
-                                  ? '#34D399'
+                                ? isDarkMode ? '#00C98D'
                                   : '#059669'
-                                : isDarkMode
-                                ? '#60A5FA'
+                                : isDarkMode ? '#3B82F6'
                                 : '#2563EB',
                             }}
                           >
@@ -2000,9 +1998,9 @@ export default function ModernOverviewDashboard({
  */
 export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop = true }) {
   const { width: windowWidth } = useWindowDimensions();
-  const baseColor = isDarkMode ? '#27272A' : '#E4E4E7';
-  const highlightColor = isDarkMode ? '#3F3F46' : '#F4F4F5';
-  const cardBg = isDarkMode ? '#18181B' : '#FFFFFF';
+  const baseColor = isDarkMode ? '#202124' : '#E4E4E7';
+  const highlightColor = isDarkMode ? '#3A3B40' : '#F4F4F5';
+  const cardBg = isDarkMode ? '#191A1D' : '#FFFFFF';
   const cardBorder = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E4E4E7';
 
   return (

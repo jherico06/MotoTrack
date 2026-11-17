@@ -58,6 +58,8 @@ export default function HeroBanner({
   showToast,
 }) {
   const { width } = useWindowDimensions();
+  const isUltraWide = width >= 1840;
+  const isWideDesktop = width >= 1440;
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
   const isMobile = width < 768;
@@ -120,7 +122,7 @@ export default function HeroBanner({
         borderRadius: 0,
         overflow: 'hidden',
         position: 'relative',
-        minHeight: isDesktop ? 460 : isTablet ? 340 : 480,
+        minHeight: isUltraWide ? 540 : isWideDesktop ? 500 : isDesktop ? 460 : isTablet ? 340 : 480,
         marginBottom: 0,
         borderWidth: 0,
         borderBottomWidth: 1,
@@ -180,11 +182,11 @@ export default function HeroBanner({
         )}
       </View>
 
-      {/* ─── INNER CONTENT WRAPPER (Aligned with site maxContainer 1360px grid) ─── */}
+      {/* ─── INNER CONTENT WRAPPER (Fluid full-width with responsive desktop padding) ─── */}
       <View
         style={{
           width: '100%',
-          maxWidth: 1360,
+          maxWidth: '100%',
           marginHorizontal: 'auto',
           position: 'relative',
           zIndex: 2,
@@ -195,14 +197,14 @@ export default function HeroBanner({
           style={{
             position: 'relative',
             zIndex: 2,
-            paddingLeft: isDesktop ? 24 : isTablet ? 24 : isUltraSmall ? 12 : 16,
-            paddingRight: isDesktop ? 24 : isTablet ? 24 : isUltraSmall ? 12 : 16,
-            paddingTop: isDesktop ? 54 : isTablet ? 28 : 36,
-            paddingBottom: isDesktop ? 40 : isTablet ? 20 : 28,
-            maxWidth: isDesktop ? 680 : isTablet ? 450 : '100%',
+            paddingLeft: isUltraWide ? 56 : isWideDesktop ? 40 : isDesktop ? 24 : isTablet ? 24 : isUltraSmall ? 12 : 16,
+            paddingRight: isUltraWide ? 56 : isWideDesktop ? 40 : isDesktop ? 24 : isTablet ? 24 : isUltraSmall ? 12 : 16,
+            paddingTop: isWideDesktop ? 62 : isDesktop ? 54 : isTablet ? 28 : 36,
+            paddingBottom: isWideDesktop ? 46 : isDesktop ? 40 : isTablet ? 20 : 28,
+            maxWidth: isUltraWide ? 840 : isWideDesktop ? 760 : isDesktop ? 680 : isTablet ? 450 : '100%',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            minHeight: isDesktop ? 460 : isTablet ? 340 : 480,
+            minHeight: isUltraWide ? 540 : isWideDesktop ? 500 : isDesktop ? 460 : isTablet ? 340 : 480,
           }}
         >
         {/* Top: Eyebrow + Headline + Subtitle + CTAs */}
@@ -233,10 +235,10 @@ export default function HeroBanner({
           {/* Headline: Dynamic banner title */}
           <Text
             style={{
-              fontSize: isDesktop ? 46 : isTablet ? 30 : isUltraSmall ? 23 : isSmallMobile ? 26 : 34,
+              fontSize: isUltraWide ? 56 : isWideDesktop ? 52 : isDesktop ? 46 : isTablet ? 30 : isUltraSmall ? 23 : isSmallMobile ? 26 : 34,
               fontWeight: '600',
               color: '#FFFFFF',
-              lineHeight: isDesktop ? 54 : isTablet ? 36 : isUltraSmall ? 29 : isSmallMobile ? 32 : 40,
+              lineHeight: isUltraWide ? 64 : isWideDesktop ? 60 : isDesktop ? 54 : isTablet ? 36 : isUltraSmall ? 29 : isSmallMobile ? 32 : 40,
               letterSpacing: -0.8,
               fontFamily: fontFamily.sans,
               marginBottom: isTablet ? 8 : 14,
@@ -248,11 +250,11 @@ export default function HeroBanner({
           {/* Description */}
           <Text
             style={{
-              fontSize: isDesktop ? 15 : isTablet ? 13 : 13.5,
-              lineHeight: isDesktop ? 23 : isTablet ? 18 : 20,
+              fontSize: isWideDesktop ? 16 : isDesktop ? 15 : isTablet ? 13 : 13.5,
+              lineHeight: isWideDesktop ? 24 : isDesktop ? 23 : isTablet ? 18 : 20,
               color: '#CBD5E1',
               fontFamily: fontFamily.sans,
-              maxWidth: isTablet ? 420 : 480,
+              maxWidth: isWideDesktop ? 560 : isTablet ? 420 : 480,
               marginBottom: isDesktop ? 28 : isTablet ? 16 : 22,
             }}
           >

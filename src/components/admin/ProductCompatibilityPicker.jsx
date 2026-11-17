@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { BootstrapIcon } from '../common';
 import { compatibilityService } from '../../services/products/compatibilityService.js';
-import { getThemeTokens } from '../../styles/theme.js';
+import { getAdminThemeTokens as getThemeTokens } from '../../styles/web/admin.web.styles.js';
 
 export default function ProductCompatibilityPicker({
   productId,
@@ -266,7 +266,7 @@ function createStyles(t, isDark) {
     addBrand: { flexGrow: 1, flexBasis: 90, minWidth: 90 },
     addModel: { flexGrow: 2, flexBasis: 140, minWidth: 120 },
     addBtn: {
-      backgroundColor: isDark ? '#EA580C' : '#0C6258',
+      backgroundColor: isDark ? '#FF5A00' : '#0C6258',
       borderRadius: 8,
       paddingHorizontal: 14,
       paddingVertical: 9,
@@ -301,7 +301,7 @@ function createStyles(t, isDark) {
     empty: { fontSize: 12, color: t.textMuted, padding: 8 },
     saveBtn: {
       marginTop: 10,
-      backgroundColor: isDark ? '#EA580C' : '#0C6258',
+      backgroundColor: isDark ? '#FF5A00' : '#0C6258',
       borderRadius: 10,
       paddingVertical: 10,
       alignItems: 'center',

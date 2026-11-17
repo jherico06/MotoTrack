@@ -300,7 +300,7 @@ export default function RateDeliveredOrderModal({
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
                   <View style={styles.headerIconWrap}>
-                    <BootstrapIcon name="star-fill" size={18} color={isDarkMode ? '#FBBF24' : '#D97706'} />
+                    <BootstrapIcon name="star-fill" size={18} color={isDarkMode ? '#F5B942' : '#D97706'} />
                   </View>
                   <View>
                     <Text style={styles.headerTitle}>
@@ -310,7 +310,7 @@ export default function RateDeliveredOrderModal({
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75}>
-                  <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                  <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -321,7 +321,7 @@ export default function RateDeliveredOrderModal({
                     <BootstrapIcon
                       name="check-circle-fill"
                       size={16}
-                      color={isDarkMode ? '#4ADE80' : '#15803D'}
+                      color={isDarkMode ? '#00C98D' : '#15803D'}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -563,9 +563,9 @@ const createStyles = (isDarkMode) =>
       padding: 24,
     },
     modalCard: {
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       maxHeight: '92%',
@@ -598,7 +598,7 @@ const createStyles = (isDarkMode) =>
       justifyContent: 'space-between',
       paddingBottom: 14,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      borderBottomColor: isDarkMode ? '#303236' : '#F1F5F9',
     },
     headerLeft: {
       flexDirection: 'row',
@@ -619,7 +619,7 @@ const createStyles = (isDarkMode) =>
     headerTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     headerSub: {
       fontSize: 12,
@@ -631,9 +631,9 @@ const createStyles = (isDarkMode) =>
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -662,7 +662,7 @@ const createStyles = (isDarkMode) =>
     deliveryBannerTitle: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#4ADE80' : '#15803D',
+      color: isDarkMode ? '#00C98D' : '#15803D',
     },
     deliveryBannerSub: {
       fontSize: 11.5,
@@ -673,13 +673,13 @@ const createStyles = (isDarkMode) =>
     sectionHeading: {
       fontSize: 14,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       marginBottom: 10,
     },
     itemReviewCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       borderRadius: 16,
       padding: 12,
       marginBottom: 12,
@@ -694,16 +694,16 @@ const createStyles = (isDarkMode) =>
       alignItems: 'center',
       gap: 10,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#F8FAFC',
+      borderBottomColor: isDarkMode ? '#303236' : '#F8FAFC',
       paddingBottom: 10,
     },
     productThumb: {
       width: 50,
       height: 50,
       borderRadius: 10,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     productInfo: {
       flex: 1,
@@ -718,7 +718,7 @@ const createStyles = (isDarkMode) =>
     productName: {
       fontSize: 13,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#1E293B',
+      color: isDarkMode ? '#F2F2F3' : '#1E293B',
       marginTop: 1,
     },
     productPrice: {
@@ -735,7 +735,7 @@ const createStyles = (isDarkMode) =>
     rateQuestionLabel: {
       fontSize: 12,
       fontWeight: '700',
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
       marginBottom: 6,
     },
     starRow: {
@@ -749,7 +749,7 @@ const createStyles = (isDarkMode) =>
     starSentimentText: {
       fontSize: 12,
       fontWeight: '600',
-      color: isDarkMode ? '#FBBF24' : '#D97706',
+      color: isDarkMode ? '#F5B942' : '#D97706',
       marginTop: 4,
     },
     quickTagsContainer: {
@@ -762,9 +762,9 @@ const createStyles = (isDarkMode) =>
       paddingHorizontal: 9,
       paddingVertical: 4.5,
       borderRadius: 14,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     tagPillActive: {
       backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#F0FDF4',
@@ -773,10 +773,10 @@ const createStyles = (isDarkMode) =>
     tagPillText: {
       fontSize: 11,
       fontWeight: '600',
-      color: isDarkMode ? '#94A3B8' : '#64748B',
+      color: isDarkMode ? '#A1A1AA' : '#64748B',
     },
     tagPillTextActive: {
-      color: isDarkMode ? '#4ADE80' : '#15803D',
+      color: isDarkMode ? '#00C98D' : '#15803D',
       fontWeight: '600',
     },
     commentInputWrap: {
@@ -790,7 +790,7 @@ const createStyles = (isDarkMode) =>
     },
     commentInput: {
       fontSize: 12.5,
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       minHeight: 44,
       textAlignVertical: 'top',
       ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
@@ -799,7 +799,7 @@ const createStyles = (isDarkMode) =>
       marginTop: 10,
       backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       borderRadius: 12,
       padding: 10,
     },
@@ -812,7 +812,7 @@ const createStyles = (isDarkMode) =>
     photosLabel: {
       fontSize: 12,
       fontWeight: '700',
-      color: isDarkMode ? '#E2E8F0' : '#334155',
+      color: isDarkMode ? '#F2F2F3' : '#334155',
     },
     photosCount: {
       fontSize: 11,
@@ -833,7 +833,7 @@ const createStyles = (isDarkMode) =>
       position: 'relative',
       borderWidth: 1,
       borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     },
     photoThumb: {
       width: '100%',
@@ -844,7 +844,7 @@ const createStyles = (isDarkMode) =>
       position: 'absolute',
       top: -6,
       right: -6,
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderRadius: 10,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
@@ -859,7 +859,7 @@ const createStyles = (isDarkMode) =>
       borderWidth: 1.5,
       borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
       borderStyle: 'dashed',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 4,
@@ -884,9 +884,9 @@ const createStyles = (isDarkMode) =>
       marginTop: 2,
     },
     courierSectionCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       borderRadius: 16,
       padding: 12,
       marginBottom: 10,
@@ -907,7 +907,7 @@ const createStyles = (isDarkMode) =>
     courierTitle: {
       fontSize: 13,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     courierSub: {
       fontSize: 11,
@@ -925,7 +925,7 @@ const createStyles = (isDarkMode) =>
     courierRatingLabel: {
       fontSize: 12,
       fontWeight: '700',
-      color: isDarkMode ? '#FBBF24' : '#D97706',
+      color: isDarkMode ? '#F5B942' : '#D97706',
       marginLeft: 6,
     },
     footer: {
@@ -934,22 +934,22 @@ const createStyles = (isDarkMode) =>
       gap: 10,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      borderTopColor: isDarkMode ? '#303236' : '#F1F5F9',
     },
     cancelBtn: {
       flex: 0.8,
       paddingVertical: 12,
       borderRadius: 14,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
     },
     cancelBtnText: {
       fontSize: 13,
       fontWeight: '700',
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
     },
     submitBtn: {
       flex: 1.5,

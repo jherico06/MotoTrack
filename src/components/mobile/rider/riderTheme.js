@@ -3,55 +3,57 @@ import { fontFamily } from '../../../styles/typography.js';
 
 export const RIDER_BRAND = {
   name: 'MotoTrack',
-  racingOrange: '#FF4D00',
-  racingOrangePressed: '#E04400',
-  racingOrangeSoft: '#FFF1EB',
-  racingOrangeBorder: '#FFD6C4',
-  racingOrangeTextDark: '#C93B00',
-  charcoal: '#202426',
-  charcoalSoft: '#2C3134',
-  charcoalMuted: '#3A4044',
+  racingOrange: '#EA580C',
+  racingOrangePressed: '#C2410C',
+  racingOrangeSoft: '#FFF7ED',
+  racingOrangeBorder: '#FED7AA',
+  racingOrangeTextDark: '#C2410C',
+  charcoal: '#141D2E',
+  charcoalSoft: '#1E2534',
+  charcoalMuted: '#334155',
 };
 
 export function getRiderPalette(isDark = false) {
   if (isDark) {
     return {
       isDark: true,
-      orange: '#FF4D00',
-      orangePressed: '#E04400',
-      orangeSoft: 'rgba(255, 77, 0, 0.16)',
-      orangeBorder: 'rgba(255, 77, 0, 0.36)',
-      orangeText: '#FF6A2B',
-      charcoal: '#202426',
-      bgCanvas: '#141718',
-      bgSheet: '#1B1F21',
-      bgCard: '#202426',
-      bgMuted: '#282D30',
-      bgInput: '#181B1D',
-      bgHeader: '#202426',
-      headerBorder: '#2B3033',
-      headerText: '#FFFFFF',
-      headerBtnBg: '#282D30',
-      headerBtnBorder: '#363C40',
-      headerBtnIcon: '#FFFFFF',
-      bgNav: '#202426',
+      orange: '#EA580C',
+      orangePressed: '#C2410C',
+      orangeSoft: 'rgba(234, 88, 12, 0.16)',
+      orangeBorder: 'rgba(234, 88, 12, 0.36)',
+      orangeText: '#FB923C',
+      charcoal: '#EA580C',
+      pillActiveBg: '#EA580C',
+      pillTrackBg: '#1E2025',
+      bgCanvas: '#121518',
+      bgSheet: '#191C21',
+      bgCard: '#191C21',
+      bgMuted: '#22262C',
+      bgInput: '#15181C',
+      bgHeader: '#121518',
+      headerBorder: 'transparent',
+      headerText: '#F9FAFB',
+      headerBtnBg: '#1C1F23',
+      headerBtnBorder: '#2B3035',
+      headerBtnIcon: '#F9FAFB',
+      bgNav: '#181A20',
       bgAvatar: '#3B251C',
-      avatarText: '#FFB394',
-      border: '#2F3538',
-      borderStrong: '#3D4448',
-      borderSubtle: '#262B2E',
-      textPrimary: '#F5F6F7',
-      textSecondary: '#C8CFD4',
-      textMuted: '#8E979E',
-      textSubtle: '#6E777E',
-      completedBadgeBg: '#2B3033',
-      completedBadgeText: '#D7DCE0',
-      completedIconBg: '#2B3033',
-      completedIconColor: '#F5F6F7',
-      success: '#16A34A',
-      successSoft: 'rgba(22, 163, 74, 0.18)',
-      successBorder: 'rgba(22, 163, 74, 0.35)',
-      successText: '#4ADE80',
+      avatarText: '#FDBA74',
+      border: '#2B3035',
+      borderStrong: '#383E46',
+      borderSubtle: '#22262C',
+      textPrimary: '#F9FAFB',
+      textSecondary: '#CBD5E1',
+      textMuted: '#94A3B8',
+      textSubtle: '#64748B',
+      completedBadgeBg: 'rgba(16, 185, 129, 0.16)',
+      completedBadgeText: '#34D399',
+      completedIconBg: 'rgba(16, 185, 129, 0.16)',
+      completedIconColor: '#34D399',
+      success: '#10B981',
+      successSoft: 'rgba(16, 185, 129, 0.16)',
+      successBorder: 'rgba(16, 185, 129, 0.35)',
+      successText: '#34D399',
       danger: '#EF4444',
       dangerSoft: 'rgba(239, 68, 68, 0.16)',
       dangerBorder: 'rgba(239, 68, 68, 0.35)',
@@ -63,47 +65,49 @@ export function getRiderPalette(isDark = false) {
 
   return {
     isDark: false,
-    orange: '#FF4D00',
-    orangePressed: '#E04400',
-    orangeSoft: '#FFF1EB',
-    orangeBorder: '#FFD6C4',
-    orangeText: '#D13F00',
-    charcoal: '#202426',
-    bgCanvas: '#F7F6F3',
+    orange: '#EA580C',
+    orangePressed: '#C2410C',
+    orangeSoft: '#FFF7ED',
+    orangeBorder: '#FED7AA',
+    orangeText: '#EA580C',
+    charcoal: '#141D2E',
+    pillActiveBg: '#141D2E',
+    pillTrackBg: '#EFECE6',
+    bgCanvas: '#F7F5F0',
     bgSheet: '#FFFFFF',
     bgCard: '#FFFFFF',
-    bgMuted: '#F3F4F5',
-    bgInput: '#FFFFFF',
-    bgHeader: '#202426', // Charcoal sticky header
-    headerBorder: '#2E3438',
-    headerText: '#FFFFFF',
-    headerBtnBg: '#2C3134',
-    headerBtnBorder: '#3A4044',
-    headerBtnIcon: '#FFFFFF',
-    bgNav: '#FFFFFF',
-    bgAvatar: '#FAD6C4',
-    avatarText: '#202426',
-    border: '#E6E8EA',
-    borderStrong: '#D5D9DC',
-    borderSubtle: '#EFEFEF',
-    textPrimary: '#202426',
-    textSecondary: '#495055',
-    textMuted: '#687076',
-    textSubtle: '#8C949A',
-    completedBadgeBg: '#EEF0F2',
-    completedBadgeText: '#202426',
-    completedIconBg: '#EEF0F2',
-    completedIconColor: '#202426',
-    success: '#15803D',
-    successSoft: '#ECFDF3',
-    successBorder: '#BBF7D0',
-    successText: '#166534',
+    bgMuted: '#F5F3EE',
+    bgInput: '#F9F8F5',
+    bgHeader: '#F7F5F0',
+    headerBorder: 'transparent',
+    headerText: '#18181B',
+    headerBtnBg: '#FFFFFF',
+    headerBtnBorder: '#EDE9E0',
+    headerBtnIcon: '#18181B',
+    bgNav: '#181A20',
+    bgAvatar: '#FFF1EB',
+    avatarText: '#EA580C',
+    border: '#EDE9E0',
+    borderStrong: '#E2DDD3',
+    borderSubtle: '#F3F1EC',
+    textPrimary: '#18181B',
+    textSecondary: '#475569',
+    textMuted: '#64748B',
+    textSubtle: '#94A3B8',
+    completedBadgeBg: '#E8F7EE',
+    completedBadgeText: '#0E7A4B',
+    completedIconBg: '#E8F7EE',
+    completedIconColor: '#0E7A4B',
+    success: '#059669',
+    successSoft: '#ECFDF5',
+    successBorder: '#A7F3D0',
+    successText: '#065F46',
     danger: '#DC2626',
     dangerSoft: '#FEF2F2',
     dangerBorder: '#FECACA',
     dangerText: '#B91C1C',
-    scrim: 'rgba(32, 36, 38, 0.52)',
-    shadowColor: '#202426',
+    scrim: 'rgba(15, 23, 42, 0.48)',
+    shadowColor: '#0F172A',
   };
 }
 
@@ -111,13 +115,13 @@ export const RIDER_FONT = fontFamily.sans;
 
 export const cardShadowStyle = Platform.select({
   ios: {
-    shadowColor: '#202426',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
   },
   android: {
-    elevation: 2,
+    elevation: 1,
   },
   default: {},
 });
@@ -147,6 +151,22 @@ export function formatOrderCode(orderId) {
 
 export function isDeliveredOrder(delivery) {
   return String(delivery?.deliveryStatus || '').trim().toLowerCase() === 'delivered';
+}
+
+export function isNeedsPickupOrder(delivery) {
+  if (isDeliveredOrder(delivery)) return false;
+  const s = String(delivery?.deliveryStatus || '').trim().toLowerCase();
+  if (!s) return true;
+  if (
+    s.includes('out') ||
+    s.includes('way') ||
+    s.includes('fail') ||
+    s.includes('issue') ||
+    s.includes('report')
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function isCodOrder(delivery) {
@@ -324,11 +344,11 @@ export function getOrderStatusBadge(delivery, palette) {
     };
   }
   return {
-    label: 'Needs confirmation',
+    label: 'Needs pickup',
     detailLabel: delivery?.deliveryStatus || 'Assigned',
-    bg: palette.orangeSoft,
-    text: palette.orangeText,
-    border: palette.orangeBorder,
+    bg: palette.isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+    text: palette.isDark ? '#FBBF24' : '#B45309',
+    border: palette.isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
     isCompleted: false,
     isUrgent: true,
   };

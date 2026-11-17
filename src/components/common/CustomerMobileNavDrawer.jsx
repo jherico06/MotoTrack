@@ -581,7 +581,7 @@ export default function CustomerMobileNavDrawer({
                   <View
                     style={[
                       drawerStyles.toggleSwitchTrack,
-                      { backgroundColor: isDarkMode ? '#EA580C' : 'rgba(255, 255, 255, 0.2)' },
+                      { backgroundColor: isDarkMode ? '#FF5A00' : 'rgba(255, 255, 255, 0.2)' },
                     ]}
                   >
                     <View
@@ -645,7 +645,7 @@ export default function CustomerMobileNavDrawer({
                 <View
                   style={[
                     drawerStyles.toggleSwitchTrack,
-                    { backgroundColor: isDarkMode ? '#EA580C' : 'rgba(255, 255, 255, 0.2)' },
+                    { backgroundColor: isDarkMode ? '#FF5A00' : 'rgba(255, 255, 255, 0.2)' },
                   ]}
                 >
                   <View

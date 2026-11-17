@@ -6,13 +6,13 @@
 
 import { StyleSheet, Platform } from 'react-native';
 
-export const packageBookingStyles = StyleSheet.create({
+const rawPackageBookingStyles = {
   // ─── WORKFLOW WRAPPER & CONTAINER ──────────────────────────────────────────
   workflowContainer: {
     width: '100%',
-    maxWidth: 1360,
+    maxWidth: '100%',
     marginHorizontal: 'auto',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingVertical: 20,
   },
   workflowHeader: {
@@ -1076,5 +1076,74 @@ export const packageBookingStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-});
+};
+
+const DARK_BG_MAP = {
+  '#FFFFFF': '#191A1D',
+  '#F8FAFC': '#202124',
+  '#FAFAFA': '#202124',
+  '#F1F5F9': '#202124',
+  '#FFF7ED': '#3A241B',
+  '#FFFBF8': '#3A241B',
+  '#FFEDD5': '#3A241B',
+  '#FEF3C7': 'rgba(245, 185, 66, 0.15)',
+  '#ECFDF5': 'rgba(0, 201, 141, 0.15)',
+  '#1E2227': '#202124',
+  '#27272A': '#202124',
+  '#18181B': '#202124',
+  '#EA580C': '#FF5A00',
+  '#C2410C': '#E95000',
+};
+
+const DARK_BORDER_MAP = {
+  '#E4E4E7': '#303236',
+  '#E2E8F0': '#303236',
+  '#CBD5E1': '#3A3B40',
+  '#F1F5F9': '#292B2F',
+  '#FDE68A': 'rgba(245, 185, 66, 0.35)',
+  '#EA580C': '#FF5A00',
+  '#18181B': '#3A3B40',
+};
+
+const DARK_TEXT_MAP = {
+  '#18181B': '#F2F2F3',
+  '#0F172A': '#F5F5F5',
+  '#1E293B': '#F2F2F3',
+  '#334155': '#F2F2F3',
+  '#475569': '#A1A1AA',
+  '#52525B': '#A1A1AA',
+  '#64748B': '#A1A1AA',
+  '#94A3B8': '#71717A',
+  '#B45309': '#F5B942',
+  '#EA580C': '#FF5A00',
+  '#C2410C': '#FF5A00',
+};
+
+function remapBookingDark(obj) {
+  if (Array.isArray(obj)) return obj.map(remapBookingDark);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    Object.keys(obj).forEach((k) => {
+      const v = obj[k];
+      if (typeof v === 'string') {
+        const upper = v.toUpperCase();
+        if (k === 'backgroundColor') out[k] = DARK_BG_MAP[upper] || v;
+        else if (k.toLowerCase().includes('bordercolor')) out[k] = DARK_BORDER_MAP[upper] || v;
+        else if (k === 'color') out[k] = DARK_TEXT_MAP[upper] || v;
+        else out[k] = v;
+      } else {
+        out[k] = remapBookingDark(v);
+      }
+    });
+    return out;
+  }
+  return obj;
+}
+
+export const packageBookingStyles = StyleSheet.create(rawPackageBookingStyles);
+const packageBookingDarkStyles = StyleSheet.create(remapBookingDark(rawPackageBookingStyles));
+
+export function getPackageBookingStyles(isDark = false) {
+  return isDark ? packageBookingDarkStyles : packageBookingStyles;
+}
 

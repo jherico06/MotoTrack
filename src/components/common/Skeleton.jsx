@@ -79,12 +79,12 @@ export default function Skeleton({
   // Determine colors based on theme tokens
   const resolvedBaseColor = useMemo(() => {
     if (baseColor) return baseColor;
-    return isDarkMode ? '#1E2824' : '#E2E8F0';
+    return isDarkMode ? (Platform.OS === 'web' ? '#202124' : '#1E2824') : '#E2E8F0';
   }, [baseColor, isDarkMode]);
 
   const resolvedHighlightColor = useMemo(() => {
     if (highlightColor) return highlightColor;
-    return isDarkMode ? '#2A3A33' : '#F1F5F9';
+    return isDarkMode ? (Platform.OS === 'web' ? '#292B2F' : '#2A3A33') : '#F1F5F9';
   }, [highlightColor, isDarkMode]);
 
   // Compute border radius
@@ -164,15 +164,15 @@ export default function Skeleton({
       backgroundColor: resolvedBaseColor,
       ...(isShimmer
         ? {
-            backgroundImage: `linear-gradient(90deg, ${resolvedBaseColor} 0%, ${resolvedHighlightColor} 50%, ${resolvedBaseColor} 100%)`,
-            backgroundSize: '200% 100%',
-            animation: `mototrack-skeleton-shimmer ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) infinite`,
-          }
+          backgroundImage: `linear-gradient(90deg, ${resolvedBaseColor} 0%, ${resolvedHighlightColor} 50%, ${resolvedBaseColor} 100%)`,
+          backgroundSize: '200% 100%',
+          animation: `mototrack-skeleton-shimmer ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) infinite`,
+        }
         : {}),
       ...(isPulse
         ? {
-            animation: `mototrack-skeleton-pulse ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) infinite`,
-          }
+          animation: `mototrack-skeleton-pulse ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) infinite`,
+        }
         : {}),
       overflow: 'hidden',
     };
@@ -330,15 +330,15 @@ export function SkeletonCard({
   try {
     const themeContext = useTheme();
     isDarkMode = themeContext?.isDarkMode ?? false;
-  } catch (_e) {}
+  } catch (_e) { }
 
   return (
     <View
       style={[
         styles.cardContainer,
         {
-          backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-          borderColor: isDarkMode ? '#26332E' : '#E2E8F0',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+          borderColor: isDarkMode ? '#303236' : '#E2E8F0',
           borderRadius,
         },
         style,
@@ -368,15 +368,15 @@ export function ProductCardSkeleton({ width, style, ...props }) {
   try {
     const themeContext = useTheme();
     isDarkMode = themeContext?.isDarkMode ?? false;
-  } catch (_e) {}
+  } catch (_e) { }
 
   return (
     <View
       style={[
         styles.productCard,
         {
-          backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-          borderColor: isDarkMode ? '#26332E' : '#E2E8F0',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+          borderColor: isDarkMode ? '#303236' : '#E2E8F0',
           width: width || '100%',
         },
         style,
@@ -386,7 +386,7 @@ export function ProductCardSkeleton({ width, style, ...props }) {
       <View
         style={[
           styles.productImageContainer,
-          { backgroundColor: isDarkMode ? '#131A17' : '#F1F5F9' },
+          { backgroundColor: isDarkMode ? (Platform.OS === 'web' ? '#202124' : '#131A17') : '#F1F5F9' },
         ]}
       >
         <Skeleton width="100%" height="100%" borderRadius={0} {...props} />
@@ -444,14 +444,14 @@ export function TableRowSkeleton({
   try {
     const themeContext = useTheme();
     isDarkMode = themeContext?.isDarkMode ?? false;
-  } catch (_e) {}
+  } catch (_e) { }
 
   if (Array.isArray(columns) && columns.length > 0) {
     return (
       <View
         style={[
           styles.tableRow,
-          { borderBottomColor: isDarkMode ? '#26332E' : '#F1F5F9' },
+          { borderBottomColor: isDarkMode ? '#303236' : '#F1F5F9' },
           style,
         ]}
       >
@@ -488,7 +488,7 @@ export function TableRowSkeleton({
     <View
       style={[
         styles.tableRow,
-        { borderBottomColor: isDarkMode ? '#26332E' : '#F1F5F9' },
+        { borderBottomColor: isDarkMode ? '#303236' : '#F1F5F9' },
         style,
       ]}
     >
@@ -533,15 +533,15 @@ export function TableSkeleton({ rows = 5, ...props }) {
   try {
     const themeContext = useTheme();
     isDarkMode = themeContext?.isDarkMode ?? false;
-  } catch (_e) {}
+  } catch (_e) { }
 
   return (
     <View
       style={[
         styles.tableContainer,
         {
-          backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-          borderColor: isDarkMode ? '#26332E' : '#E2E8F0',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+          borderColor: isDarkMode ? '#303236' : '#E2E8F0',
         },
       ]}
     >
@@ -551,7 +551,7 @@ export function TableSkeleton({ rows = 5, ...props }) {
           styles.tableHeader,
           {
             backgroundColor: isDarkMode ? '#121A17' : '#F8FAF9',
-            borderBottomColor: isDarkMode ? '#26332E' : '#E2E8F0',
+            borderBottomColor: isDarkMode ? '#303236' : '#E2E8F0',
           },
         ]}
       >
@@ -578,15 +578,15 @@ export function StatCardSkeleton({ style, ...props }) {
   try {
     const themeContext = useTheme();
     isDarkMode = themeContext?.isDarkMode ?? false;
-  } catch (_e) {}
+  } catch (_e) { }
 
   return (
     <View
       style={[
         styles.statCard,
         {
-          backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-          borderColor: isDarkMode ? '#26332E' : '#E2E8F0',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+          borderColor: isDarkMode ? '#303236' : '#E2E8F0',
         },
         style,
       ]}
@@ -614,7 +614,7 @@ export function SkeletonList({ count = 4, gap = 12, style, ...props }) {
   try {
     const themeContext = useTheme();
     isDarkMode = themeContext?.isDarkMode ?? false;
-  } catch (_e) {}
+  } catch (_e) { }
 
   return (
     <View style={[{ gap }, style]}>
@@ -624,8 +624,8 @@ export function SkeletonList({ count = 4, gap = 12, style, ...props }) {
           style={[
             styles.listItem,
             {
-              backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-              borderColor: isDarkMode ? '#26332E' : '#E2E8F0',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+              borderColor: isDarkMode ? '#303236' : '#E2E8F0',
             },
           ]}
         >

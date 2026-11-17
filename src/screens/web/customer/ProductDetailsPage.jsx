@@ -155,7 +155,7 @@ export default function ProductDetailsPageWeb({
           const bike = await compatibilityService.getActiveMotorcycle?.(userId);
           if (alive && bike) setActiveBike(bike);
         }
-      } catch (_e) {}
+      } catch (_e) { }
     })();
     return () => {
       alive = false;
@@ -188,7 +188,7 @@ export default function ProductDetailsPageWeb({
             if (Array.isArray(revRes)) setReviews(revRes);
           }
         })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => {
           if (!cancelled) setReviewsLoading(false);
         });
@@ -272,7 +272,7 @@ export default function ProductDetailsPageWeb({
             setFreeShippingPromoId(match.promoId || null);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
     return () => {
       cancelled = true;
@@ -454,7 +454,7 @@ export default function ProductDetailsPageWeb({
       >
         <View
           style={{
-            maxWidth: 1360,
+            maxWidth: '100%',
             marginHorizontal: 'auto',
             width: '100%',
             paddingHorizontal: isMobile ? (isSmallMobile ? 8 : 12) : 24,
@@ -503,7 +503,7 @@ export default function ProductDetailsPageWeb({
               {[
                 { id: 'shop', label: 'Shop', active: true, onPress: onNavigateToStore },
                 { id: 'garage', label: 'Book a Service', onPress: () => onNavigateToScreen?.('garage') },
-                
+
                 { id: 'customizer', label: 'Customize', onPress: () => onNavigateToScreen?.('customizer') },
                 { id: 'orders', label: 'Orders', onPress: onNavigateToOrders },
               ].map((item) => (
@@ -640,7 +640,7 @@ export default function ProductDetailsPageWeb({
       >
         <View
           style={{
-            maxWidth: 1360,
+            maxWidth: '100%',
             marginHorizontal: 'auto',
             width: '100%',
             paddingHorizontal: isMobile ? (isSmallMobile ? 12 : 16) : 24,
@@ -650,19 +650,19 @@ export default function ProductDetailsPageWeb({
           {/* Breadcrumbs Row */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
             <TouchableOpacity onPress={onNavigateToStore} activeOpacity={0.7}>
-              <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDarkMode ? '#94A3B8' : '#64748B' }}>Store</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDarkMode ? '#A1A1AA' : '#64748B' }}>Store</Text>
             </TouchableOpacity>
             <BootstrapIcon name="chevron-right" size={10} color="#94A3B8" />
             {product.category && (
               <>
-                <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
                   {product.category}
                 </Text>
                 <BootstrapIcon name="chevron-right" size={10} color="#94A3B8" />
               </>
             )}
             <Text
-              style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A', maxWidth: 280 }}
+              style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A', maxWidth: 280 }}
               numberOfLines={1}
             >
               {product.name}
@@ -832,7 +832,7 @@ export default function ProductDetailsPageWeb({
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <BootstrapIcon name="patch-check-fill" size={16} color="#EA580C" />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#334155' }}>
                     100% Genuine MotoTrack Part
                   </Text>
                 </View>
@@ -876,7 +876,7 @@ export default function ProductDetailsPageWeb({
                   style={{
                     fontSize: isMobile ? 18 : 22,
                     fontWeight: '700',
-                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                    color: isDarkMode ? '#F2F2F3' : '#0F172A',
                     lineHeight: isMobile ? 24 : 30,
                     marginBottom: 12,
                   }}
@@ -913,8 +913,8 @@ export default function ProductDetailsPageWeb({
                     {productSoldOut
                       ? 'Out of stock'
                       : availableStock <= 5
-                      ? `Only ${availableStock} left in stock`
-                      : `${availableStock} units available`}
+                        ? `Only ${availableStock} left in stock`
+                        : `${availableStock} units available`}
                   </Text>
                 </View>
 
@@ -974,7 +974,7 @@ export default function ProductDetailsPageWeb({
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <BootstrapIcon name="motorcycle" size={16} color="#EA580C" />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#1E293B' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#1E293B' }}>
                         {activeBike ? `${activeBike.brand} ${activeBike.model}` : 'All Motorcycles'}
                       </Text>
                     </View>
@@ -984,8 +984,8 @@ export default function ProductDetailsPageWeb({
                           compatStatus === COMPAT_STATUS.COMPATIBLE
                             ? '#DCFCE7'
                             : compatStatus === COMPAT_STATUS.INCOMPATIBLE
-                            ? '#FEE2E2'
-                            : '#F1F5F9',
+                              ? '#FEE2E2'
+                              : '#F1F5F9',
                         paddingHorizontal: 8,
                         paddingVertical: 3,
                         borderRadius: 6,
@@ -999,15 +999,15 @@ export default function ProductDetailsPageWeb({
                             compatStatus === COMPAT_STATUS.COMPATIBLE
                               ? '#166534'
                               : compatStatus === COMPAT_STATUS.INCOMPATIBLE
-                              ? '#991B1B'
-                              : '#475569',
+                                ? '#991B1B'
+                                : '#475569',
                         }}
                       >
                         {compatStatus === COMPAT_STATUS.COMPATIBLE
                           ? '100% Guaranteed Fit'
                           : compatStatus === COMPAT_STATUS.INCOMPATIBLE
-                          ? 'Not Compatible'
-                          : 'Universal Fit'}
+                            ? 'Not Compatible'
+                            : 'Universal Fit'}
                       </Text>
                     </View>
                   </View>
@@ -1016,7 +1016,7 @@ export default function ProductDetailsPageWeb({
                 {/* Size Variants (if applicable) */}
                 {sizeEntries.length > 0 && (
                   <View style={{ marginBottom: 18 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B', marginBottom: 8 }}>
                       Select Size: {selectedSize}
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -1043,7 +1043,7 @@ export default function ProductDetailsPageWeb({
                               style={{
                                 fontSize: 12.5,
                                 fontWeight: '700',
-                                color: isSelected ? '#FFFFFF' : isDarkMode ? '#F8FAFC' : '#1E293B',
+                                color: isSelected ? '#FFFFFF' : isDarkMode ? '#F2F2F3' : '#1E293B',
                               }}
                             >
                               {s.name}
@@ -1058,7 +1058,7 @@ export default function ProductDetailsPageWeb({
                 {/* Color Variants (if applicable) */}
                 {colorEntries.length > 0 && (
                   <View style={{ marginBottom: 18 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B', marginBottom: 8 }}>
                       Select Color: {selectedColor}
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -1082,7 +1082,7 @@ export default function ProductDetailsPageWeb({
                               style={{
                                 fontSize: 12.5,
                                 fontWeight: '700',
-                                color: isSelected ? '#FFFFFF' : isDarkMode ? '#F8FAFC' : '#1E293B',
+                                color: isSelected ? '#FFFFFF' : isDarkMode ? '#F2F2F3' : '#1E293B',
                               }}
                             >
                               {c.name}
@@ -1096,7 +1096,7 @@ export default function ProductDetailsPageWeb({
 
                 {/* Quantity Stepper */}
                 <View style={{ marginBottom: 22 }}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B', marginBottom: 8 }}>
                     Quantity
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -1123,7 +1123,7 @@ export default function ProductDetailsPageWeb({
                           textAlign: 'center',
                           fontSize: 14,
                           fontWeight: '700',
-                          color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                          color: isDarkMode ? '#F2F2F3' : '#0F172A',
                           fontVariant: ['tabular-nums'],
                         }}
                       >
@@ -1148,7 +1148,7 @@ export default function ProductDetailsPageWeb({
                   <TouchableOpacity
                     style={{
                       flex: 1,
-                      backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
+                      backgroundColor: isDarkMode ? '#202124' : '#FFF7ED',
                       borderWidth: 1.5,
                       borderColor: '#EA580C',
                       borderRadius: 8,
@@ -1191,10 +1191,10 @@ export default function ProductDetailsPageWeb({
 
                 {/* Description */}
                 <View style={{ borderTopWidth: 1, borderTopColor: isDarkMode ? '#2D3742' : '#F1F5F9', paddingTop: 18, marginTop: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B', marginBottom: 8 }}>
                     Product Description
                   </Text>
-                  <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#475569', lineHeight: 20 }}>
+                  <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#475569', lineHeight: 20 }}>
                     {product.description || 'High-performance genuine replacement part crafted for maximum durability and track reliability.'}
                   </Text>
                 </View>
@@ -1202,13 +1202,13 @@ export default function ProductDetailsPageWeb({
                 {/* Key Features List (if available) */}
                 {Array.isArray(product.features) && product.features.length > 0 && (
                   <View style={{ marginTop: 16 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B', marginBottom: 8 }}>
                       Key Features
                     </Text>
                     {product.features.map((feat, idx) => (
                       <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <BootstrapIcon name="check-circle-fill" size={13} color="#16A34A" />
-                        <Text style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#334155' }}>{feat}</Text>
+                        <Text style={{ fontSize: 12.5, color: isDarkMode ? '#A1A1AA' : '#334155' }}>{feat}</Text>
                       </View>
                     ))}
                   </View>
@@ -1217,7 +1217,7 @@ export default function ProductDetailsPageWeb({
                 {/* Customer Reviews Section */}
                 <View style={{ borderTopWidth: 1, borderTopColor: isDarkMode ? '#2D3742' : '#F1F5F9', paddingTop: 20, marginTop: 18 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B' }}>
                       Customer Reviews ({reviewListCount})
                     </Text>
                     {hasRatings && (
@@ -1250,7 +1250,7 @@ export default function ProductDetailsPageWeb({
                           }}
                         >
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#1E293B' }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B' }}>
                               {rev.customer_name || rev.user_name || 'Verified Rider'}
                             </Text>
                             <Text style={{ fontSize: 11, color: '#94A3B8' }}>
@@ -1259,7 +1259,7 @@ export default function ProductDetailsPageWeb({
                           </View>
                           <StarRow rating={rev.rating || 5} size={12} />
                           {rev.comment ? (
-                            <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#475569', marginTop: 6, lineHeight: 18 }}>
+                            <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#475569', marginTop: 6, lineHeight: 18 }}>
                               {rev.comment}
                             </Text>
                           ) : null}
@@ -1275,7 +1275,7 @@ export default function ProductDetailsPageWeb({
                                     borderRadius: 8,
                                     borderWidth: 1,
                                     borderColor: isDarkMode ? '#2D3742' : '#E2E8F0',
-                                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                                    backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
                                   }}
                                   resizeMode="cover"
                                 />
@@ -1389,7 +1389,7 @@ export default function ProductDetailsPageWeb({
         overrideTotal={
           buyNowItems
             ? buyNowItems.reduce((acc, it) => acc + (it.product?.price || 0) * (it.quantity || 1), 0) +
-              (isFreeShippingActive ? 0 : 150)
+            (isFreeShippingActive ? 0 : 150)
             : null
         }
       />

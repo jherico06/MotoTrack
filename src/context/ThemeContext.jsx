@@ -13,24 +13,34 @@ export function ThemeProvider({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const saved =
+        appStorage.getItem('mototrack_theme_mode') ||
         appStorage.getItem('mototrack_customer_dark_mode') ||
-        appStorage.getItem('mototrack_theme_mode');
-      return saved === 'true' || saved === 'dark';
+        appStorage.getItem('mototrack_admin_dark_mode');
+      const initial = saved === 'true' || saved === 'dark';
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.classList.toggle('dark', initial);
+      }
+      return initial;
     } catch (_e) {
       return false;
     }
   });
 
+  const syncStorageAndDom = (next) => {
+    try {
+      appStorage.setItem('mototrack_customer_dark_mode', String(next));
+      appStorage.setItem('mototrack_admin_dark_mode', String(next));
+      appStorage.setItem('mototrack_theme_mode', next ? 'dark' : 'light');
+      if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.classList.toggle('dark', next);
+      }
+    } catch (_e) {}
+  };
+
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => {
       const next = !prev;
-      try {
-        appStorage.setItem('mototrack_customer_dark_mode', String(next));
-        appStorage.setItem('mototrack_theme_mode', next ? 'dark' : 'light');
-        if (typeof document !== 'undefined' && document.documentElement) {
-          document.documentElement.classList.toggle('dark', next);
-        }
-      } catch (_e) {}
+      syncStorageAndDom(next);
       return next;
     });
   };
@@ -38,13 +48,7 @@ export function ThemeProvider({ children }) {
   const setDarkMode = (val) => {
     const next = Boolean(val);
     setIsDarkMode(next);
-    try {
-      appStorage.setItem('mototrack_customer_dark_mode', String(next));
-      appStorage.setItem('mototrack_theme_mode', next ? 'dark' : 'light');
-      if (typeof document !== 'undefined' && document.documentElement) {
-        document.documentElement.classList.toggle('dark', next);
-      }
-    } catch (_e) {}
+    syncStorageAndDom(next);
   };
 
   // Keep DOM class synced on web
@@ -54,9 +58,48 @@ export function ThemeProvider({ children }) {
     }
   }, [isDarkMode]);
 
-  // Color tokens matching admin dark theme and customer profile design system
+  // Color tokens matching MotoTrack global dark theme and customer design system
   const tokens = useMemo(() => {
     if (isDarkMode) {
+      if (Platform.OS === 'web') {
+        return {
+          isDark: true,
+          bgMain: '#111315',
+          bgSidebar: '#18181B',
+          bgTopBar: '#111315',
+          bgContent: '#18181B',
+          bgCard: '#191A1D',
+          bgSub: '#202124',
+          bgSubtle: '#202124',
+          bgElevated: '#202124',
+          bgHover: '#292B2F',
+          inputBg: '#202124',
+          border: '#303236',
+          borderLight: '#292B2F',
+          divider: '#303236',
+          borderInput: '#3A3B40',
+          borderFocus: '#FF5A00',
+          textPrimary: '#F2F2F3',
+          textHeading: '#F5F5F5',
+          textSecondary: '#A1A1AA',
+          textMuted: '#71717A',
+          textDisabled: '#52525B',
+          textSubtle: '#71717A',
+          brandPrimary: '#FF5A00',
+          brandPrimaryDark: '#E95000',
+          brandLight: '#3A241B',
+          brandBorder: '#8A3D19',
+          success: '#00C98D',
+          warning: '#F5B942',
+          error: '#F04444',
+          info: '#3B82F6',
+          headerBg: '#111315',
+          headerBorder: '#303236',
+          cardShadow: '0 1px 3px rgba(0, 0, 0, 0.35)',
+          tagBg: '#3A241B',
+          tagText: '#FF5A00',
+        };
+      }
       return {
         isDark: true,
         bgMain: '#121518',

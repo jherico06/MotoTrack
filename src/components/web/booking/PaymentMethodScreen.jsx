@@ -3,10 +3,11 @@
 // Supports GCash, Credit/Debit Card, and Cash with business rules & drawer
 // =========================================================================
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 
 export default function PaymentMethodScreen({
@@ -23,6 +24,8 @@ export default function PaymentMethodScreen({
   onContinue,
   showToast,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const downpaymentAmount = pricingData?.downpaymentAmount ?? 0;
   const totalAmount = pricingData?.subtotal ?? 0;
 
@@ -130,19 +133,19 @@ export default function PaymentMethodScreen({
             </View>
 
             <View style={{ marginBottom: 10 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 4 }}>
                 Your GCash Mobile Number *
               </Text>
               <TextInput
                 style={{
                   height: 38,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 12,
                   fontSize: 13,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                 }}
                 placeholder="09XX XXX XXXX"
                 placeholderTextColor="#94A3B8"
@@ -154,7 +157,7 @@ export default function PaymentMethodScreen({
 
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155' }}>
                   GCash Reference Code
                 </Text>
                 <TouchableOpacity onPress={handleGenerateFreshGcashRef}>
@@ -166,14 +169,14 @@ export default function PaymentMethodScreen({
               <TextInput
                 style={{
                   height: 38,
-                  backgroundColor: '#F8FAFC',
+                  backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 12,
                   fontSize: 13,
                   fontWeight: '600',
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                 }}
                 value={gcashReference}
                 onChangeText={setGcashReference}
@@ -233,19 +236,19 @@ export default function PaymentMethodScreen({
         {paymentMethod === 'Credit/Debit Card' && (
           <View style={styles.paymentDrawer}>
             <View style={{ marginBottom: 10 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 4 }}>
                 Cardholder Full Name *
               </Text>
               <TextInput
                 style={{
                   height: 38,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 12,
                   fontSize: 13,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                 }}
                 placeholder="Name on card"
                 placeholderTextColor="#94A3B8"
@@ -255,19 +258,19 @@ export default function PaymentMethodScreen({
             </View>
 
             <View style={{ marginBottom: 10 }}>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 4 }}>
                 Card Number *
               </Text>
               <TextInput
                 style={{
                   height: 38,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
-                  borderColor: '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   borderRadius: 8,
                   paddingHorizontal: 12,
                   fontSize: 13,
-                  color: '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                 }}
                 placeholder="4111 2222 3333 4444"
                 placeholderTextColor="#94A3B8"
@@ -279,19 +282,19 @@ export default function PaymentMethodScreen({
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 4 }}>
                   Expiry (MM/YY) *
                 </Text>
                 <TextInput
                   style={{
                     height: 38,
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                     borderWidth: 1,
-                    borderColor: '#CBD5E1',
+                    borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                     borderRadius: 8,
                     paddingHorizontal: 12,
                     fontSize: 13,
-                    color: '#0F172A',
+                    color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   }}
                   placeholder="MM/YY"
                   placeholderTextColor="#94A3B8"
@@ -302,19 +305,19 @@ export default function PaymentMethodScreen({
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#334155', marginBottom: 4 }}>
                   CVV / CVC *
                 </Text>
                 <TextInput
                   style={{
                     height: 38,
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                     borderWidth: 1,
-                    borderColor: '#CBD5E1',
+                    borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                     borderRadius: 8,
                     paddingHorizontal: 12,
                     fontSize: 13,
-                    color: '#0F172A',
+                    color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   }}
                   placeholder="123"
                   placeholderTextColor="#94A3B8"

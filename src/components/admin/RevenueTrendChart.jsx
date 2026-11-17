@@ -298,11 +298,11 @@ export default function RevenueTrendChart({
       style={{
         position: 'relative',
         flexDirection: 'row',
-        backgroundColor: activeIsDark ? '#151C19' : '#F1F5F9',
+        backgroundColor: activeIsDark ? '#202124' : '#F1F5F9',
         borderRadius: 9,
         padding: 3,
         borderWidth: 1,
-        borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
+        borderColor: activeIsDark ? '#303236' : '#E2E8F0',
         width: isDesktop ? 220 : '100%',
       }}
     >
@@ -314,7 +314,7 @@ export default function RevenueTrendChart({
           bottom: 3,
           left: 3,
           width: 'calc((100% - 6px) / 3)',
-          backgroundColor: '#EA580C',
+          backgroundColor: '#FF5A00',
           borderRadius: 6,
           boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
           transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -356,7 +356,7 @@ export default function RevenueTrendChart({
                 fontWeight: active ? '700' : '600',
                 color: active
                   ? '#FFFFFF'
-                  : (activeIsDark ? '#AAB4B0' : '#64748B'),
+                  : (activeIsDark ? '#A1A1AA' : '#64748B'),
                 transition: 'color 200ms ease',
               }}
             >
@@ -373,10 +373,10 @@ export default function RevenueTrendChart({
       ref={containerRef}
       style={[
         {
-          backgroundColor: activeIsDark ? '#24272B' : '#FFFFFF',
+          backgroundColor: activeIsDark ? '#191A1D' : '#FFFFFF',
           borderRadius: 16,
           borderWidth: 1,
-          borderColor: activeIsDark ? '#374151' : '#E5E7EB',
+          borderColor: activeIsDark ? '#303236' : '#E5E7EB',
           padding: 20,
           marginBottom: 20,
           shadowColor: '#000000',
@@ -413,7 +413,7 @@ export default function RevenueTrendChart({
             <BootstrapIcon
               name="graph-up"
               size={15}
-              color="#EA580C"
+              color="#FF5A00"
             />
           </View>
           <View>
@@ -421,13 +421,13 @@ export default function RevenueTrendChart({
               style={{
                 fontSize: 14,
                 fontWeight: '600',
-                color: activeIsDark ? '#F9FAFB' : '#111827',
+                color: activeIsDark ? '#F2F2F3' : '#111827',
                 letterSpacing: 0.2,
               }}
             >
               {title}
             </Text>
-            <Text style={{ fontSize: 11.5, color: activeIsDark ? '#9CA3AF' : '#6B7280', marginTop: 1 }}>
+            <Text style={{ fontSize: 11.5, color: activeIsDark ? '#A1A1AA' : '#6B7280', marginTop: 1 }}>
               {resolvedSubtitle}
             </Text>
           </View>
@@ -440,12 +440,12 @@ export default function RevenueTrendChart({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
-                backgroundColor: activeIsDark ? '#151C19' : '#F8FAFC',
+                backgroundColor: activeIsDark ? '#202124' : '#F8FAFC',
                 paddingHorizontal: 10,
                 paddingVertical: 5,
                 borderRadius: 7,
                 borderWidth: 1,
-                borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
+                borderColor: activeIsDark ? '#303236' : '#E2E8F0',
               }}
             >
               <View
@@ -457,7 +457,7 @@ export default function RevenueTrendChart({
                   borderStyle: 'dashed',
                 }}
               />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#9CA3AF' : '#6B7280' }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#A1A1AA' : '#6B7280' }}>
                 Avg: {formatPeso(avgRev)}/{activeGranularity === 'daily' ? 'day' : activeGranularity === 'weekly' ? 'wk' : 'mo'}
               </Text>
             </View>
@@ -480,12 +480,12 @@ export default function RevenueTrendChart({
                 <linearGradient id="reportsRevTrendGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="0%"
-                    stopColor="#EA580C"
+                    stopColor="#FF5A00"
                     stopOpacity={0.28}
                   />
                   <stop
                     offset="100%"
-                    stopColor="#EA580C"
+                    stopColor="#FF5A00"
                     stopOpacity={0.0}
                   />
                 </linearGradient>
@@ -511,7 +511,7 @@ export default function RevenueTrendChart({
                       textAnchor="end"
                       fontSize="10"
                       fontWeight="600"
-                      fill={activeIsDark ? '#AAB4B0' : '#64748B'}
+                      fill={activeIsDark ? '#A1A1AA' : '#64748B'}
                       fontFamily="inherit"
                     >
                       ₱{val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k` : val}
@@ -542,7 +542,7 @@ export default function RevenueTrendChart({
                 <path
                   d={linePath}
                   fill="none"
-                  stroke="#EA580C"
+                  stroke="#FF5A00"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -556,7 +556,7 @@ export default function RevenueTrendChart({
                   y1={padding.top}
                   x2={activePoint.x}
                   y2={baseline}
-                  stroke="#EA580C"
+                  stroke="#FF5A00"
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
                   strokeOpacity={0.8}
@@ -576,8 +576,8 @@ export default function RevenueTrendChart({
                         cx={p.x}
                         cy={p.y}
                         r={isHovered ? 6 : 3.5}
-                        fill={isHovered || p.revenue <= 0 ? '#EA580C' : (activeIsDark ? '#24272B' : '#FFFFFF')}
-                        stroke="#EA580C"
+                        fill={isHovered || p.revenue <= 0 ? '#FF5A00' : (activeIsDark ? '#191A1D' : '#FFFFFF')}
+                        stroke="#FF5A00"
                         strokeWidth={isHovered ? 2.5 : 2}
                         style={{ transition: 'all 0.15s ease' }}
                       />
@@ -591,7 +591,7 @@ export default function RevenueTrendChart({
                         textAnchor="middle"
                         fontSize="10"
                         fontWeight={isHovered ? '700' : '600'}
-                        fill={isHovered ? (activeIsDark ? '#F5F7F6' : '#0F172A') : (activeIsDark ? '#AAB4B0' : '#64748B')}
+                        fill={isHovered ? (activeIsDark ? '#F5F7F6' : '#0F172A') : (activeIsDark ? '#A1A1AA' : '#64748B')}
                         fontFamily="inherit"
                       >
                         {p.label}
@@ -620,7 +620,7 @@ export default function RevenueTrendChart({
                 style={{
                   height: '100%',
                   width: hasData ? '70%' : '10%',
-                  backgroundColor: '#EA580C',
+                  backgroundColor: '#FF5A00',
                   borderRadius: 3,
                 }}
               />
@@ -638,7 +638,9 @@ export default function RevenueTrendChart({
                   Math.max(10, activePoint.x - 70),
                   Math.max(10, chartWidth - 170)
                 ),
-                backgroundColor: '#24272B',
+                backgroundColor: activeIsDark ? '#202124' : '#24272B',
+                borderWidth: activeIsDark ? 1 : 0,
+                borderColor: '#303236',
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 8,
@@ -676,7 +678,7 @@ export default function RevenueTrendChart({
                     style={{
                       fontSize: 10,
                       fontWeight: '700',
-                      color: activePoint.revenue >= avgRev ? '#4ADE80' : '#F87171',
+                      color: activePoint.revenue >= avgRev ? '#00C98D' : '#F04444',
                     }}
                   >
                     {activePoint.revenue >= avgRev ? '↑' : '↓'}{' '}
@@ -697,11 +699,11 @@ export default function RevenueTrendChart({
           marginTop: 16,
           paddingTop: 14,
           borderTopWidth: 1,
-          borderTopColor: activeIsDark ? '#26332E' : '#E2E8F0',
+          borderTopColor: activeIsDark ? '#303236' : '#E2E8F0',
         }}
       >
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#A1A1AA' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Total
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
@@ -710,31 +712,31 @@ export default function RevenueTrendChart({
         </View>
 
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#A1A1AA' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Average
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(avgRev)}{' '}
-            <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#A1A1AA' : '#64748B' }}>
               /{activeGranularity === 'daily' ? 'day' : activeGranularity === 'weekly' ? 'wk' : 'mo'}
             </Text>
           </Text>
         </View>
 
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#A1A1AA' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Peak Period
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {peakRev > 0 ? formatPeso(peakRev) : '₱0'}{' '}
-            <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#A1A1AA' : '#64748B' }}>
               ({peakLabel})
             </Text>
           </Text>
         </View>
 
         <View style={{ flex: 1, minWidth: 120 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#A1A1AA' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Orders in Period
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   Modal,
   ScrollView,
@@ -63,17 +64,23 @@ export function RiderAvatar({ uri, name, size = 38, palette }) {
 
 export function RiderTopHeader({
   palette,
+  activeTab = 'home',
   riderName,
   riderAvatar,
   unreadCount = 0,
+  activeOrderCount = 0,
+  searchQuery = '',
+  onSearchChange,
+  onCycleFilter,
   onPressLogo,
   onPressNotifications,
+  onPressOrders,
+  onPressScanQr,
   onPressProfile,
 }) {
   const [settings, setSettings] = useState(() =>
     systemSettingsService.getSettings()
   );
-  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     const unsub = systemSettingsService.subscribe((updated) => {
@@ -83,9 +90,216 @@ export function RiderTopHeader({
   }, []);
 
   const storeName = (settings?.storeName || RIDER_BRAND.name).trim();
-  const hubName = settings?.hubName ? settings.hubName.trim() : '';
-  const customLogoUrl =
-    !logoFailed && settings?.storeLogoUrl ? settings.storeLogoUrl.trim() : '';
+  const isHomeTab = activeTab === 'home';
+  const headerBg = palette.isDark ? '#24272B' : '#F7F5F0';
+  const headerBorder = palette.isDark ? '#1A1D20' : '#EDE9E0';
+  const primaryTextColor = palette.isDark ? '#FFFFFF' : '#0F172A';
+  const iconColor = palette.isDark ? '#FFFFFF' : '#0F172A';
+
+  if (isHomeTab) {
+    return (
+      <View
+        style={[
+          styles.shopHeaderRoot,
+          {
+            backgroundColor: headerBg,
+            borderBottomColor: headerBorder,
+            ...(palette.isDark
+              ? {}
+              : {
+                  shadowOpacity: 0.03,
+                  elevation: 1,
+                }),
+          },
+        ]}
+      >
+        <View style={styles.shopHeaderInner}>
+          <View style={styles.shopHeaderWrapper}>
+            <View style={styles.shopHeaderRow}>
+              <TouchableOpacity
+                style={styles.shopHeaderLeft}
+                onPress={onPressProfile}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Open rider profile menu"
+              >
+                <View
+                  style={[
+                    styles.shopAvatarWrap,
+                    !palette.isDark && {
+                      backgroundColor: '#FFFFFF',
+                      borderColor: '#E2E8F0',
+                    },
+                  ]}
+                >
+                  <RiderAvatar
+                    uri={riderAvatar}
+                    name={riderName}
+                    size={35}
+                    palette={palette}
+                  />
+                </View>
+                <View style={styles.shopUserGreetingWrap}>
+                  <View style={styles.shopGreetingNameRow}>
+                    <Text
+                      style={[styles.shopUserName, { color: primaryTextColor }]}
+                      numberOfLines={1}
+                    >
+                      {riderName || 'MotoTrack Rider'}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.shopHeaderRight}>
+                <TouchableOpacity
+                  style={styles.shopHeaderIconBtn}
+                  onPress={onPressNotifications}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    unreadCount > 0
+                      ? `Notifications, ${unreadCount} unread`
+                      : 'Notifications'
+                  }
+                >
+                  <BootstrapIcon name="bell" size={18} color={iconColor} />
+                  {unreadCount > 0 ? (
+                    <View
+                      style={[
+                        styles.shopBadgeDot,
+                        {
+                          backgroundColor: '#EF4444',
+                          borderColor: headerBg,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.shopBadgeDotText}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+
+                {onPressScanQr ? (
+                  <TouchableOpacity
+                    style={styles.shopHeaderIconBtn}
+                    onPress={onPressScanQr}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Scan QR code"
+                  >
+                    <BootstrapIcon
+                      name="qr-code-scan"
+                      size={18}
+                      color={iconColor}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+
+                {onPressOrders ? (
+                  <TouchableOpacity
+                    style={styles.shopHeaderIconBtn}
+                    onPress={onPressOrders}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Active delivery orders"
+                  >
+                    <BootstrapIcon name="box-seam" size={18} color={iconColor} />
+                    {activeOrderCount > 0 ? (
+                      <View
+                        style={[
+                          styles.shopBadgeDot,
+                          {
+                            backgroundColor: '#EA580C',
+                            borderColor: headerBg,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.shopBadgeDotText}>
+                          {activeOrderCount > 9 ? '9+' : activeOrderCount}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          </View>
+
+          {typeof onSearchChange === 'function' ? (
+            <View style={styles.shopSearchSection}>
+              <View
+                style={[
+                  styles.shopSearchBarPill,
+                  !palette.isDark && {
+                    backgroundColor: '#FFFFFF',
+                    borderColor: '#E2E8F0',
+                  },
+                ]}
+              >
+                <BootstrapIcon
+                  name="search"
+                  size={15}
+                  color={palette.isDark ? '#FFFFFF' : '#64748B'}
+                  style={{ marginRight: 8 }}
+                />
+                <TextInput
+                  style={[
+                    styles.shopSearchInput,
+                    !palette.isDark && { color: '#0F172A' },
+                  ]}
+                  placeholder="Search orders, customer, or address..."
+                  placeholderTextColor={
+                    palette.isDark ? 'rgba(255, 255, 255, 0.45)' : '#94A3B8'
+                  }
+                  value={searchQuery}
+                  onChangeText={onSearchChange}
+                  autoCapitalize="none"
+                  returnKeyType="search"
+                />
+                {searchQuery ? (
+                  <TouchableOpacity
+                    style={styles.shopFilterBtnInside}
+                    onPress={() => onSearchChange('')}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Clear search"
+                  >
+                    <BootstrapIcon
+                      name="x-circle-fill"
+                      size={15}
+                      color={palette.isDark ? '#FFFFFF' : '#64748B'}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+                {onCycleFilter ? (
+                  <TouchableOpacity
+                    style={styles.shopFilterBtnInside}
+                    onPress={onCycleFilter}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Cycle order filter"
+                  >
+                    <BootstrapIcon
+                      name="sliders"
+                      size={16}
+                      color={palette.isDark ? '#FFFFFF' : '#475569'}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
+  const pageTitle =
+    activeTab === 'orders'
+      ? 'Orders'
+      : activeTab === 'earnings'
+        ? 'Earnings'
+        : 'Account';
 
   return (
     <View
@@ -93,89 +307,30 @@ export function RiderTopHeader({
         styles.headerWrap,
         {
           backgroundColor: palette.bgHeader,
-          borderBottomColor: palette.headerBorder || palette.border,
         },
       ]}
     >
-      {/* Left: Logo & App/Shop Name */}
+      {/* Left: Customer-Style Eyebrow + Page Title */}
       <TouchableOpacity
         style={styles.brandBtn}
         onPress={onPressLogo}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel={`${storeName} Home`}
+        accessibilityLabel={`${storeName} ${pageTitle}`}
       >
-        <View
-          style={[
-            styles.logoBox,
-            {
-              backgroundColor: customLogoUrl ? 'transparent' : palette.orange,
-              borderColor: customLogoUrl
-                ? palette.headerBtnBorder
-                : 'transparent',
-              borderWidth: customLogoUrl ? 1 : 0,
-            },
-          ]}
-        >
-          {customLogoUrl ? (
-            <Image
-              source={{ uri: customLogoUrl }}
-              style={styles.logoImage}
-              resizeMode="contain"
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            <Image
-              source={require('../../../../assets/emblem.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-
         <View style={styles.brandTextColumn}>
-          <View style={styles.brandNameRow}>
-            {storeName.toLowerCase() === 'mototrack' ? (
-              <Text style={styles.brandWordmark}>
-                <Text style={{ color: '#FFFFFF' }}>Moto</Text>
-                <Text style={{ color: palette.orange }}>Track</Text>
-              </Text>
-            ) : (
-              <Text
-                style={[
-                  styles.brandWordmark,
-                  { color: palette.headerText || '#FFFFFF' },
-                ]}
-                numberOfLines={1}
-              >
-                {storeName}
-              </Text>
-            )}
-            <View
-              style={[
-                styles.riderPill,
-                {
-                  backgroundColor: palette.orangeSoft,
-                  borderColor: palette.orangeBorder,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.riderPillText, { color: palette.orangeText }]}
-              >
-                RIDER
-              </Text>
-            </View>
-          </View>
-
-          {hubName ? (
-            <Text
-              style={[styles.shopSubtitle, { color: palette.textMuted }]}
-              numberOfLines={1}
-            >
-              {hubName}
-            </Text>
-          ) : null}
+          <Text style={[styles.headerEyebrow, { color: palette.orange }]}>
+            {storeName.toUpperCase()} RIDER
+          </Text>
+          <Text
+            style={[
+              styles.headerPageTitle,
+              { color: palette.headerText || palette.textPrimary },
+            ]}
+            numberOfLines={1}
+          >
+            {pageTitle}
+          </Text>
         </View>
       </TouchableOpacity>
 
@@ -184,8 +339,8 @@ export function RiderTopHeader({
           style={[
             styles.notifBtn,
             {
-              backgroundColor: palette.headerBtnBg || '#2C3134',
-              borderColor: palette.headerBtnBorder || '#3A4044',
+              backgroundColor: palette.headerBtnBg,
+              borderColor: palette.headerBtnBorder,
             },
           ]}
           onPress={onPressNotifications}
@@ -200,7 +355,7 @@ export function RiderTopHeader({
           <BootstrapIcon
             name="bell"
             size={18}
-            color={palette.headerBtnIcon || '#FFFFFF'}
+            color={palette.headerBtnIcon || palette.textPrimary}
           />
           {unreadCount > 0 ? (
             <View
@@ -208,7 +363,7 @@ export function RiderTopHeader({
                 styles.unreadDot,
                 {
                   backgroundColor: palette.orange,
-                  borderColor: palette.bgHeader,
+                  borderColor: palette.headerBtnBg,
                 },
               ]}
             />
@@ -218,14 +373,20 @@ export function RiderTopHeader({
         <TouchableOpacity
           onPress={onPressProfile}
           activeOpacity={0.8}
-          style={styles.avatarTouch}
+          style={[
+            styles.avatarTouch,
+            {
+              backgroundColor: palette.headerBtnBg,
+              borderColor: palette.headerBtnBorder,
+            },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Open rider profile menu"
         >
           <RiderAvatar
             uri={riderAvatar}
             name={riderName}
-            size={38}
+            size={36}
             palette={palette}
           />
         </TouchableOpacity>
@@ -685,68 +846,179 @@ export function RiderNotificationsModal({
 }
 
 const styles = StyleSheet.create({
+  shopHeaderRoot: {
+    backgroundColor: '#24272B',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1D20',
+    zIndex: 1000,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.22)' }
+      : {
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.22,
+          shadowRadius: 5,
+        }),
+    elevation: 8,
+  },
+  shopHeaderInner: {
+    width: '100%',
+    maxWidth: 1320,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'web' ? 10 : 4,
+    paddingBottom: 10,
+  },
+  shopHeaderWrapper: {
+    backgroundColor: 'transparent',
+    paddingTop: 2,
+    paddingBottom: 6,
+  },
+  shopHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  shopHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 10,
+  },
+  shopAvatarWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: '#32373D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopUserGreetingWrap: {
+    justifyContent: 'center',
+    flexShrink: 1,
+  },
+  shopGreetingSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '400',
+    fontFamily: RIDER_FONT,
+  },
+  shopGreetingNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 1,
+  },
+  shopUserName: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+    fontFamily: RIDER_FONT,
+  },
+  shopHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shopHeaderIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  shopBadgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#24272B',
+  },
+  shopBadgeDotText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '700',
+    fontFamily: RIDER_FONT,
+  },
+  shopSearchSection: {
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  shopSearchBarPill: {
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  shopSearchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    color: '#FFFFFF',
+    fontWeight: '400',
+    fontFamily: RIDER_FONT,
+    paddingVertical: 0,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+  },
+  shopFilterBtnInside: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
   headerWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 0,
   },
   brandBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     minHeight: 40,
     flex: 1,
     marginRight: 10,
-  },
-  logoBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  logoImage: {
-    width: 30,
-    height: 30,
   },
   brandTextColumn: {
     justifyContent: 'center',
     flexShrink: 1,
   },
-  brandNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  brandWordmark: {
-    fontFamily: RIDER_FONT,
-    fontSize: 17.5,
-    lineHeight: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  riderPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-    borderWidth: 1,
-  },
-  riderPillText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 9.5,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  shopSubtitle: {
+  headerEyebrow: {
     fontFamily: RIDER_FONT,
     fontSize: 10.5,
-    fontWeight: '500',
-    letterSpacing: -0.1,
-    marginTop: 0.5,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  headerPageTitle: {
+    fontFamily: RIDER_FONT,
+    fontSize: 26,
+    lineHeight: 31,
+    fontWeight: '700',
+    letterSpacing: -0.6,
   },
   headerActions: {
     flexDirection: 'row',
@@ -756,26 +1028,37 @@ const styles = StyleSheet.create({
   notifBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   unreadDot: {
     position: 'absolute',
     top: 8,
-    right: 8,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    borderWidth: 1.5,
+    right: 9,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   avatarTouch: {
-    minWidth: 40,
-    minHeight: 40,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   avatarCircle: {
     alignItems: 'center',

@@ -90,7 +90,7 @@ export default function RequireLoginModal({
             accessibilityRole="button"
             accessibilityLabel="Close sign in prompt"
           >
-            <BootstrapIcon name="x" size={20} color={isDarkMode ? '#CBD5E1' : '#64748B'} />
+            <BootstrapIcon name="x" size={20} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
           </TouchableOpacity>
 
           {/* Icon Badge */}
@@ -110,7 +110,7 @@ export default function RequireLoginModal({
           <Text
             style={[
               styles.modalTitle,
-              { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
+              { color: isDarkMode ? '#F2F2F3' : '#0F172A' },
             ]}
           >
             {title}
@@ -119,7 +119,7 @@ export default function RequireLoginModal({
           <Text
             style={[
               styles.modalMessage,
-              { color: isDarkMode ? '#94A3B8' : '#475569' },
+              { color: isDarkMode ? '#A1A1AA' : '#475569' },
             ]}
           >
             {message}
@@ -131,19 +131,19 @@ export default function RequireLoginModal({
               styles.benefitsBox,
               {
                 backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
-                borderColor: isDarkMode ? '#334155' : '#EEF2F6',
+                borderColor: isDarkMode ? '#3A3B40' : '#EEF2F6',
               },
             ]}
           >
             <View style={styles.benefitRow}>
               <BootstrapIcon name="check-circle-fill" size={13} color="#16A34A" />
-              <Text style={[styles.benefitText, { color: isDarkMode ? '#CBD5E1' : '#334155' }]}>
+              <Text style={[styles.benefitText, { color: isDarkMode ? '#A1A1AA' : '#334155' }]}>
                 Real-time pit booking telemetry & order status
               </Text>
             </View>
             <View style={styles.benefitRow}>
               <BootstrapIcon name="check-circle-fill" size={13} color="#16A34A" />
-              <Text style={[styles.benefitText, { color: isDarkMode ? '#CBD5E1' : '#334155' }]}>
+              <Text style={[styles.benefitText, { color: isDarkMode ? '#A1A1AA' : '#334155' }]}>
                 Save motorcycles to your garage for instant fitment check
               </Text>
             </View>
@@ -180,12 +180,12 @@ export default function RequireLoginModal({
               <BootstrapIcon
                 name="person-plus"
                 size={15}
-                color={isDarkMode ? '#E2E8F0' : '#1E293B'}
+                color={isDarkMode ? '#F2F2F3' : '#1E293B'}
               />
               <Text
                 style={[
                   styles.secondaryBtnText,
-                  { color: isDarkMode ? '#E2E8F0' : '#1E293B' },
+                  { color: isDarkMode ? '#F2F2F3' : '#1E293B' },
                 ]}
               >
                 Create Account
@@ -201,7 +201,7 @@ export default function RequireLoginModal({
               <Text
                 style={[
                   styles.tertiaryBtnText,
-                  { color: isDarkMode ? '#94A3B8' : '#64748B' },
+                  { color: isDarkMode ? '#A1A1AA' : '#64748B' },
                 ]}
               >
                 Continue Browsing

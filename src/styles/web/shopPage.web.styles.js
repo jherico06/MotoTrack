@@ -1,18 +1,18 @@
 import { StyleSheet } from 'react-native';
 
 export function createShopWebStyles(isDark = false) {
-  const bgMain = isDark ? '#121518' : '#F3F4F6';
-  const bgCard = isDark ? '#1C2025' : '#FFFFFF';
-  const bgSub = isDark ? '#181B1F' : '#F1F5F9';
-  const _bgHover = isDark ? '#252A30' : '#F1F5F9';
-  const border = isDark ? '#282D34' : '#E2E8F0';
-  const textPrimary = isDark ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDark ? '#CBD5E1' : '#334155';
-  const textMuted = isDark ? '#94A3B8' : '#64748B';
-  const headerBg = isDark ? '#181B1F' : '#1E2227';
-  const brandPrimary = '#FF5A0A';
-  const footerBg = '#13161A';
-  const footerBorder = isDark ? '#242A30' : 'rgba(255, 255, 255, 0.08)';
+  const bgMain = isDark ? '#111315' : '#F3F4F6';
+  const bgCard = isDark ? '#191A1D' : '#FFFFFF';
+  const bgSub = isDark ? '#202124' : '#F1F5F9';
+  const _bgHover = isDark ? '#292B2F' : '#F1F5F9';
+  const border = isDark ? '#303236' : '#E2E8F0';
+  const textPrimary = isDark ? '#F2F2F3' : '#0F172A';
+  const textSecondary = isDark ? '#A1A1AA' : '#334155';
+  const textMuted = isDark ? '#71717A' : '#64748B';
+  const headerBg = isDark ? '#111315' : '#1E2227';
+  const brandPrimary = '#FF5A00';
+  const footerBg = isDark ? '#111315' : '#13161A';
+  const footerBorder = isDark ? '#303236' : 'rgba(255, 255, 255, 0.08)';
   const footerTextPrimary = '#FFFFFF';
   const footerTextMuted = '#94A3B8';
 
@@ -45,7 +45,7 @@ export function createShopWebStyles(isDark = false) {
       boxSizing: 'border-box',
     },
     headerInner: {
-      maxWidth: 1360,
+      maxWidth: '100%',
       marginHorizontal: 'auto',
       width: '100%',
       paddingHorizontal: 24,
@@ -502,7 +502,7 @@ export function createShopWebStyles(isDark = false) {
       paddingHorizontal: 0,
     },
     maxContainer: {
-      maxWidth: 1360,
+      maxWidth: '100%',
       marginHorizontal: 'auto',
       width: '100%',
       paddingHorizontal: 24,
@@ -919,7 +919,7 @@ export function createShopWebStyles(isDark = false) {
       width: '100%',
     },
     footerInner: {
-      maxWidth: 1360,
+      maxWidth: '100%',
       marginHorizontal: 'auto',
       width: '100%',
       paddingTop: 52,

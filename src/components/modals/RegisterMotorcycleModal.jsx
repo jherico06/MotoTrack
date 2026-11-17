@@ -78,11 +78,11 @@ export default function RegisterMotorcycleModal({
 
   if (!visible) return null;
 
-  const bgModal = isDarkMode ? '#0F172A' : '#FFFFFF';
-  const bgInput = isDarkMode ? '#1E293B' : '#F8FAFC';
-  const borderCol = isDarkMode ? '#334155' : '#E2E8F0';
-  const textMain = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const bgModal = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const bgInput = isDarkMode ? '#202124' : '#F8FAFC';
+  const borderCol = isDarkMode ? '#3A3B40' : '#E2E8F0';
+  const textMain = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
 
   const handleUploadPhoto = async () => {
     setErrorMessage('');

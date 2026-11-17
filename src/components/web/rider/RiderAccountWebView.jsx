@@ -565,7 +565,7 @@ export default function RiderAccountWebView({
                   <Text
                     style={[
                       styles.ratingText,
-                      { color: palette.isDark ? '#FBBF24' : '#B45309' },
+                      { color: palette.isDark ? '#F5B942' : '#B45309' },
                     ]}
                   >
                     {Number(riderProfile?.rating || 5.0).toFixed(1)} Rating

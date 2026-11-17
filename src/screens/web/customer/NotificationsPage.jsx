@@ -56,62 +56,62 @@ function formatFullDate(isoString) {
   }
 }
 
-function getCategoryConfig(notif) {
+function getCategoryConfig(notif, isDarkMode = false) {
   const cat = String(notif.category || notif.type || '').toLowerCase();
 
   if (cat.includes('booking') || cat.includes('service') || cat.includes('garage') || cat.includes('pit')) {
     return {
       label: 'Booking',
       icon: 'calendar-check',
-      bg: '#FDF4E7',
-      color: '#D97706',
+      bg: isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FDF4E7',
+      color: isDarkMode ? '#F5B942' : '#D97706',
     };
   }
   if (cat.includes('order') || cat.includes('dispatch') || cat.includes('ship')) {
     return {
       label: 'Order',
       icon: 'box-seam',
-      bg: '#EFF6FF',
-      color: '#2563EB',
+      bg: isDarkMode ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF',
+      color: isDarkMode ? '#3B82F6' : '#2563EB',
     };
   }
   if (cat.includes('payment') || cat.includes('paid') || cat.includes('spend')) {
     return {
       label: 'Payment',
       icon: 'credit-card-2-front',
-      bg: '#ECFDF5',
-      color: '#059669',
+      bg: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+      color: isDarkMode ? '#00C98D' : '#059669',
     };
   }
   if (cat.includes('stock') || cat.includes('inventory') || cat.includes('restock')) {
     return {
       label: 'Inventory',
       icon: 'exclamation-diamond',
-      bg: '#FEF2F2',
-      color: '#DC2626',
+      bg: isDarkMode ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
+      color: isDarkMode ? '#F04444' : '#DC2626',
     };
   }
   if (cat.includes('security') || cat.includes('system') || cat.includes('alert')) {
     return {
       label: 'System',
       icon: 'shield-exclamation',
-      bg: '#F3E8FF',
-      color: '#7C3AED',
+      bg: isDarkMode ? 'rgba(168, 85, 247, 0.14)' : '#F3E8FF',
+      color: isDarkMode ? '#C084FC' : '#7C3AED',
     };
   }
   if (cat.includes('promo') || cat.includes('discount')) {
     return {
       label: 'Promotion',
       icon: 'ticket-perforated',
-      bg: '#FEF3C7',
-      color: '#D97706',
+      bg: isDarkMode ? '#3A241B' : '#FEF3C7',
+      color: isDarkMode ? '#FF5A00' : '#D97706',
     };
   }
   return {
     label: notif.categoryLabel || 'Notice',
     icon: 'bell',
-    bg: '#F4F3F0',
-    color: '#6B6862',
+    bg: isDarkMode ? '#202124' : '#F4F3F0',
+    color: isDarkMode ? '#A1A1AA' : '#6B6862',
   };
 }
 
@@ -339,10 +339,10 @@ export default function NotificationsPage({
   );
 
   return (
-    <SafeAreaView style={[styles.pageWrapper, { backgroundColor: isDarkMode ? '#0E1311' : '#F3F4F6' }]}>
+    <SafeAreaView style={[styles.pageWrapper, { backgroundColor: isDarkMode ? '#111315' : '#F3F4F6' }]}>
       {/* Toast Alert */}
       {Boolean(toastMessage) && (
-        <View style={styles.toast}>
+        <View style={[styles.toast, isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }]}>
           <Text style={styles.toastText}>{toastMessage}</Text>
         </View>
       )}
@@ -352,19 +352,23 @@ export default function NotificationsPage({
         <View style={styles.topHeader}>
           <View style={styles.headerLeft}>
             {onNavigateBack && (
-              <TouchableOpacity style={styles.backBtn} onPress={onNavigateBack} activeOpacity={0.7}>
-                <BootstrapIcon name="chevron-left" size={14} color="#52525B" />
-                <Text style={styles.backBtnText}>Back</Text>
+              <TouchableOpacity
+                style={[styles.backBtn, isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }]}
+                onPress={onNavigateBack}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="chevron-left" size={14} color={isDarkMode ? '#A1A1AA' : '#52525B'} />
+                <Text style={[styles.backBtnText, isDarkMode && { color: '#F2F2F3' }]}>Back</Text>
               </TouchableOpacity>
             )}
 
             <View style={styles.pageTitleGroup}>
-              <Text style={[styles.pageTitle, { color: isDarkMode ? '#F4F4F5' : '#18181B' }]}>
+              <Text style={[styles.pageTitle, { color: isDarkMode ? '#F5F5F5' : '#18181B' }]}>
                 Notifications
               </Text>
               {totalUnread > 0 && (
-                <View style={styles.unreadBadgePill}>
-                  <Text style={styles.unreadBadgePillText}>{totalUnread} UNREAD</Text>
+                <View style={[styles.unreadBadgePill, isDarkMode && { backgroundColor: '#3A241B', borderWidth: 1, borderColor: '#8A3D19' }]}>
+                  <Text style={[styles.unreadBadgePillText, isDarkMode && { color: '#FF5A00' }]}>{totalUnread} UNREAD</Text>
                 </View>
               )}
             </View>
@@ -372,30 +376,38 @@ export default function NotificationsPage({
 
           <View style={styles.headerRight}>
             <TouchableOpacity
-              style={styles.pillActionBtn}
+              style={[styles.pillActionBtn, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}
               onPress={() => handleSyncDatabase(true)}
               disabled={isSyncing}
               activeOpacity={0.7}
             >
               {isSyncing ? (
-                <ActivityIndicator size="small" color="#18181B" />
+                <ActivityIndicator size="small" color={isDarkMode ? '#F2F2F3' : '#18181B'} />
               ) : (
-                <BootstrapIcon name="arrow-repeat" size={13} color="#52525B" />
+                <BootstrapIcon name="arrow-repeat" size={13} color={isDarkMode ? '#A1A1AA' : '#52525B'} />
               )}
-              <Text style={styles.pillActionBtnText}>{isSyncing ? 'Syncing...' : 'Sync Data'}</Text>
+              <Text style={[styles.pillActionBtnText, isDarkMode && { color: '#F2F2F3' }]}>{isSyncing ? 'Syncing...' : 'Sync Data'}</Text>
             </TouchableOpacity>
 
             {notifications.length > 0 && (
-              <TouchableOpacity style={styles.pillActionBtn} onPress={handleMarkAllRead} activeOpacity={0.7}>
-                <BootstrapIcon name="check2-all" size={14} color="#52525B" />
-                <Text style={styles.pillActionBtnText}>Mark all read</Text>
+              <TouchableOpacity
+                style={[styles.pillActionBtn, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}
+                onPress={handleMarkAllRead}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="check2-all" size={14} color={isDarkMode ? '#A1A1AA' : '#52525B'} />
+                <Text style={[styles.pillActionBtnText, isDarkMode && { color: '#F2F2F3' }]}>Mark all read</Text>
               </TouchableOpacity>
             )}
 
             {statsHaveMock(notifications) && (
-              <TouchableOpacity style={styles.pillActionBtn} onPress={handleClearSampleAlerts} activeOpacity={0.7}>
-                <BootstrapIcon name="trash3" size={13} color="#D97706" />
-                <Text style={[styles.pillActionBtnText, { color: '#D97706' }]}>Clear Mock</Text>
+              <TouchableOpacity
+                style={[styles.pillActionBtn, isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' }]}
+                onPress={handleClearSampleAlerts}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="trash3" size={13} color={isDarkMode ? '#F5B942' : '#D97706'} />
+                <Text style={[styles.pillActionBtnText, { color: isDarkMode ? '#F5B942' : '#D97706' }]}>Clear Mock</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -403,39 +415,67 @@ export default function NotificationsPage({
 
         {/* Search & Filter Bar */}
         <View style={styles.controlsBar}>
-          <View style={[styles.searchBox, { backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF' }]}>
-            <BootstrapIcon name="search" size={14} color="#A1A1AA" />
+          <View
+            style={[
+              styles.searchBox,
+              {
+                backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
+                borderColor: isDarkMode ? '#3A3B40' : '#E4E4E7',
+              },
+            ]}
+          >
+            <BootstrapIcon name="search" size={14} color={isDarkMode ? '#71717A' : '#A1A1AA'} />
             <TextInput
-              style={[styles.searchInput, { color: isDarkMode ? '#F4F4F5' : '#18181B' }]}
+              style={[styles.searchInput, { color: isDarkMode ? '#F2F2F3' : '#18181B' }]}
               placeholder="Search notifications..."
-              placeholderTextColor="#A1A1AA"
+              placeholderTextColor={isDarkMode ? '#71717A' : '#A1A1AA'}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {Boolean(searchQuery) && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <BootstrapIcon name="x-circle-fill" size={14} color="#A1A1AA" />
+                <BootstrapIcon name="x-circle-fill" size={14} color={isDarkMode ? '#71717A' : '#A1A1AA'} />
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.filterPills}>
             <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'all' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+                activeFilter === 'all' && (isDarkMode ? { backgroundColor: '#FF5A00', borderColor: '#FF5A00' } : styles.filterPillActive),
+              ]}
               onPress={() => setActiveFilter('all')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.filterPillText, activeFilter === 'all' && styles.filterPillTextActive]}>
+              <Text
+                style={[
+                  styles.filterPillText,
+                  isDarkMode && { color: '#A1A1AA' },
+                  activeFilter === 'all' && styles.filterPillTextActive,
+                ]}
+              >
                 All ({notifications.length})
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'unread' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+                activeFilter === 'unread' && (isDarkMode ? { backgroundColor: '#FF5A00', borderColor: '#FF5A00' } : styles.filterPillActive),
+              ]}
               onPress={() => setActiveFilter('unread')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.filterPillText, activeFilter === 'unread' && styles.filterPillTextActive]}>
+              <Text
+                style={[
+                  styles.filterPillText,
+                  isDarkMode && { color: '#A1A1AA' },
+                  activeFilter === 'unread' && styles.filterPillTextActive,
+                ]}
+              >
                 Unread ({totalUnread})
               </Text>
             </TouchableOpacity>
@@ -444,21 +484,21 @@ export default function NotificationsPage({
 
         {/* Grouped Notifications List */}
         {groupedSections.length === 0 ? (
-          <View style={[styles.emptyCard, isDarkMode && { backgroundColor: '#1C1C1F', borderColor: '#3F3F46' }]}>
-            <View style={[styles.emptyIconCircle, isDarkMode && { backgroundColor: '#27272A' }]}>
-              <BootstrapIcon name="bell-slash" size={26} color="#A1A1AA" />
+          <View style={[styles.emptyCard, isDarkMode && { backgroundColor: '#191A1D', borderColor: '#303236' }]}>
+            <View style={[styles.emptyIconCircle, isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }]}>
+              <BootstrapIcon name="bell-slash" size={26} color={isDarkMode ? '#71717A' : '#A1A1AA'} />
             </View>
-            <Text style={[styles.emptyTitle, isDarkMode && { color: '#F4F4F5' }]}>No notifications</Text>
-            <Text style={[styles.emptySubtitle, isDarkMode && { color: '#D4D4D8' }]}>You're all caught up.</Text>
+            <Text style={[styles.emptyTitle, isDarkMode && { color: '#F5F5F5' }]}>No notifications</Text>
+            <Text style={[styles.emptySubtitle, isDarkMode && { color: '#A1A1AA' }]}>You're all caught up.</Text>
           </View>
         ) : (
           groupedSections.map((section) => (
             <View key={section.key} style={styles.sectionContainer}>
-              {/* Group Section Header matching Reference Screenshot 1 */}
+              {/* Group Section Header */}
               <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, isDarkMode && { color: '#D4D4D8' }]}>{section.title}</Text>
-                <View style={[styles.sectionBadgeCircle, isDarkMode && { backgroundColor: '#27272A' }]}>
-                  <Text style={[styles.sectionBadgeText, isDarkMode && { color: '#F4F4F5' }]}>{section.count}</Text>
+                <Text style={[styles.sectionTitle, isDarkMode && { color: '#A1A1AA' }]}>{section.title}</Text>
+                <View style={[styles.sectionBadgeCircle, isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }]}>
+                  <Text style={[styles.sectionBadgeText, isDarkMode && { color: '#F2F2F3' }]}>{section.count}</Text>
                 </View>
               </View>
 
@@ -467,7 +507,7 @@ export default function NotificationsPage({
                 {section.items.map((notif) => {
                   const isExpanded = expandedCardIds.has(notif.id);
                   const isUnread = notif.status === 'unread';
-                  const config = getCategoryConfig(notif);
+                  const config = getCategoryConfig(notif, isDarkMode);
 
                   return (
                     <View
@@ -476,8 +516,8 @@ export default function NotificationsPage({
                         styles.cardContainer,
                         isUnread && styles.cardUnread,
                         {
-                          backgroundColor: isDarkMode ? '#1C1C1F' : '#FFFFFF',
-                          borderColor: isDarkMode ? '#3F3F46' : '#E4E4E7',
+                          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+                          borderColor: isDarkMode ? (isUnread ? '#3A3B40' : '#303236') : (isUnread ? '#D4D4D8' : '#E4E4E7'),
                         },
                       ]}
                     >
@@ -489,7 +529,16 @@ export default function NotificationsPage({
                       >
                         <View style={styles.cardHeaderLeft}>
                           {/* Soft circular icon container */}
-                          <View style={[styles.iconCircle, { backgroundColor: config.bg }]}>
+                          <View
+                            style={[
+                              styles.iconCircle,
+                              {
+                                backgroundColor: config.bg,
+                                borderWidth: isDarkMode ? 1 : 0,
+                                borderColor: isDarkMode ? '#303236' : 'transparent',
+                              },
+                            ]}
+                          >
                             <BootstrapIcon name={config.icon} size={15} color={config.color} />
                           </View>
 
@@ -499,19 +548,19 @@ export default function NotificationsPage({
                                 style={[
                                   styles.cardTitle,
                                   isUnread && styles.cardTitleUnread,
-                                  isDarkMode && { color: '#F4F4F5' },
+                                  isDarkMode && { color: '#F2F2F3' },
                                 ]}
                               >
                                 {stripEmojis(notif.title)}
                               </Text>
                               {isUnread && (
-                                <View style={[styles.unreadDot, isDarkMode && { backgroundColor: '#4ADE80' }]} />
+                                <View style={[styles.unreadDot, isDarkMode && { backgroundColor: '#FF5A00' }]} />
                               )}
                             </View>
 
                             {!isExpanded && (
                               <Text
-                                style={[styles.cardPreviewText, isDarkMode && { color: '#D4D4D8' }]}
+                                style={[styles.cardPreviewText, isDarkMode && { color: '#A1A1AA' }]}
                                 numberOfLines={1}
                               >
                                 {stripEmojis(notif.message)}
@@ -521,14 +570,14 @@ export default function NotificationsPage({
                         </View>
 
                         <View style={styles.cardHeaderRight}>
-                          <Text style={[styles.relativeTimeText, isDarkMode && { color: '#C4C4CC' }]}>
+                          <Text style={[styles.relativeTimeText, isDarkMode && { color: '#71717A' }]}>
                             {formatRelativeTime(notif.created_at)}
                           </Text>
                           <View style={styles.chevronWrap}>
                             <BootstrapIcon
                               name={isExpanded ? 'chevron-up' : 'chevron-down'}
                               size={14}
-                              color="#8E8E93"
+                              color={isDarkMode ? '#71717A' : '#8E8E93'}
                             />
                           </View>
                         </View>
@@ -537,16 +586,16 @@ export default function NotificationsPage({
                       {/* Expanded Card Body */}
                       {isExpanded && (
                         <View style={styles.cardExpandedBody}>
-                          <Text style={[styles.cardFullMessage, isDarkMode && { color: '#E4E4E7' }]}>
+                          <Text style={[styles.cardFullMessage, isDarkMode && { color: '#F2F2F3' }]}>
                             {stripEmojis(notif.message)}
                           </Text>
 
                           {/* Subtle Divider Line */}
-                          <View style={[styles.cardDivider, isDarkMode && { backgroundColor: '#3F3F46' }]} />
+                          <View style={[styles.cardDivider, isDarkMode && { backgroundColor: '#303236' }]} />
 
                           {/* Footer */}
                           <View style={styles.cardFooterRow}>
-                            <Text style={[styles.cardMetadataText, isDarkMode && { color: '#C4C4CC' }]}>
+                            <Text style={[styles.cardMetadataText, isDarkMode && { color: '#71717A' }]}>
                               {formatFullDate(notif.created_at)} · {config.label}
                             </Text>
 
@@ -555,8 +604,8 @@ export default function NotificationsPage({
                               onPress={(e) => handleDeleteSingle(notif.id, e)}
                               activeOpacity={0.7}
                             >
-                              <BootstrapIcon name="trash3" size={13} color="#71717A" />
-                              <Text style={[styles.dismissBtnText, isDarkMode && { color: '#E4E4E7' }]}>Dismiss</Text>
+                              <BootstrapIcon name="trash3" size={13} color={isDarkMode ? '#A1A1AA' : '#71717A'} />
+                              <Text style={[styles.dismissBtnText, isDarkMode && { color: '#A1A1AA' }]}>Dismiss</Text>
                             </TouchableOpacity>
                           </View>
                         </View>

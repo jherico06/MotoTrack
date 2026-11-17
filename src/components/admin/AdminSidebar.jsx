@@ -178,29 +178,29 @@ export default function AdminSidebar({
     setAvatarLoadError(false);
   }, [userAvatarUri]);
 
-  // ─── Theme Colors: MotoTrack Charcoal (#24272B) + Racing Orange (#EA580C) ───
+  // ─── Theme Colors: MotoTrack Charcoal (#24272B) + Racing Orange (#FF5A00) ───
   const theme = useMemo(() => {
     return {
-      bg: '#24272B', // Charcoal sidebar
-      border: 'rgba(255, 255, 255, 0.10)',
-      divider: 'rgba(255, 255, 255, 0.10)',
-      activeBg: 'rgba(234, 88, 12, 0.16)', // Warm dark charcoal with orange undertone
-      activeAccent: '#EA580C', // Deep racing orange accent
-      activeIcon: '#EA580C', // Orange icon when active
+      bg: isDarkMode ? '#191A1D' : '#24272B',
+      border: isDarkMode ? '#303236' : 'rgba(255, 255, 255, 0.10)',
+      divider: isDarkMode ? '#303236' : 'rgba(255, 255, 255, 0.10)',
+      activeBg: isDarkMode ? '#3A241B' : 'rgba(234, 88, 12, 0.16)',
+      activeAccent: isDarkMode ? '#FF5A00' : '#EA580C',
+      activeIcon: isDarkMode ? '#FF5A00' : '#EA580C',
       activeText: '#FFFFFF',
-      textPrimary: '#FFFFFF',
-      textSecondary: '#9CA3AF', // Muted gray icons and text for inactive navigation items (turns #FFFFFF on hover)
-      sectionLabel: '#6B7280', // Subtle muted section label
-      hoverBg: 'rgba(255, 255, 255, 0.08)',
-      profileBg: 'rgba(255, 255, 255, 0.08)',
-      profileHoverBg: 'rgba(255, 255, 255, 0.14)',
-      profileBorder: 'rgba(255, 255, 255, 0.12)',
-      badgeBg: 'rgba(255, 255, 255, 0.14)',
-      badgeActiveBg: 'rgba(255, 255, 255, 0.25)',
-      badgeBorder: 'rgba(255, 255, 255, 0.20)',
+      textPrimary: isDarkMode ? '#F2F2F3' : '#FFFFFF',
+      textSecondary: isDarkMode ? '#A1A1AA' : '#9CA3AF',
+      sectionLabel: isDarkMode ? '#71717A' : '#6B7280',
+      hoverBg: isDarkMode ? '#202124' : 'rgba(255, 255, 255, 0.08)',
+      profileBg: isDarkMode ? '#202124' : 'rgba(255, 255, 255, 0.08)',
+      profileHoverBg: isDarkMode ? '#292B2F' : 'rgba(255, 255, 255, 0.14)',
+      profileBorder: isDarkMode ? '#303236' : 'rgba(255, 255, 255, 0.12)',
+      badgeBg: isDarkMode ? '#202124' : 'rgba(255, 255, 255, 0.14)',
+      badgeActiveBg: isDarkMode ? '#3A241B' : 'rgba(255, 255, 255, 0.25)',
+      badgeBorder: isDarkMode ? '#303236' : 'rgba(255, 255, 255, 0.20)',
       badgeText: '#FFFFFF',
-      warningBg: '#EA580C',
-      dangerBg: '#EF4444',
+      warningBg: isDarkMode ? '#FF5A00' : '#EA580C',
+      dangerBg: isDarkMode ? '#F04444' : '#EF4444',
     };
   }, [isDarkMode]);
 
@@ -366,7 +366,7 @@ export default function AdminSidebar({
           icon: 'shop',
           isAction: true,
           onAction: onBackToStorefront,
-          customColor: isDarkMode ? '#34D399' : '#6EE7B7',
+          customColor: isDarkMode ? '#00C98D' : '#6EE7B7',
         },
       ],
     },
@@ -418,7 +418,7 @@ export default function AdminSidebar({
                 size={34}
                 textSize={15.5}
                 textColor="#FFFFFF"
-                accentColor={isDarkMode ? '#34D399' : '#6EE7B7'}
+                accentColor={isDarkMode ? '#00C98D' : '#6EE7B7'}
               />
             </View>
 
@@ -958,14 +958,14 @@ export function AdminSidebarSkeleton({
 }) {
   const theme = useMemo(() => {
     return {
-      bg: '#24272B', // Charcoal
-      border: 'rgba(255, 255, 255, 0.10)',
-      divider: 'rgba(255, 255, 255, 0.10)',
-      baseColor: 'rgba(255, 255, 255, 0.15)',
-      highlightColor: 'rgba(255, 255, 255, 0.30)',
-      activePill: '#EA580C',
-      activeAccent: '#EA580C',
-      badgeBg: 'rgba(255, 255, 255, 0.22)',
+      bg: isDarkMode ? '#191A1D' : '#24272B',
+      border: isDarkMode ? '#303236' : 'rgba(255, 255, 255, 0.10)',
+      divider: isDarkMode ? '#303236' : 'rgba(255, 255, 255, 0.10)',
+      baseColor: isDarkMode ? '#202124' : 'rgba(255, 255, 255, 0.15)',
+      highlightColor: isDarkMode ? '#292B2F' : 'rgba(255, 255, 255, 0.30)',
+      activePill: isDarkMode ? '#FF5A00' : '#EA580C',
+      activeAccent: isDarkMode ? '#FF5A00' : '#EA580C',
+      badgeBg: isDarkMode ? '#202124' : 'rgba(255, 255, 255, 0.22)',
     };
   }, [isDarkMode]);
 

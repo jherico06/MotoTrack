@@ -24,7 +24,7 @@ export default function IosGaragePage(props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: iosTokens.colors.background,
+    backgroundColor: '#F7F5F0',
   },
 });
 

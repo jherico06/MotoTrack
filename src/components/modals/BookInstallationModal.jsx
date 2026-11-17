@@ -255,13 +255,13 @@ export default function BookInstallationModal({
 
   // Brand Palette
   const BRAND = '#EA580C';
-  const HEADER_DARK = isDarkMode ? '#181B1F' : '#1E2227';
+  const HEADER_DARK = isDarkMode ? '#18181B' : '#1E2227';
   const SURFACE = isDarkMode ? '#141816' : '#FFFFFF';
   const CARD_BG = isDarkMode ? '#1A211D' : '#F8FAFC';
   const CARD_BORDER = isDarkMode ? '#27342D' : '#E2E8F0';
-  const INK = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const MUTED = isDarkMode ? '#94A3B8' : '#64748B';
-  const SUBTLE = isDarkMode ? '#64748B' : '#94A3B8';
+  const INK = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const MUTED = isDarkMode ? '#A1A1AA' : '#64748B';
+  const SUBTLE = isDarkMode ? '#71717A' : '#94A3B8';
 
   // Pitstop Garage Rule Downpayment Settings
   const adminSettings = useMemo(() => {
@@ -420,7 +420,7 @@ export default function BookInstallationModal({
     if (typeof window !== 'undefined' && window.open) {
       window.open(GOOGLE_STREET_VIEW_URL, '_blank', 'noopener,noreferrer');
     } else {
-      Linking.openURL(GOOGLE_STREET_VIEW_URL).catch(() => {});
+      Linking.openURL(GOOGLE_STREET_VIEW_URL).catch(() => { });
     }
   };
 
@@ -561,7 +561,7 @@ export default function BookInstallationModal({
                       style={[
                         styles.imageThumb,
                         {
-                          backgroundColor: isDarkMode ? '#101714' : '#FFFFFF',
+                          backgroundColor: isDarkMode ? '#111315' : '#FFFFFF',
                           borderColor: CARD_BORDER,
                         },
                       ]}
@@ -675,7 +675,7 @@ export default function BookInstallationModal({
                   <View style={styles.weekdaysRow}>
                     {WEEKDAY_NAMES.map((wName) => (
                       <View key={wName} style={styles.weekdayCell}>
-                        <Text style={[styles.weekdayText, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>
+                        <Text style={[styles.weekdayText, { color: isDarkMode ? '#A1A1AA' : '#64748B' }]}>
                           {wName}
                         </Text>
                       </View>
@@ -688,7 +688,7 @@ export default function BookInstallationModal({
                       if (!cell.isCurrentMonth) {
                         return (
                           <View key={cell.key} style={styles.dayCellDimmed}>
-                            <Text style={{ fontSize: 12, color: isDarkMode ? '#334155' : '#E2E8F0' }}>
+                            <Text style={{ fontSize: 12, color: isDarkMode ? '#3A3B40' : '#E2E8F0' }}>
                               {cell.day}
                             </Text>
                           </View>
@@ -975,7 +975,7 @@ export default function BookInstallationModal({
                     <Text style={[styles.downpaymentBoxLabel, { color: BRAND }]}>
                       {downpaymentPercent === 100 ? 'FULL PAYMENT' : `${downpaymentPercent}% DOWN PAYMENT`}
                     </Text>
-                    <Text style={[styles.downpaymentBoxSub, { color: isDarkMode ? '#CBD5E1' : '#7C2D12' }]}>
+                    <Text style={[styles.downpaymentBoxSub, { color: isDarkMode ? '#A1A1AA' : '#7C2D12' }]}>
                       Due upon confirmation • Pit Rule
                     </Text>
                   </View>
@@ -995,7 +995,7 @@ export default function BookInstallationModal({
                   ]}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.downpaymentBoxLabel, { color: isDarkMode ? '#E2E8F0' : '#334155' }]}>
+                    <Text style={[styles.downpaymentBoxLabel, { color: isDarkMode ? '#F2F2F3' : '#334155' }]}>
                       REMAINING BALANCE ({100 - downpaymentPercent}%)
                     </Text>
                     <Text style={[styles.downpaymentBoxSub, { color: MUTED }]}>
@@ -1096,7 +1096,7 @@ export default function BookInstallationModal({
                     {/* Address with red pin */}
                     <View style={styles.workshopAddressRow}>
                       <BootstrapIcon name="geo-alt-fill" size={13} color="#EF4444" />
-                      <Text style={[styles.workshopAddressText, { color: isDarkMode ? '#CBD5E1' : '#3F3F46' }]}>
+                      <Text style={[styles.workshopAddressText, { color: isDarkMode ? '#A1A1AA' : '#3F3F46' }]}>
                         109 Natalio B. Bacalso S National Hwy, City of Naga, Cebu, 6037
                       </Text>
                     </View>
@@ -1171,7 +1171,7 @@ export default function BookInstallationModal({
                   <View style={styles.mapViewerHeaderRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <BootstrapIcon name="compass" size={13} color="#D97706" />
-                      <Text style={[styles.mapViewerTitle, { color: isDarkMode ? '#F8FAFC' : '#78350F' }]}>
+                      <Text style={[styles.mapViewerTitle, { color: isDarkMode ? '#F2F2F3' : '#78350F' }]}>
                         Workshop Street View & Map
                       </Text>
                     </View>
@@ -1496,8 +1496,8 @@ export default function BookInstallationModal({
                     style={[
                       styles.wishlistBtn,
                       {
-                        borderColor: isDarkMode ? '#34463F' : '#CBD5E1',
-                        backgroundColor: isDarkMode ? '#1C2622' : '#FFFFFF',
+                        borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
+                        backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
                       },
                     ]}
                     onPress={() => !busy && onWishlist()}

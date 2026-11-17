@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { BootstrapIcon } from '../common';
 import { compatibilityService } from '../../services/products/compatibilityService.js';
-import { getThemeTokens } from '../../styles/theme.js';
+import { getAdminThemeTokens as getThemeTokens } from '../../styles/web/admin.web.styles.js';
 
 export default function MotorcycleModelsAdminPanel({ onToast, style, isDarkMode = false }) {
   const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
@@ -159,7 +159,7 @@ function createStyles(t, isDark) {
       backgroundColor: t.inputBg,
     },
     addBtn: {
-      backgroundColor: isDark ? '#EA580C' : '#0C6258',
+      backgroundColor: isDark ? '#FF5A00' : '#0C6258',
       borderRadius: 10,
       paddingHorizontal: 16,
       justifyContent: 'center',

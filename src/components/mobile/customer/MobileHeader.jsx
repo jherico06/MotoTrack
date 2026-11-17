@@ -41,15 +41,40 @@ export default function MobileHeader({
     return () => unsub?.();
   }, [currentUser?.id]);
 
+  const headerBg = isDarkMode ? '#24272B' : '#F7F5F0';
+  const headerBorder = isDarkMode ? '#1A1D20' : '#EDE9E0';
+  const primaryTextColor = isDarkMode ? '#FFFFFF' : '#0F172A';
+  const subTextColor = isDarkMode ? '#94A3B8' : '#64748B';
+  const iconColor = isDarkMode ? '#FFFFFF' : '#0F172A';
+
   return (
-    <View style={[styles.mobileHeaderRoot, isDarkMode && { backgroundColor: '#24272B', borderBottomColor: '#1A1D20' }]}>
+    <View
+      style={[
+        styles.mobileHeaderRoot,
+        {
+          backgroundColor: headerBg,
+          borderBottomColor: headerBorder,
+          ...(isDarkMode
+            ? {}
+            : {
+                shadowOpacity: 0.03,
+                elevation: 1,
+              }),
+        },
+      ]}
+    >
       <View style={[styles.mobileHeaderInner, { paddingHorizontal: isSmallMobile ? 12 : 14 }]}>
         <View style={styles.headerWrapper}>
           <View style={[styles.headerRow, isSmallMobile && { gap: 6 }]}>
             {/* Left: User Avatar & Greeting or Sign In */}
             {currentUser ? (
               <TouchableOpacity style={styles.headerLeft} onPress={onOpenProfile} activeOpacity={0.75}>
-                <View style={styles.avatarWrap}>
+                <View
+                  style={[
+                    styles.avatarWrap,
+                    !isDarkMode && { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
+                  ]}
+                >
                   <Image
                     source={{
                       uri:
@@ -60,11 +85,13 @@ export default function MobileHeader({
                   />
                 </View>
                 <View style={styles.userGreetingWrap}>
-                  <Text style={styles.greetingSub}>
+                  <Text style={[styles.greetingSub, { color: subTextColor }]}>
                     {currentUser.role === 'admin' ? 'Administrator' : 'Welcome back,'}
                   </Text>
                   <View style={styles.greetingNameRow}>
-                    <Text style={styles.userName}>{currentUser.name || currentUser.fullName}</Text>
+                    <Text style={[styles.userName, { color: primaryTextColor }]}>
+                      {currentUser.name || currentUser.fullName}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -80,15 +107,15 @@ export default function MobileHeader({
                     {
                       justifyContent: 'center',
                       alignItems: 'center',
-                      backgroundColor: 'rgba(255, 255, 255, 0.12)',
-                      borderColor: 'rgba(255, 255, 255, 0.25)',
+                      backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#FFFFFF',
+                      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.25)' : '#E2E8F0',
                     },
                   ]}
                 >
-                  <BootstrapIcon name="person" size={17} color="#FFFFFF" />
+                  <BootstrapIcon name="person" size={17} color={isDarkMode ? '#FFFFFF' : '#475569'} />
                 </View>
                 <View>
-                  <Text style={styles.greetingSub}>Welcome</Text>
+                  <Text style={[styles.greetingSub, { color: subTextColor }]}>Welcome</Text>
                   <Text style={[styles.userName, { color: '#EA580C', fontSize: 13.5 }]}>
                     Sign In / Register ➔
                   </Text>
@@ -104,9 +131,9 @@ export default function MobileHeader({
                 title="Notifications"
                 activeOpacity={0.75}
               >
-                <BootstrapIcon name="bell" size={18} color="#FFFFFF" />
+                <BootstrapIcon name="bell" size={18} color={iconColor} />
                 {unreadNotifCount > 0 && (
-                  <View style={[styles.cartBadgeDot, { backgroundColor: '#EF4444' }]}>
+                  <View style={[styles.cartBadgeDot, { backgroundColor: '#EF4444', borderColor: headerBg }]}>
                     <Text style={styles.cartBadgeDotText}>
                       {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
                     </Text>
@@ -117,12 +144,12 @@ export default function MobileHeader({
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 onPress={onNavigateToWishlist}
-                title="Saved Favorites"
+                title="Saved Wishlist"
                 activeOpacity={0.75}
               >
-                <BootstrapIcon name="heart" size={18} color="#FFFFFF" />
+                <BootstrapIcon name="bookmark" size={18} color={iconColor} />
                 {wishlistCount > 0 && (
-                  <View style={[styles.cartBadgeDot, { backgroundColor: '#EF4444' }]}>
+                  <View style={[styles.cartBadgeDot, { backgroundColor: '#EA580C', borderColor: headerBg }]}>
                     <Text style={styles.cartBadgeDotText}>{wishlistCount}</Text>
                   </View>
                 )}
@@ -134,9 +161,9 @@ export default function MobileHeader({
                 title="Shopping Cart"
                 activeOpacity={0.75}
               >
-                <BootstrapIcon name="cart3" size={19} color="#FFFFFF" />
+                <BootstrapIcon name="cart3" size={19} color={iconColor} />
                 {cartItemCount > 0 && (
-                  <View style={[styles.cartBadgeDot, { backgroundColor: '#EF4444' }]}>
+                  <View style={[styles.cartBadgeDot, { backgroundColor: '#EF4444', borderColor: headerBg }]}>
                     <Text style={styles.cartBadgeDotText}>{cartItemCount}</Text>
                   </View>
                 )}
@@ -148,17 +175,25 @@ export default function MobileHeader({
         {/* Mobile Minimalist Search & Filter Bar */}
         {showSearch && (
           <View style={styles.searchSection}>
-            <View style={styles.searchBarPill}>
+            <View
+              style={[
+                styles.searchBarPill,
+                !isDarkMode && {
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
               <BootstrapIcon
                 name="search"
                 size={15}
-                color="#FFFFFF"
+                color={isDarkMode ? '#FFFFFF' : '#64748B'}
                 style={{ marginRight: 8 }}
               />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, !isDarkMode && { color: '#0F172A' }]}
                 placeholder={searchPlaceholder}
-                placeholderTextColor="rgba(255, 255, 255, 0.45)"
+                placeholderTextColor={isDarkMode ? 'rgba(255, 255, 255, 0.45)' : '#94A3B8'}
                 value={searchQuery}
                 onChangeText={onSearchChange}
               />
@@ -168,7 +203,7 @@ export default function MobileHeader({
                   onPress={onCycleFilterSort}
                   activeOpacity={0.7}
                 >
-                  <BootstrapIcon name="sliders" size={16} color="#FFFFFF" />
+                  <BootstrapIcon name="sliders" size={16} color={isDarkMode ? '#FFFFFF' : '#475569'} />
                 </TouchableOpacity>
               )}
             </View>

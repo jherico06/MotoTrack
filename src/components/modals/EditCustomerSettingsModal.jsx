@@ -118,9 +118,9 @@ export default function EditCustomerSettingsModal({
 
   if (!visible) return null;
 
-  const bgModal = isDarkMode ? '#141A18' : '#FFFFFF';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDarkMode ? '#94A3B8' : '#475569';
+  const bgModal = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textSecondary = isDarkMode ? '#A1A1AA' : '#475569';
   const inputBg = isDarkMode ? '#1C2422' : '#F8FAFC';
   const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0';
 

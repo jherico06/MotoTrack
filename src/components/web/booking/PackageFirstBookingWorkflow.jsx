@@ -7,7 +7,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import {
   PACKAGE_CATEGORIES,
   calculatePackagePriceForCc,
@@ -41,12 +42,15 @@ export default function PackageFirstBookingWorkflow({
   onViewBookingDetails,
   onNavigateToAppointments,
   onNavigateToLogin: _onNavigateToLogin,
+  onRequireLogin,
   onNavigateToStore: _onNavigateToStore,
   showToast,
   defaultSelectedPackageId = null,
   searchQuery: externalSearchQuery,
   onSearchQueryChange,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   // ─── STEPPER STATE (4 CLEAN STEPS) ───
   // Step 1: Choose Service
   // Step 2: Rider Info & Motorcycle
@@ -105,23 +109,25 @@ export default function PackageFirstBookingWorkflow({
 
   // ─── CUSTOMER CONTACT INFORMATION (STEP 2) ───
   const [firstName, setFirstName] = useState(() => {
+    if (!currentUser) return '';
     if (currentUser?.firstName) return currentUser.firstName;
     const parts = String(currentUser?.name || currentUser?.fullName || '').trim().split(' ');
-    return parts[0] || 'Jherico';
+    return parts[0] || '';
   });
   const [lastName, setLastName] = useState(() => {
+    if (!currentUser) return '';
     if (currentUser?.lastName) return currentUser.lastName;
     const parts = String(currentUser?.name || currentUser?.fullName || '').trim().split(' ');
-    return parts.slice(1).join(' ') || 'Maurin';
+    return parts.slice(1).join(' ') || '';
   });
   const [mobileNumber, setMobileNumber] = useState(
-    () => currentUser?.phone || currentUser?.mobile || '09614904841'
+    () => (currentUser ? currentUser?.phone || currentUser?.mobile || '' : '')
   );
   const [email, setEmail] = useState(
-    () => currentUser?.email || 'jhericomaurin67@gmail.com'
+    () => (currentUser ? currentUser?.email || '' : '')
   );
   const [socialMedia, setSocialMedia] = useState(
-    () => currentUser?.socialMedia || currentUser?.social_media || 'N/A'
+    () => (currentUser ? currentUser?.socialMedia || currentUser?.social_media || 'N/A' : '')
   );
 
   // ─── SCHEDULE & INFO STATE (STEP 3) ───
@@ -132,7 +138,7 @@ export default function PackageFirstBookingWorkflow({
 
   // ─── PAYMENT STATE (STEP 4) ───
   const [paymentMethod, setPaymentMethod] = useState('GCash');
-  const [gcashNumber] = useState(currentUser?.phone || '0917-882-9102');
+  const [gcashNumber] = useState(currentUser?.phone || '');
   const [gcashReference] = useState(
     () => 'MP-GCASH-' + Math.floor(100000 + Math.random() * 900000)
   );
@@ -140,6 +146,41 @@ export default function PackageFirstBookingWorkflow({
   // ─── SUBMISSION STATE ───
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedBookingResult, setSubmittedBookingResult] = useState(null);
+
+  const promptBookingLogin = () => {
+    if (typeof onRequireLogin === 'function') {
+      onRequireLogin({
+        title: 'Sign In to Book a Service',
+        message: 'Please log in first or create an account to book a pit service appointment for your motorcycle.',
+        actionLabel: 'Sign In to Book',
+        feature: 'book',
+      });
+      return;
+    }
+    _onNavigateToLogin?.();
+  };
+
+  // Sync customer contact info and enforce Step 1 browse-only mode when logged out
+  useEffect(() => {
+    if (!currentUser) {
+      setCurrentStep(1);
+      setSelectedPackageIds([]);
+      setSelectedMotorcycleId('');
+      setIsChangeBikeModalOpen(false);
+      setFirstName('');
+      setLastName('');
+      setMobileNumber('');
+      setEmail('');
+      setSocialMedia('');
+      return;
+    }
+    const parts = String(currentUser?.name || currentUser?.fullName || '').trim().split(' ');
+    setFirstName(currentUser?.firstName || parts[0] || '');
+    setLastName(currentUser?.lastName || parts.slice(1).join(' ') || '');
+    setMobileNumber(currentUser?.phone || currentUser?.mobile || '');
+    setEmail(currentUser?.email || '');
+    setSocialMedia(currentUser?.socialMedia || currentUser?.social_media || 'N/A');
+  }, [currentUser]);
 
   // Live catalog from pmsPricingService (Admin Services Packages Catalog strictly - 22 packages)
   useEffect(() => {
@@ -226,19 +267,20 @@ export default function PackageFirstBookingWorkflow({
     };
   }, [currentUser]);
 
-  // Combined list of user's garage motorcycles
+  // Combined list of user's garage motorcycles (empty for guests so generic CC tiers display)
   const allMotorcycles = useMemo(() => {
+    if (!currentUser) return [];
     let list = [];
     if (Array.isArray(garageMotorcycles) && garageMotorcycles.length > 0) {
       list = [...garageMotorcycles];
-    } else if (currentUser) {
+    } else {
       try {
         list = motorcycleService.getMotorcycles(currentUser) || [];
       } catch (_e) {
         list = [];
       }
     }
-    if (list.length === 0 && currentUser) {
+    if (list.length === 0) {
       try {
         list = motorcycleService.getAllMotorcycles() || [];
       } catch (_e) { }
@@ -327,6 +369,10 @@ export default function PackageFirstBookingWorkflow({
 
   // ─── SWITCH & REGISTER PRIMARY MOTORCYCLE (DYNAMIC CC RATES) ───
   const handleSelectMotorcycle = async (bike) => {
+    if (!currentUser) {
+      promptBookingLogin();
+      return;
+    }
     if (!bike) return;
     const bikeId = bike.motorcycle_id || bike.id;
     const rawCc =
@@ -357,8 +403,12 @@ export default function PackageFirstBookingWorkflow({
   };
 
   const handleAddNewMotorcycle = async (newBikeData) => {
-    const uid = currentUser?.id || currentUser?.user_id || 'usr-rider-01';
-    const uemail = currentUser?.email || 'jhericomaurin67@gmail.com';
+    if (!currentUser) {
+      promptBookingLogin();
+      return;
+    }
+    const uid = currentUser?.id || currentUser?.user_id;
+    const uemail = currentUser?.email || '';
     const res = await motorcycleService.addMotorcycle({
       ...newBikeData,
       user_id: uid,
@@ -443,9 +493,13 @@ export default function PackageFirstBookingWorkflow({
 
   const selectedPackagesSubtotal = pricingData.subtotal;
 
-  // Toggle package selection helper: selects and advances to next step, or unselects if already selected
+  // Toggle package selection helper: requires sign-in before booking; otherwise selects and advances to Step 2
   const handleTogglePackage = (pkgId) => {
     if (!pkgId) return;
+    if (!currentUser) {
+      promptBookingLogin();
+      return;
+    }
     if (selectedPackageIds.includes(pkgId)) {
       setSelectedPackageIds((prev) => prev.filter((id) => id !== pkgId));
     } else {
@@ -456,6 +510,10 @@ export default function PackageFirstBookingWorkflow({
 
   // ─── FINAL BOOKING SUBMISSION ───
   const handleConfirmBooking = async (paymentDetails) => {
+    if (!currentUser) {
+      promptBookingLogin();
+      return;
+    }
     if (!selectedPackages.length || !selectedMotorcycle) {
       showToast?.('Please ensure package(s) and motorcycle are selected.');
       return;
@@ -507,6 +565,8 @@ export default function PackageFirstBookingWorkflow({
         payment_status: 'DOWNPAYMENT_PAID',
         deposit_paid: true,
         transaction_ref: paymentDetails?.transactionRef || null,
+        xenditPaymentId: paymentDetails?.xenditPaymentId || null,
+        xenditInvoiceId: paymentDetails?.xenditInvoiceId || null,
         motorcycle_id: selectedMotorcycle.motorcycle_id || selectedMotorcycle.id,
         motorcycle_cc: engineCc,
         cc_category_id:
@@ -540,20 +600,33 @@ export default function PackageFirstBookingWorkflow({
           bookingReference: createdBookingId,
         };
 
-        // Record the transaction in Supabase payments table linked to the created booking
+        // Link the verified Xendit transaction (or record if offline/manual) to the created booking
         try {
-          await xenditPaymentService.recordPaymentTransaction({
-            bookingId: createdBookingId,
-            customerId: bookingPayload.user_id,
-            amount: downpayment,
-            paymentMethod: chosenPaymentMethod,
-            referenceNumber: paymentDetails?.transactionRef || (chosenPaymentMethod.includes('GCash') ? gcashReference : `XND-${Date.now()}`),
-            transactionRef: paymentDetails?.transactionRef,
-            status: 'Completed',
-            notes: `Downpayment for booking #${createdBookingId} via ${chosenPaymentMethod}`,
-          });
+          if (paymentDetails?.xenditInvoiceId || paymentDetails?.xenditPaymentId) {
+            await xenditPaymentService.linkPaymentToBooking({
+              invoiceId: paymentDetails?.xenditInvoiceId || paymentDetails?.transactionRef,
+              paymentId: paymentDetails?.xenditPaymentId,
+              bookingId: createdBookingId,
+              notes: `Verified GCash downpayment for booking #${createdBookingId}`,
+            });
+          } else {
+            await xenditPaymentService.recordPaymentTransaction({
+              bookingId: createdBookingId,
+              customerId: bookingPayload.user_id,
+              amount: downpayment,
+              paymentType: 'DOWNPAYMENT',
+              paymentMethod: chosenPaymentMethod,
+              referenceNumber:
+                paymentDetails?.referenceNumber ||
+                paymentDetails?.transactionRef ||
+                (chosenPaymentMethod.includes('GCash') ? gcashReference : `XND-${Date.now()}`),
+              transactionRef: paymentDetails?.transactionRef,
+              status: 'Completed',
+              notes: `Downpayment for booking #${createdBookingId} via ${chosenPaymentMethod}`,
+            });
+          }
         } catch (dbErr) {
-          console.warn('[PackageFirstBookingWorkflow] Database payment log notice:', dbErr);
+          console.warn('[PackageFirstBookingWorkflow] Database payment link notice:', dbErr);
         }
 
         setSubmittedBookingResult(finalBooking);
@@ -578,14 +651,22 @@ export default function PackageFirstBookingWorkflow({
         <BookingProgressIndicator
           currentStep={currentStep}
           onStepClick={(stepId) => {
-            if (stepId === 1) setCurrentStep(1);
-            else if (stepId === 2 && selectedPackageIds.length > 0) setCurrentStep(2);
+            if (stepId === 1) {
+              setCurrentStep(1);
+              return;
+            }
+            if (!currentUser) {
+              promptBookingLogin();
+              return;
+            }
+            if (stepId === 2 && selectedPackageIds.length > 0) setCurrentStep(2);
             else if (stepId === 3 && firstName.trim() && lastName.trim() && mobileNumber.trim()) setCurrentStep(3);
             else if (stepId === 4 && preferredDate && preferredTimeSlot) setCurrentStep(4);
             else if (stepId === 5 && preferredDate && preferredTimeSlot) setCurrentStep(5);
           }}
           canNavigateToStep={(stepId) => {
             if (stepId === 1) return true;
+            if (!currentUser) return false;
             if (stepId === 2) return selectedPackageIds.length > 0;
             if (stepId === 3) return selectedPackageIds.length > 0 && !!firstName.trim() && !!lastName.trim();
             if (stepId === 4) return selectedPackageIds.length > 0 && !!preferredDate && !!preferredTimeSlot;
@@ -608,7 +689,7 @@ export default function PackageFirstBookingWorkflow({
                 style={{
                   fontSize: 28,
                   fontWeight: '800',
-                  color: '#18181B',
+                  color: isDarkMode ? '#F2F2F3' : '#18181B',
                   letterSpacing: -0.6,
                   marginBottom: 6,
                   textAlign: 'center',
@@ -619,7 +700,7 @@ export default function PackageFirstBookingWorkflow({
               <Text
                 style={{
                   fontSize: 14.5,
-                  color: '#52525B',
+                  color: isDarkMode ? '#A1A1AA' : '#52525B',
                   maxWidth: 580,
                   textAlign: 'center',
                   lineHeight: 22,
@@ -711,7 +792,7 @@ export default function PackageFirstBookingWorkflow({
                   paddingHorizontal: 14,
                   paddingVertical: 7,
                   borderRadius: 8,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderWidth: 1,
                   borderColor: '#EA580C',
                   cursor: 'pointer',
@@ -767,11 +848,71 @@ export default function PackageFirstBookingWorkflow({
               </TouchableOpacity>
             </View>
 
+            {/* Guest Browse Notice Banner (when customer is not signed in) */}
+            {!currentUser && (
+              <View
+                style={{
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  paddingHorizontal: 16,
+                  paddingVertical: 11,
+                  marginBottom: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 220 }}>
+                  <View
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
+                      borderWidth: 1,
+                      borderColor: '#FED7AA',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon name="eye" size={14} color="#EA580C" />
+                  </View>
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: '#3F3F46', flex: 1, flexShrink: 1 }}>
+                    Browsing service packages & CC pricing as a guest.{' '}
+                    <Text style={{ fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>Sign in or create an account</Text> when you're ready to book an appointment.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={promptBookingLogin}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 8,
+                    backgroundColor: '#EA580C',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="box-arrow-in-right" size={13} color="#FFFFFF" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                    Sign In to Book
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Active Motorcycle CC Pricing Indicator Banner */}
             {selectedMotorcycle && (
               <View
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderRadius: 12,
                   borderWidth: 1,
                   borderColor: '#FED7AA',
@@ -787,7 +928,7 @@ export default function PackageFirstBookingWorkflow({
               >
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 200, maxWidth: '100%' }}>
                   <BootstrapIcon name="speedometer" size={15} color="#EA580C" />
-                  <Text style={{ fontSize: 13, lineHeight: 19, color: '#18181B', flex: 1, flexShrink: 1 }}>
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: isDarkMode ? '#F2F2F3' : '#18181B', flex: 1, flexShrink: 1 }}>
                     Showing package rates for <Text style={{ fontWeight: '700' }}>{selectedMotorcycle.brand} {selectedMotorcycle.model}</Text>{' '}
                     (<Text style={{ fontWeight: '700', color: '#EA580C' }}>{pricingData.engineCc} CC • {pricingData.matchedCategory}</Text>)
                   </Text>
@@ -798,7 +939,7 @@ export default function PackageFirstBookingWorkflow({
                     paddingHorizontal: 12,
                     paddingVertical: 5,
                     borderRadius: 8,
-                    backgroundColor: '#FFF7ED',
+                    backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                     borderWidth: 1,
                     borderColor: '#FED7AA',
                     cursor: 'pointer',
@@ -816,10 +957,10 @@ export default function PackageFirstBookingWorkflow({
             {searchQuery.trim() ? (
               <View
                 style={{
-                  backgroundColor: '#F8FAFC',
+                  backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
                   borderRadius: 8,
                   borderWidth: 1,
-                  borderColor: '#E2E8F0',
+                  borderColor: isDarkMode ? '#303236' : '#E2E8F0',
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   marginBottom: 16,
@@ -832,8 +973,8 @@ export default function PackageFirstBookingWorkflow({
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 200, maxWidth: '100%' }}>
                   <BootstrapIcon name="search" size={13} color="#FF5A0A" />
-                  <Text style={{ fontSize: 13, lineHeight: 19, color: '#334155', flex: 1, flexShrink: 1 }}>
-                    Showing results for <Text style={{ fontWeight: '700', color: '#0F172A' }}>"{searchQuery}"</Text>{' '}
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: isDarkMode ? '#A1A1AA' : '#334155', flex: 1, flexShrink: 1 }}>
+                    Showing results for <Text style={{ fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>"{searchQuery}"</Text>{' '}
                     • <Text style={{ fontWeight: '600', color: '#FF5A0A' }}>{displayPackages.length} package{displayPackages.length === 1 ? '' : 's'}</Text> found
                   </Text>
                 </View>
@@ -846,15 +987,15 @@ export default function PackageFirstBookingWorkflow({
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                     borderRadius: 6,
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                     borderWidth: 1,
-                    borderColor: '#CBD5E1',
+                    borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                     cursor: 'pointer',
                   }}
                   activeOpacity={0.7}
                 >
                   <BootstrapIcon name="x" size={14} color="#64748B" />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569' }}>Clear Search</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#475569' }}>Clear Search</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -899,10 +1040,10 @@ export default function PackageFirstBookingWorkflow({
             {displayPackages.length === 0 ? (
               <View
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderRadius: 16,
                   borderWidth: 1,
-                  borderColor: '#E4E4E7',
+                  borderColor: isDarkMode ? '#303236' : '#E4E4E7',
                   padding: 48,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -911,7 +1052,7 @@ export default function PackageFirstBookingWorkflow({
                 }}
               >
                 <BootstrapIcon name="tools" size={30} color="#D4D4D8" />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#18181B' }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>
                   {searchQuery ? 'No services match your search' : 'No service packages available'}
                 </Text>
                 <Text style={{ fontSize: 13, color: '#71717A', textAlign: 'center', maxWidth: 420 }}>

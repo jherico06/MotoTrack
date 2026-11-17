@@ -443,13 +443,13 @@ function buildPromoModalStyles(tokens, isDark) {
       justifyContent: 'center',
     },
     segmentRadioSelected: {
-      borderColor: isDark ? '#34D399' : BRAND,
+      borderColor: isDark ? '#00C98D' : BRAND,
     },
     segmentRadioDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
-      backgroundColor: isDark ? '#34D399' : BRAND,
+      backgroundColor: isDark ? '#00C98D' : BRAND,
     },
     segmentLabel: {
       fontSize: 12.5,
@@ -1214,8 +1214,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                             {
                               color: prm.isActive
                                 ? '#FFFFFF'
-                                : isDarkMode
-                                  ? '#FBBF24'
+                                : isDarkMode ? '#F5B942'
                                   : '#B45309',
                             },
                           ]}
@@ -1254,8 +1253,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                           opacity: togglingId === prm.promo_id ? 0.7 : 1,
                           backgroundColor: prm.isActive
                             ? '#EA580C'
-                            : isDarkMode
-                              ? '#334155'
+                            : isDarkMode ? '#3A3B40'
                               : '#CBD5E1',
                         }}
                       >

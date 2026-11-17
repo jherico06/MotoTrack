@@ -127,7 +127,7 @@ export default function BottomNavBar({
   ]);
 
   const activeColor = '#EA580C';
-  const inactiveColor = isDarkMode ? '#94A3B8' : '#64748B';
+  const inactiveColor = isDarkMode ? '#A1A1AA' : '#64748B';
 
   return (
     <View
@@ -166,7 +166,7 @@ export default function BottomNavBar({
                       navStyles.navCountBadge,
                       {
                         backgroundColor: activeColor,
-                        borderColor: isDarkMode ? '#181A1D' : '#FFFFFF',
+                        borderColor: isDarkMode ? '#111315' : '#FFFFFF',
                       },
                     ]}
                   >

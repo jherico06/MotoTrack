@@ -4,10 +4,13 @@
 // =========================================================================
 
 import React from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BootstrapIcon } from '../../common';
 
 export default function BookingHero({ onBookServicePress }) {
+  const { isDarkMode } = useTheme();
+  const heroStyles = get_heroStyles(isDarkMode);
   return (
     <View style={heroStyles.heroWrapper}>
       <View style={heroStyles.heroInner}>
@@ -50,7 +53,13 @@ export default function BookingHero({ onBookServicePress }) {
   );
 }
 
-const heroStyles = StyleSheet.create({
+let _light_heroStyles = null;
+let _dark_heroStyles = null;
+function get_heroStyles(isDarkMode) {
+  if (isDarkMode && _dark_heroStyles) return _dark_heroStyles;
+  if (!isDarkMode && _light_heroStyles) return _light_heroStyles;
+  const created = StyleSheet.create({
+
   heroWrapper: {
     backgroundColor: 'transparent',
     paddingTop: 56,
@@ -73,9 +82,9 @@ const heroStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
     marginBottom: 16,
   },
   eyebrowDot: {
@@ -93,7 +102,7 @@ const heroStyles = StyleSheet.create({
   headline: {
     fontSize: 44,
     fontWeight: '800',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
     letterSpacing: -1.2,
     lineHeight: 52,
     marginBottom: 16,
@@ -102,7 +111,7 @@ const heroStyles = StyleSheet.create({
   subcopy: {
     fontSize: 15,
     lineHeight: 24,
-    color: '#52525B',
+    color: isDarkMode ? '#A1A1AA' : '#52525B',
     maxWidth: 640,
     textAlign: 'center',
     marginBottom: 28,
@@ -145,5 +154,10 @@ const heroStyles = StyleSheet.create({
     fontWeight: '500',
     color: '#71717A',
   },
-});
+
+  });
+  if (isDarkMode) _dark_heroStyles = created;
+  else _light_heroStyles = created;
+  return created;
+}
 

@@ -6,7 +6,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 import { calculatePackagePriceForCc } from './bookingPackagesData.js';
 
@@ -16,6 +17,8 @@ export default function PackagePricingScreen({
   onBack,
   onContinue,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const engineCc = Number(
     selectedMotorcycle?.engine_displacement ||
     selectedMotorcycle?.engine_cc ||
@@ -81,7 +84,7 @@ export default function PackagePricingScreen({
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A' }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
               {bikeTitle}
             </Text>
             <View style={{ backgroundColor: '#EA580C', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
@@ -90,8 +93,8 @@ export default function PackagePricingScreen({
               </Text>
             </View>
           </View>
-          <Text style={{ fontSize: 12.5, color: '#475569', marginTop: 3 }}>
-            Matched Pricing Category: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{pricingData.matchedCategory}</Text>
+          <Text style={{ fontSize: 12.5, color: isDarkMode ? '#A1A1AA' : '#475569', marginTop: 3 }}>
+            Matched Pricing Category: <Text style={{ fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>{pricingData.matchedCategory}</Text>
           </Text>
         </View>
       </View>
@@ -99,7 +102,7 @@ export default function PackagePricingScreen({
       {/* ─── SELECTED PACKAGES PRICING BREAKDOWN ─── */}
       <View style={styles.pricingCard}>
         <Text style={styles.sectionTitle}>Selected Packages Breakdown</Text>
-        <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+        <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', marginBottom: 12 }}>
           {selectedPackages.length} package{selectedPackages.length === 1 ? '' : 's'} selected for this appointment:
         </Text>
 
@@ -129,15 +132,15 @@ export default function PackagePricingScreen({
         {/* ─── TOTAL SUMMARY CALCULATION ─── */}
         <View style={styles.totalSummaryBox}>
           <View style={styles.summaryRow}>
-            <Text style={{ fontSize: 13, color: '#475569' }}>Total Labor Subtotal</Text>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>
+            <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#475569' }}>Total Labor Subtotal</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
               {formatPhp(pricingData.subtotal)}
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 13, color: '#475569' }}>20% Slot Reservation Downpayment</Text>
+              <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#475569' }}>20% Slot Reservation Downpayment</Text>
               <BootstrapIcon name="info-circle" size={12} color="#94A3B8" />
             </View>
             <Text style={{ fontSize: 14, fontWeight: '600', color: '#EA580C' }}>
@@ -146,16 +149,16 @@ export default function PackagePricingScreen({
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={{ fontSize: 13, color: '#475569' }}>Balance Payable Upon Completion</Text>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B' }}>
+            <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#475569' }}>Balance Payable Upon Completion</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
               {formatPhp(pricingData.balanceRemaining)}
             </Text>
           </View>
 
-          <View style={[styles.summaryRow, { marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }]}>
+          <View style={[styles.summaryRow, { marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? '#303236' : '#E2E8F0' }]}>
             <View>
               <Text style={styles.totalLabel}>Total Service Labor</Text>
-              <Text style={{ fontSize: 11, color: '#64748B' }}>
+              <Text style={{ fontSize: 11, color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
                 All selected packages included
               </Text>
             </View>
@@ -165,9 +168,9 @@ export default function PackagePricingScreen({
           </View>
         </View>
 
-        <View style={{ marginTop: 14, backgroundColor: '#F8FAFC', padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ marginTop: 14, backgroundColor: isDarkMode ? '#202124' : '#F8FAFC', padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <BootstrapIcon name="shield-check" size={14} color="#16A34A" />
-          <Text style={{ fontSize: 11.5, color: '#475569', flex: 1, lineHeight: 16 }}>
+          <Text style={{ fontSize: 11.5, color: isDarkMode ? '#A1A1AA' : '#475569', flex: 1, lineHeight: 16 }}>
             Pricing is automatically validated against official shop CC rate schedules. Any required replacement parts will be quoted separately after initial bay inspection.
           </Text>
         </View>

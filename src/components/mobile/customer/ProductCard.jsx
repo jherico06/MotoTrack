@@ -50,7 +50,7 @@ function resolveProductImage(url) {
   return raw;
 }
 
-export default function ProductCard({ product, bike, onPress }) {
+export default function ProductCard({ product, bike, onPress, containerPadding }) {
   const { width } = useWindowDimensions();
   const { isDarkMode = false } = useTheme?.() || {};
   const isTablet = width >= 700 && width < 1024;
@@ -58,7 +58,8 @@ export default function ProductCard({ product, bike, onPress }) {
   const isMobile = width < 700;
 
   // Exact 2-column mathematical width for mobile to ensure zero line wrapping or overflow
-  const horizontalPadding = width < 380 ? 12 : 14;
+  const horizontalPadding =
+    typeof containerPadding === 'number' ? containerPadding : width < 380 ? 12 : 14;
   const cardGap = 10;
   const mobileCardWidth = isMobile
     ? Math.floor((width - horizontalPadding * 2 - cardGap) / 2)
@@ -181,25 +182,39 @@ export default function ProductCard({ product, bike, onPress }) {
           activeOpacity={0.8}
         >
           <BootstrapIcon
-            name={isFav ? 'heart-fill' : 'heart'}
+            name={isFav ? 'bookmark-fill' : 'bookmark'}
             size={13}
-            color={isFav ? '#EF4444' : (isDarkMode ? '#94A3B8' : '#64748B')}
+            color={isFav ? '#EA580C' : (isDarkMode ? '#94A3B8' : '#64748B')}
           />
         </TouchableOpacity>
       </View>
 
       <View style={[styles.productCardDetails, isDarkMode && { backgroundColor: '#1C1F23' }]}>
         {product?.brand ? (
-          <Text style={[styles.productBrandText, isDarkMode && { color: '#94A3B8' }]} numberOfLines={1}>
+          <Text
+            style={[
+              styles.productBrandText,
+              { marginBottom: 0, includeFontPadding: false },
+              isDarkMode && { color: '#94A3B8' },
+            ]}
+            numberOfLines={1}
+          >
             {product.brand.toUpperCase()}
           </Text>
         ) : null}
 
-        <Text style={[styles.productTitle, isDarkMode && { color: '#F9FAFB' }]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.productTitle,
+            { minHeight: 0, marginBottom: 0, includeFontPadding: false },
+            isDarkMode && { color: '#F9FAFB' },
+          ]}
+          numberOfLines={2}
+        >
           {product?.name}
         </Text>
 
-        <View style={styles.priceRow}>
+        <View style={[styles.priceRow, { marginTop: 0, marginBottom: 4 }]}>
           <Text style={styles.priceMainText}>₱{displayPrice.toFixed(2)}</Text>
         </View>
 

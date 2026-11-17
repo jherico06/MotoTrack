@@ -739,8 +739,8 @@ export default function UserProfileDropdown({
                     style={[
                       styles.themeOptionRow,
                       {
-                        backgroundColor: effectiveDarkMode ? (theme.isDark ? '#1C2622' : 'rgba(77, 184, 150, 0.12)') : theme.bgSub,
-                        borderColor: effectiveDarkMode ? '#EA580C' : theme.border,
+                        backgroundColor: effectiveDarkMode ? '#202124' : theme.bgSub,
+                        borderColor: effectiveDarkMode ? '#FF5A00' : theme.border,
                       },
                     ]}
                     onPress={handleToggleDarkMode}

@@ -30,10 +30,10 @@ function getInitials(name) {
 export default function AdminProfileLogsPanel({
   isDarkMode = false,
   tokens = {},
-  showToast = () => {},
-  showConfirm: _showConfirm = () => {},
+  showToast = () => { },
+  showConfirm: _showConfirm = () => { },
   isDesktop = true,
-  onNavigate: _onNavigate = () => {},
+  onNavigate: _onNavigate = () => { },
 }) {
   const { currentUser, updateProfile, changeEmail, changePassword } = useAuth();
 
@@ -101,7 +101,7 @@ export default function AdminProfileLogsPanel({
         .then((meta) => {
           if (isMounted && meta) setPinMeta(meta);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
     return () => {
       isMounted = false;
@@ -295,12 +295,15 @@ export default function AdminProfileLogsPanel({
   };
 
   // Color tokens
-  const cardBg = isDarkMode ? tokens.bgElevated || '#131A17' : '#FFFFFF';
-  const cardBorder = isDarkMode ? tokens.borderInput || '#23322B' : '#E2E8F0';
-  const textPrimary = isDarkMode ? tokens.textPrimary || '#F8FAFC' : '#0F172A';
-  const textMuted = isDarkMode ? tokens.textMuted || '#94A3B8' : '#64748B';
-  const inputBg = isDarkMode ? '#17221E' : '#FFFFFF';
-  const inputBorder = isDarkMode ? '#2D4037' : '#CBD5E1';
+  const cardBg = isDarkMode ? tokens.bgCard || '#191A1D' : '#FFFFFF';
+  const cardBorder = isDarkMode ? tokens.border || '#303236' : '#E2E8F0';
+  const textPrimary = isDarkMode ? tokens.textPrimary || '#F2F2F3' : '#0F172A';
+  const textMuted = isDarkMode ? tokens.textSecondary || '#A1A1AA' : '#64748B';
+  const inputBg = isDarkMode ? tokens.inputBg || '#202124' : '#FFFFFF';
+  const inputBorder = isDarkMode ? tokens.borderInput || '#3A3B40' : '#CBD5E1';
+  const secondaryBg = isDarkMode ? tokens.bgSub || '#202124' : '#F8FAFC';
+  const iconMuted = isDarkMode ? '#71717A' : '#94A3B8';
+  const placeholderColor = isDarkMode ? '#71717A' : '#94A3B8';
 
   const displayName = name || currentUser?.name || currentUser?.fullName || 'Jherico Maurin';
   const displayEmail = currentUser?.email || 'jhericomaurin615@gmail.com';
@@ -323,7 +326,7 @@ export default function AdminProfileLogsPanel({
           <View style={styles.heroLeft}>
             {/* Squircle Avatar with Green Verified Badge */}
             <View style={styles.avatarContainer}>
-              <View style={[styles.avatarSquircle, { backgroundColor: isDarkMode ? '#1E293B' : '#2D3748' }]}>
+              <View style={[styles.avatarSquircle, { backgroundColor: isDarkMode ? '#202124' : '#2D3748' }]}>
                 {hasCustomAvatar && !adminImgError ? (
                   <Image
                     source={{ uri: currentUser.avatar }}
@@ -336,7 +339,12 @@ export default function AdminProfileLogsPanel({
                 )}
               </View>
               {/* Green Verified Checkmark Badge */}
-              <View style={styles.verifiedCheckBadge}>
+              <View
+                style={[
+                  styles.verifiedCheckBadge,
+                  isDarkMode && { backgroundColor: '#00C98D', borderColor: '#191A1D' },
+                ]}
+              >
                 <BootstrapIcon name="check" size={13} color="#FFFFFF" />
               </View>
             </View>
@@ -345,9 +353,19 @@ export default function AdminProfileLogsPanel({
             <View style={styles.identityDetailsWrap}>
               <View style={styles.nameAndRoleRow}>
                 <Text style={[styles.heroName, { color: textPrimary }]}>{displayName}</Text>
-                <View style={styles.storeAdminPill}>
-                  <BootstrapIcon name="shield-check" size={13} color="#059669" />
-                  <Text style={styles.storeAdminPillText}>Store administrator</Text>
+                <View
+                  style={[
+                    styles.storeAdminPill,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                      borderColor: 'rgba(0, 201, 141, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="shield-check" size={13} color={isDarkMode ? '#00C98D' : '#059669'} />
+                  <Text style={[styles.storeAdminPillText, isDarkMode && { color: '#00C98D' }]}>
+                    Store administrator
+                  </Text>
                 </View>
               </View>
 
@@ -359,8 +377,8 @@ export default function AdminProfileLogsPanel({
                   style={[
                     styles.changePhotoBtn,
                     {
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      backgroundColor: isDarkMode ? '#1B2621' : '#FFFFFF',
+                      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
+                      backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
                     },
                   ]}
                   onPress={handlePickAvatar}
@@ -368,18 +386,18 @@ export default function AdminProfileLogsPanel({
                   activeOpacity={0.75}
                 >
                   {isUploadingAvatar ? (
-                    <ActivityIndicator size="small" color="#EA580C" />
+                    <ActivityIndicator size="small" color="#FF5A00" />
                   ) : (
                     <>
                       <BootstrapIcon
                         name="camera"
                         size={13}
-                        color={isDarkMode ? tokens.textPrimary : '#0F172A'}
+                        color={isDarkMode ? '#F2F2F3' : '#0F172A'}
                       />
                       <Text
                         style={[
                           styles.changePhotoBtnText,
-                          { color: isDarkMode ? tokens.textPrimary : '#0F172A' },
+                          { color: isDarkMode ? '#F2F2F3' : '#0F172A' },
                         ]}
                       >
                         Change photo
@@ -395,8 +413,8 @@ export default function AdminProfileLogsPanel({
                     disabled={isUploadingAvatar}
                     activeOpacity={0.75}
                   >
-                    <BootstrapIcon name="trash" size={13} color="#DC2626" />
-                    <Text style={styles.removePhotoBtnText}>Remove</Text>
+                    <BootstrapIcon name="trash" size={13} color={isDarkMode ? '#F04444' : '#DC2626'} />
+                    <Text style={[styles.removePhotoBtnText, isDarkMode && { color: '#F04444' }]}>Remove</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -408,39 +426,39 @@ export default function AdminProfileLogsPanel({
             style={[
               styles.heroRightStats,
               {
-                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                backgroundColor: isDarkMode ? '#0F1412' : '#FFFFFF',
+                borderColor: cardBorder,
+                backgroundColor: secondaryBg,
               },
             ]}
           >
             {/* Col 1: ACCESS LEVEL */}
             <View style={styles.statCell}>
-              <Text style={styles.statLabel}>ACCESS LEVEL</Text>
+              <Text style={[styles.statLabel, isDarkMode && { color: '#71717A' }]}>ACCESS LEVEL</Text>
               <Text style={[styles.statValue, { color: textPrimary }]}>Full permissions</Text>
               <Text style={[styles.statSubtext, { color: textMuted }]}>Store administrator</Text>
             </View>
 
             <View
-              style={[styles.statDivider, { backgroundColor: isDarkMode ? tokens.borderInput : '#E2E8F0' }]}
+              style={[styles.statDivider, { backgroundColor: cardBorder }]}
             />
 
             {/* Col 2: SESSION */}
             <View style={styles.statCell}>
-              <Text style={styles.statLabel}>SESSION</Text>
+              <Text style={[styles.statLabel, isDarkMode && { color: '#71717A' }]}>SESSION</Text>
               <View style={styles.sessionValueRow}>
-                <View style={styles.sessionActiveDot} />
-                <Text style={styles.sessionActiveText}>Active</Text>
+                <View style={[styles.sessionActiveDot, isDarkMode && { backgroundColor: '#00C98D' }]} />
+                <Text style={[styles.sessionActiveText, isDarkMode && { color: '#00C98D' }]}>Active</Text>
               </View>
               <Text style={[styles.statSubtext, { color: textMuted }]}>Verified device</Text>
             </View>
 
             <View
-              style={[styles.statDivider, { backgroundColor: isDarkMode ? tokens.borderInput : '#E2E8F0' }]}
+              style={[styles.statDivider, { backgroundColor: cardBorder }]}
             />
 
             {/* Col 3: AUTH PROVIDER */}
             <View style={styles.statCell}>
-              <Text style={styles.statLabel}>AUTH PROVIDER</Text>
+              <Text style={[styles.statLabel, isDarkMode && { color: '#71717A' }]}>AUTH PROVIDER</Text>
               <Text style={[styles.statValue, { color: textPrimary }]}>Supabase</Text>
               <Text style={[styles.statSubtext, { color: textMuted }]}>Synced automatically</Text>
             </View>
@@ -463,25 +481,35 @@ export default function AdminProfileLogsPanel({
             },
           ]}
         >
-          <Text style={styles.settingsNavHeader}>SETTINGS</Text>
+          <Text style={[styles.settingsNavHeader, isDarkMode && { color: '#71717A' }]}>SETTINGS</Text>
 
           <View style={styles.settingsNavList}>
             {/* Nav Item 1: Profile information */}
             <TouchableOpacity
-              style={[styles.navItemBtn, activeTab === 'profile' && styles.navItemBtnActive]}
+              style={[
+                styles.navItemBtn,
+                activeTab === 'profile' &&
+                (isDarkMode
+                  ? { backgroundColor: '#3A241B', borderColor: '#8A3D19' }
+                  : styles.navItemBtnActive),
+              ]}
               onPress={() => setActiveTab('profile')}
               activeOpacity={0.8}
             >
               <View
                 style={[
                   styles.navIconBox,
-                  activeTab === 'profile' ? styles.navIconBoxActive : styles.navIconBoxInactive,
+                  activeTab === 'profile'
+                    ? styles.navIconBoxActive
+                    : isDarkMode
+                      ? { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }
+                      : styles.navIconBoxInactive,
                 ]}
               >
                 <BootstrapIcon
                   name={activeTab === 'profile' ? 'person-fill' : 'person'}
                   size={16}
-                  color={activeTab === 'profile' ? '#FFFFFF' : '#64748B'}
+                  color={activeTab === 'profile' ? '#FFFFFF' : isDarkMode ? '#A1A1AA' : '#64748B'}
                 />
               </View>
 
@@ -489,8 +517,9 @@ export default function AdminProfileLogsPanel({
                 <Text
                   style={[
                     styles.navItemTitle,
-                    { color: textPrimary },
-                    activeTab === 'profile' && styles.navItemTitleActive,
+                    { color: isDarkMode ? '#A1A1AA' : textPrimary },
+                    activeTab === 'profile' &&
+                    (isDarkMode ? { color: '#F5F5F5', fontWeight: '700' } : styles.navItemTitleActive),
                   ]}
                 >
                   Profile information
@@ -501,26 +530,36 @@ export default function AdminProfileLogsPanel({
               <BootstrapIcon
                 name="chevron-right"
                 size={12}
-                color={activeTab === 'profile' ? '#EA580C' : '#94A3B8'}
+                color={activeTab === 'profile' ? '#FF5A00' : iconMuted}
               />
             </TouchableOpacity>
 
             {/* Nav Item 2: Security & credentials */}
             <TouchableOpacity
-              style={[styles.navItemBtn, activeTab === 'security' && styles.navItemBtnActive]}
+              style={[
+                styles.navItemBtn,
+                activeTab === 'security' &&
+                (isDarkMode
+                  ? { backgroundColor: '#3A241B', borderColor: '#8A3D19' }
+                  : styles.navItemBtnActive),
+              ]}
               onPress={() => setActiveTab('security')}
               activeOpacity={0.8}
             >
               <View
                 style={[
                   styles.navIconBox,
-                  activeTab === 'security' ? styles.navIconBoxActive : styles.navIconBoxInactive,
+                  activeTab === 'security'
+                    ? styles.navIconBoxActive
+                    : isDarkMode
+                      ? { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }
+                      : styles.navIconBoxInactive,
                 ]}
               >
                 <BootstrapIcon
                   name={activeTab === 'security' ? 'shield-lock-fill' : 'shield-lock'}
                   size={16}
-                  color={activeTab === 'security' ? '#FFFFFF' : '#64748B'}
+                  color={activeTab === 'security' ? '#FFFFFF' : isDarkMode ? '#A1A1AA' : '#64748B'}
                 />
               </View>
 
@@ -528,8 +567,9 @@ export default function AdminProfileLogsPanel({
                 <Text
                   style={[
                     styles.navItemTitle,
-                    { color: textPrimary },
-                    activeTab === 'security' && styles.navItemTitleActive,
+                    { color: isDarkMode ? '#A1A1AA' : textPrimary },
+                    activeTab === 'security' &&
+                    (isDarkMode ? { color: '#F5F5F5', fontWeight: '700' } : styles.navItemTitleActive),
                   ]}
                 >
                   Security & credentials
@@ -540,7 +580,7 @@ export default function AdminProfileLogsPanel({
               <BootstrapIcon
                 name="chevron-right"
                 size={12}
-                color={activeTab === 'security' ? '#EA580C' : '#94A3B8'}
+                color={activeTab === 'security' ? '#FF5A00' : iconMuted}
               />
             </TouchableOpacity>
           </View>
@@ -548,10 +588,14 @@ export default function AdminProfileLogsPanel({
           {/* Bottom Security Guarantee Badge */}
           <View style={[styles.navBottomDivider, { backgroundColor: cardBorder }]} />
           <View style={styles.securityPledgeRow}>
-            <BootstrapIcon name="shield-check" size={18} color="#059669" />
+            <BootstrapIcon name="shield-check" size={18} color={isDarkMode ? '#00C98D' : '#059669'} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.securityPledgeTitle}>Your account is secure</Text>
-              <Text style={styles.securityPledgeSubtitle}>Credentials are encrypted and protected.</Text>
+              <Text style={[styles.securityPledgeTitle, isDarkMode && { color: '#00C98D' }]}>
+                Your account is secure
+              </Text>
+              <Text style={[styles.securityPledgeSubtitle, { color: textMuted }]}>
+                Credentials are encrypted and protected.
+              </Text>
             </View>
           </View>
         </View>
@@ -562,16 +606,31 @@ export default function AdminProfileLogsPanel({
           {activeTab === 'profile' && (
             <View style={[styles.mainContentCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               {profileSuccessMsg ? (
-                <View style={styles.bannerSuccess}>
-                  <BootstrapIcon name="check-circle-fill" size={14} color="#059669" />
-                  <Text style={styles.bannerSuccessText}>{profileSuccessMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerSuccess,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                      borderColor: 'rgba(0, 201, 141, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={14} color={isDarkMode ? '#00C98D' : '#059669'} />
+                  <Text style={[styles.bannerSuccessText, isDarkMode && { color: '#00C98D' }]}>
+                    {profileSuccessMsg}
+                  </Text>
                 </View>
               ) : null}
 
               {/* ── Section 1: Personal information ── */}
               <View style={styles.sectionHeaderRow}>
-                <View style={styles.peachSectionIconBox}>
-                  <BootstrapIcon name="person" size={18} color="#EA580C" />
+                <View
+                  style={[
+                    styles.peachSectionIconBox,
+                    isDarkMode && { backgroundColor: '#3A241B', borderWidth: 1, borderColor: '#8A3D19' },
+                  ]}
+                >
+                  <BootstrapIcon name="person" size={18} color="#FF5A00" />
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: textPrimary }]}>Personal information</Text>
@@ -586,7 +645,7 @@ export default function AdminProfileLogsPanel({
                 {/* Full Name */}
                 <View style={styles.formGridCol}>
                   <Text style={[styles.fieldLabel, { color: textPrimary }]}>
-                    Full name <Text style={{ color: '#EA580C' }}>*</Text>
+                    Full name <Text style={{ color: '#FF5A00' }}>*</Text>
                   </Text>
                   <View
                     style={[
@@ -597,13 +656,13 @@ export default function AdminProfileLogsPanel({
                       },
                     ]}
                   >
-                    <BootstrapIcon name="person" size={16} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="person" size={16} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={name}
                       onChangeText={setName}
                       placeholder="Jherico Maurin"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                     />
                   </View>
                 </View>
@@ -620,16 +679,16 @@ export default function AdminProfileLogsPanel({
                       },
                     ]}
                   >
-                    <BootstrapIcon name="telephone" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="telephone" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={phone}
                       onChangeText={setPhone}
                       placeholder="e.g. 0917 123 4567"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                     />
                   </View>
-                  <Text style={styles.fieldHelperText}>
+                  <Text style={[styles.fieldHelperText, isDarkMode && { color: '#71717A' }]}>
                     Used only for account recovery and urgent alerts.
                   </Text>
                 </View>
@@ -640,8 +699,17 @@ export default function AdminProfileLogsPanel({
 
               {/* ── Section 2: Administrative access ── */}
               <View style={styles.sectionHeaderRow}>
-                <View style={styles.greenSectionIconBox}>
-                  <BootstrapIcon name="shield-check" size={18} color="#10B981" />
+                <View
+                  style={[
+                    styles.greenSectionIconBox,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(0, 201, 141, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="shield-check" size={18} color={isDarkMode ? '#00C98D' : '#10B981'} />
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: textPrimary }]}>Administrative access</Text>
@@ -656,17 +724,27 @@ export default function AdminProfileLogsPanel({
                 style={[
                   styles.roleCardBox,
                   {
-                    backgroundColor: isDarkMode ? '#17221E' : '#F8FAFC',
+                    backgroundColor: secondaryBg,
                     borderColor: cardBorder,
                   },
                 ]}
               >
                 <View style={styles.roleCardLeft}>
-                  <View style={styles.roleIconCircle}>
-                    <BootstrapIcon name="shield-check" size={18} color="#059669" />
+                  <View
+                    style={[
+                      styles.roleIconCircle,
+                      isDarkMode && {
+                        backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                        borderColor: 'rgba(0, 201, 141, 0.28)',
+                      },
+                    ]}
+                  >
+                    <BootstrapIcon name="shield-check" size={18} color={isDarkMode ? '#00C98D' : '#059669'} />
                   </View>
                   <View style={styles.roleTextWrap}>
-                    <Text style={styles.roleCardHeaderLabel}>CURRENT ROLE</Text>
+                    <Text style={[styles.roleCardHeaderLabel, isDarkMode && { color: '#71717A' }]}>
+                      CURRENT ROLE
+                    </Text>
                     <Text style={[styles.roleCardTitle, { color: textPrimary }]}>Store administrator</Text>
                     <Text style={[styles.roleCardDesc, { color: textMuted }]}>
                       Full access to store operations, customers, reports, and settings.
@@ -679,19 +757,21 @@ export default function AdminProfileLogsPanel({
                   style={[
                     styles.lockedBadge,
                     {
-                      backgroundColor: isDarkMode ? tokens.borderInput : '#F1F5F9',
-                      borderColor: cardBorder,
+                      backgroundColor: isDarkMode ? '#292B2F' : '#F1F5F9',
+                      borderColor: isDarkMode ? '#3A3B40' : cardBorder,
                     },
                   ]}
                 >
-                  <BootstrapIcon name="lock-fill" size={12} color="#64748B" />
-                  <Text style={styles.lockedBadgeText}>Locked</Text>
+                  <BootstrapIcon name="lock-fill" size={12} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
+                  <Text style={[styles.lockedBadgeText, isDarkMode && { color: '#A1A1AA' }]}>Locked</Text>
                 </View>
               </View>
 
               {/* ── Bottom Footer with Save Changes Button ── */}
               <View style={[styles.footerActionRow, { borderTopColor: cardBorder }]}>
-                <Text style={styles.footerNoteText}>Changes apply to your administrator profile only.</Text>
+                <Text style={[styles.footerNoteText, isDarkMode && { color: '#71717A' }]}>
+                  Changes apply to your administrator profile only.
+                </Text>
 
                 <TouchableOpacity
                   style={styles.saveChangesBtn}
@@ -717,8 +797,13 @@ export default function AdminProfileLogsPanel({
             <View style={[styles.mainContentCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               {/* ── Section A: Administrator Email ── */}
               <View style={styles.sectionHeaderRow}>
-                <View style={styles.peachSectionIconBox}>
-                  <BootstrapIcon name="envelope-fill" size={17} color="#EA580C" />
+                <View
+                  style={[
+                    styles.peachSectionIconBox,
+                    isDarkMode && { backgroundColor: '#3A241B', borderWidth: 1, borderColor: '#8A3D19' },
+                  ]}
+                >
+                  <BootstrapIcon name="envelope-fill" size={17} color="#FF5A00" />
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: textPrimary }]}>Administrator Email</Text>
@@ -729,15 +814,35 @@ export default function AdminProfileLogsPanel({
               </View>
 
               {emailErrorMsg ? (
-                <View style={styles.bannerError}>
-                  <BootstrapIcon name="exclamation-circle-fill" size={14} color="#DC2626" />
-                  <Text style={styles.bannerErrorText}>{emailErrorMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerError,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(240, 68, 68, 0.14)',
+                      borderColor: 'rgba(240, 68, 68, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="exclamation-circle-fill" size={14} color={isDarkMode ? '#F04444' : '#DC2626'} />
+                  <Text style={[styles.bannerErrorText, isDarkMode && { color: '#FCA5A5' }]}>
+                    {emailErrorMsg}
+                  </Text>
                 </View>
               ) : null}
               {emailSuccessMsg ? (
-                <View style={styles.bannerSuccess}>
-                  <BootstrapIcon name="check-circle-fill" size={14} color="#059669" />
-                  <Text style={styles.bannerSuccessText}>{emailSuccessMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerSuccess,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                      borderColor: 'rgba(0, 201, 141, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={14} color={isDarkMode ? '#00C98D' : '#059669'} />
+                  <Text style={[styles.bannerSuccessText, isDarkMode && { color: '#00C98D' }]}>
+                    {emailSuccessMsg}
+                  </Text>
                 </View>
               ) : null}
 
@@ -749,7 +854,7 @@ export default function AdminProfileLogsPanel({
                     style={[
                       styles.fieldInputWrap,
                       {
-                        backgroundColor: isDarkMode ? '#131A17' : '#F8FAFC',
+                        backgroundColor: secondaryBg,
                         borderColor: cardBorder,
                       },
                     ]}
@@ -757,14 +862,24 @@ export default function AdminProfileLogsPanel({
                     <BootstrapIcon
                       name="check-circle-fill"
                       size={15}
-                      color="#10B981"
+                      color={isDarkMode ? '#00C98D' : '#10B981'}
                       style={{ marginRight: 10 }}
                     />
                     <Text style={{ flex: 1, fontSize: 13.5, color: textPrimary, fontWeight: '600' }}>
                       {displayEmail}
                     </Text>
-                    <View style={styles.verifiedSmallPill}>
-                      <Text style={styles.verifiedSmallPillText}>Verified</Text>
+                    <View
+                      style={[
+                        styles.verifiedSmallPill,
+                        isDarkMode && {
+                          backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                          borderColor: 'rgba(0, 201, 141, 0.28)',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.verifiedSmallPillText, isDarkMode && { color: '#00C98D' }]}>
+                        Verified
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -775,13 +890,13 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[styles.fieldInputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
                   >
-                    <BootstrapIcon name="envelope" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="envelope" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={newEmail}
                       onChangeText={setNewEmail}
                       placeholder="admin@newdomain.com"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                       keyboardType="email-address"
                       autoCapitalize="none"
                     />
@@ -797,13 +912,13 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[styles.fieldInputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
                   >
-                    <BootstrapIcon name="lock" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="lock" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={emailCurrentPassword}
                       onChangeText={setEmailCurrentPassword}
                       placeholder="Enter current password"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                       secureTextEntry={!showEmailCurrentPwd}
                     />
                     <TouchableOpacity
@@ -813,7 +928,7 @@ export default function AdminProfileLogsPanel({
                       <BootstrapIcon
                         name={showEmailCurrentPwd ? 'eye-slash' : 'eye'}
                         size={15}
-                        color="#94A3B8"
+                        color={iconMuted}
                       />
                     </TouchableOpacity>
                   </View>
@@ -838,8 +953,13 @@ export default function AdminProfileLogsPanel({
 
               {/* ── Section B: Administrator Password ── */}
               <View style={styles.sectionHeaderRow}>
-                <View style={styles.peachSectionIconBox}>
-                  <BootstrapIcon name="key-fill" size={17} color="#EA580C" />
+                <View
+                  style={[
+                    styles.peachSectionIconBox,
+                    isDarkMode && { backgroundColor: '#3A241B', borderWidth: 1, borderColor: '#8A3D19' },
+                  ]}
+                >
+                  <BootstrapIcon name="key-fill" size={17} color="#FF5A00" />
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: textPrimary }]}>Account Password</Text>
@@ -850,15 +970,35 @@ export default function AdminProfileLogsPanel({
               </View>
 
               {pwdErrorMsg ? (
-                <View style={styles.bannerError}>
-                  <BootstrapIcon name="exclamation-circle-fill" size={14} color="#DC2626" />
-                  <Text style={styles.bannerErrorText}>{pwdErrorMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerError,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(240, 68, 68, 0.14)',
+                      borderColor: 'rgba(240, 68, 68, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="exclamation-circle-fill" size={14} color={isDarkMode ? '#F04444' : '#DC2626'} />
+                  <Text style={[styles.bannerErrorText, isDarkMode && { color: '#FCA5A5' }]}>
+                    {pwdErrorMsg}
+                  </Text>
                 </View>
               ) : null}
               {pwdSuccessMsg ? (
-                <View style={styles.bannerSuccess}>
-                  <BootstrapIcon name="check-circle-fill" size={14} color="#059669" />
-                  <Text style={styles.bannerSuccessText}>{pwdSuccessMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerSuccess,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                      borderColor: 'rgba(0, 201, 141, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={14} color={isDarkMode ? '#00C98D' : '#059669'} />
+                  <Text style={[styles.bannerSuccessText, isDarkMode && { color: '#00C98D' }]}>
+                    {pwdSuccessMsg}
+                  </Text>
                 </View>
               ) : null}
 
@@ -869,20 +1009,20 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[styles.fieldInputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
                   >
-                    <BootstrapIcon name="lock" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="lock" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={pwdCurrentPassword}
                       onChangeText={setPwdCurrentPassword}
                       placeholder="Enter current password"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                       secureTextEntry={!showPwdCurrent}
                     />
                     <TouchableOpacity
                       onPress={() => setShowPwdCurrent(!showPwdCurrent)}
                       style={{ padding: 6 }}
                     >
-                      <BootstrapIcon name={showPwdCurrent ? 'eye-slash' : 'eye'} size={15} color="#94A3B8" />
+                      <BootstrapIcon name={showPwdCurrent ? 'eye-slash' : 'eye'} size={15} color={iconMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -897,7 +1037,7 @@ export default function AdminProfileLogsPanel({
                       <BootstrapIcon
                         name="shield-lock"
                         size={15}
-                        color="#94A3B8"
+                        color={iconMuted}
                         style={{ marginRight: 10 }}
                       />
                       <TextInput
@@ -905,11 +1045,11 @@ export default function AdminProfileLogsPanel({
                         value={newPassword}
                         onChangeText={setNewPassword}
                         placeholder="At least 8 characters"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={placeholderColor}
                         secureTextEntry={!showNewPwd}
                       />
                       <TouchableOpacity onPress={() => setShowNewPwd(!showNewPwd)} style={{ padding: 6 }}>
-                        <BootstrapIcon name={showNewPwd ? 'eye-slash' : 'eye'} size={15} color="#94A3B8" />
+                        <BootstrapIcon name={showNewPwd ? 'eye-slash' : 'eye'} size={15} color={iconMuted} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -922,7 +1062,7 @@ export default function AdminProfileLogsPanel({
                       <BootstrapIcon
                         name="shield-lock"
                         size={15}
-                        color="#94A3B8"
+                        color={iconMuted}
                         style={{ marginRight: 10 }}
                       />
                       <TextInput
@@ -930,7 +1070,7 @@ export default function AdminProfileLogsPanel({
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
                         placeholder="Confirm password"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={placeholderColor}
                         secureTextEntry={!showConfirmPwd}
                       />
                       <TouchableOpacity
@@ -940,7 +1080,7 @@ export default function AdminProfileLogsPanel({
                         <BootstrapIcon
                           name={showConfirmPwd ? 'eye-slash' : 'eye'}
                           size={15}
-                          color="#94A3B8"
+                          color={iconMuted}
                         />
                       </TouchableOpacity>
                     </View>
@@ -952,7 +1092,7 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[
                       styles.strengthMeterBox,
-                      { backgroundColor: isDarkMode ? '#1A221E' : '#F8FAFC', borderColor: cardBorder },
+                      { backgroundColor: secondaryBg, borderColor: cardBorder },
                     ]}
                   >
                     <View
@@ -970,7 +1110,7 @@ export default function AdminProfileLogsPanel({
                         {pwdStrength.label}
                       </Text>
                     </View>
-                    <View style={styles.strengthTrack}>
+                    <View style={[styles.strengthTrack, isDarkMode && { backgroundColor: '#303236' }]}>
                       <View
                         style={[
                           styles.strengthFill,
@@ -1003,8 +1143,13 @@ export default function AdminProfileLogsPanel({
 
               {/* ── Section C: Admin Security PIN ── */}
               <View style={styles.sectionHeaderRow}>
-                <View style={styles.peachSectionIconBox}>
-                  <BootstrapIcon name="grid-3x3-gap-fill" size={17} color="#EA580C" />
+                <View
+                  style={[
+                    styles.peachSectionIconBox,
+                    isDarkMode && { backgroundColor: '#3A241B', borderWidth: 1, borderColor: '#8A3D19' },
+                  ]}
+                >
+                  <BootstrapIcon name="grid-3x3-gap-fill" size={17} color="#FF5A00" />
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: textPrimary }]}>Admin Security PIN</Text>
@@ -1017,15 +1162,35 @@ export default function AdminProfileLogsPanel({
               </View>
 
               {pinErrorMsg ? (
-                <View style={styles.bannerError}>
-                  <BootstrapIcon name="exclamation-circle-fill" size={14} color="#DC2626" />
-                  <Text style={styles.bannerErrorText}>{pinErrorMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerError,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(240, 68, 68, 0.14)',
+                      borderColor: 'rgba(240, 68, 68, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="exclamation-circle-fill" size={14} color={isDarkMode ? '#F04444' : '#DC2626'} />
+                  <Text style={[styles.bannerErrorText, isDarkMode && { color: '#FCA5A5' }]}>
+                    {pinErrorMsg}
+                  </Text>
                 </View>
               ) : null}
               {pinSuccessMsg ? (
-                <View style={styles.bannerSuccess}>
-                  <BootstrapIcon name="check-circle-fill" size={14} color="#059669" />
-                  <Text style={styles.bannerSuccessText}>{pinSuccessMsg}</Text>
+                <View
+                  style={[
+                    styles.bannerSuccess,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(0, 201, 141, 0.14)',
+                      borderColor: 'rgba(0, 201, 141, 0.28)',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={14} color={isDarkMode ? '#00C98D' : '#059669'} />
+                  <Text style={[styles.bannerSuccessText, isDarkMode && { color: '#00C98D' }]}>
+                    {pinSuccessMsg}
+                  </Text>
                 </View>
               ) : null}
 
@@ -1036,13 +1201,13 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[styles.fieldInputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
                   >
-                    <BootstrapIcon name="lock" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="lock" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={currentPin}
                       onChangeText={setCurrentPin}
                       placeholder="e.g. 2026"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                       keyboardType="numeric"
                       maxLength={6}
                       secureTextEntry={!showPins}
@@ -1056,13 +1221,13 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[styles.fieldInputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
                   >
-                    <BootstrapIcon name="key" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="key" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={newPin}
                       onChangeText={setNewPin}
                       placeholder="New PIN digits"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                       keyboardType="numeric"
                       maxLength={6}
                       secureTextEntry={!showPins}
@@ -1076,13 +1241,13 @@ export default function AdminProfileLogsPanel({
                   <View
                     style={[styles.fieldInputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
                   >
-                    <BootstrapIcon name="check2" size={15} color="#94A3B8" style={{ marginRight: 10 }} />
+                    <BootstrapIcon name="check2" size={15} color={iconMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={[styles.fieldTextInput, { color: textPrimary }]}
                       value={confirmPin}
                       onChangeText={setConfirmPin}
                       placeholder="Repeat new PIN"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={placeholderColor}
                       keyboardType="numeric"
                       maxLength={6}
                       secureTextEntry={!showPins}
@@ -1109,8 +1274,8 @@ export default function AdminProfileLogsPanel({
                   onPress={() => setShowPins(!showPins)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 }}
                 >
-                  <BootstrapIcon name={showPins ? 'eye-slash' : 'eye'} size={14} color="#64748B" />
-                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
+                  <BootstrapIcon name={showPins ? 'eye-slash' : 'eye'} size={14} color={textMuted} />
+                  <Text style={{ fontSize: 12, color: textMuted, fontWeight: '600' }}>
                     {showPins ? 'Hide PIN digits' : 'Show digits'}
                   </Text>
                 </TouchableOpacity>
@@ -1556,7 +1721,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FF5A00',
     paddingHorizontal: 22,
     paddingVertical: 10,
     borderRadius: 10,
@@ -1569,7 +1734,7 @@ const styles = StyleSheet.create({
   },
 
   actionSubmitBtn: {
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FF5A00',
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 8,

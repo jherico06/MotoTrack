@@ -21,8 +21,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon } from '../../../components/common/BootstrapIcon.jsx';
+import MobileBottomNavBar from '../../../components/mobile/customer/MobileBottomNavBar.jsx';
 import RiderQrScanSheet from '../../../components/modals/RiderQrScanSheet.jsx';
 import RiderDeliveryConfirmSheet from '../../../components/modals/RiderDeliveryConfirmSheet.jsx';
+import LiveOrderTrackingMapModal from '../../../components/modals/LiveOrderTrackingMapModal.jsx';
 import {
   RiderTopHeader,
   RiderProfileMenuModal,
@@ -30,17 +32,15 @@ import {
 } from '../../../components/mobile/rider/RiderHeaderAndMenus.jsx';
 import RiderOrderCard from '../../../components/mobile/rider/RiderOrderCard.jsx';
 import RiderOrderDetailsSheet from '../../../components/mobile/rider/RiderOrderDetailsSheet.jsx';
+import RiderHomeDeliveryMapCard from '../../../components/mobile/rider/RiderHomeDeliveryMapCard.jsx';
 import RiderEarningsView from '../../../components/mobile/rider/RiderEarningsView.jsx';
 import RiderAccountView from '../../../components/mobile/rider/RiderAccountView.jsx';
 import {
   RIDER_FONT,
   cardShadowStyle,
   getRiderPalette,
-  formatPhp,
-  formatHeroDate,
-  getGreetingByHour,
-  getFirstName,
   isDeliveredOrder,
+  isNeedsPickupOrder,
   formatOrderCode,
 } from '../../../components/mobile/rider/riderTheme.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
@@ -62,7 +62,7 @@ import { areaFromAddress } from '../../../utils/geo.js';
 
 const DEFAULT_PREFS = {
   pushNotifications: true,
-  smsUpdates: true,
+  emailUpdates: true,
   twoFactorEnabled: false,
   homeAddress: '',
 };
@@ -404,9 +404,16 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     [needConfirmationOrders]
   );
 
+  const needsPickupOrders = useMemo(
+    () => needConfirmationOrders.filter((d) => isNeedsPickupOrder(d)),
+    [needConfirmationOrders]
+  );
+
   const filteredOrders = useMemo(() => {
     let list = [];
-    if (orderFilter === 'to_confirm') {
+    if (orderFilter === 'needs_pickup') {
+      list = needsPickupOrders;
+    } else if (orderFilter === 'to_confirm') {
       list = needConfirmationOrders;
       if (mainTab === 'orders' && ordersSubFilter === 'out') {
         list = list.filter((d) =>
@@ -440,6 +447,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     ordersSubFilter,
     mainTab,
     searchQuery,
+    needsPickupOrders,
     needConfirmationOrders,
     deliveredOrders,
   ]);
@@ -510,20 +518,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     showFeedback,
   ]);
 
-  // Weekly Earnings Subtitle
-  const weeklyEarningsSub = useMemo(() => {
-    if (prevWeekEarnings > 0 && weekEarnings > 0) {
-      const pct = Math.round(
-        ((weekEarnings - prevWeekEarnings) / prevWeekEarnings) * 100
-      );
-      if (pct >= 0) return `+${pct}% from last week`;
-      return `${pct}% from last week`;
-    }
-    if (weekEarnings > 0) {
-      return `${deliveredOrders.length} completed`;
-    }
-    return 'This week';
-  }, [weekEarnings, prevWeekEarnings, deliveredOrders.length]);
+  // Weekly Earnings State cleanup — kept prevWeekEarnings/weekEarnings for RiderEarningsView
 
   // QR Scanner & Delivery Confirmation Handlers
   const openScannerFromDetail = useCallback((targetOrder) => {
@@ -666,6 +661,11 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   const handleConfirmDelivery = async () => {
     const target = verified || selectedOrder;
     if (confirming || !target?.orderId) return;
+    const activeProofPhoto = podPhoto || target.deliveryPhoto || null;
+    if (!activeProofPhoto) {
+      setConfirmError('Please attach a proof of delivery photo before confirming.');
+      return;
+    }
     setConfirming(true);
     setConfirmError('');
     try {
@@ -677,13 +677,22 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
           orderId: target.orderId,
           scannedRaw: target.scannedRaw,
         });
+        if (res.success && podPhoto) {
+          await deliveryService
+            .riderUploadProofPhoto({
+              riderId,
+              orderId: res.delivery?.orderId || target.orderId,
+              photoUri: podPhoto,
+            })
+            .catch(() => {});
+        }
       } else {
         res = await deliveryService.riderConfirmOrderDelivery({
           riderId,
           riderUser: currentUser,
           orderId: target.orderId,
           notes: 'Delivered by rider via MotoTrack mobile confirmation',
-          photoUri: podPhoto || target.deliveryPhoto || null,
+          photoUri: activeProofPhoto,
         });
       }
       if (!res.success) {
@@ -693,14 +702,18 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         );
         return;
       }
-      applyDeliveredLocally(res.delivery);
-      setConfirmed(res.delivery);
+      const deliveredRecord = {
+        ...res.delivery,
+        deliveryPhoto: res.delivery?.deliveryPhoto || activeProofPhoto,
+      };
+      applyDeliveredLocally(deliveredRecord);
+      setConfirmed(deliveredRecord);
       setVerified(null);
       setSelectedOrder(null);
       setPodPhoto(null);
       await riderGpsTrackingService.stop({
         clearDb: true,
-        orderId: res.delivery.orderId,
+        orderId: deliveredRecord.orderId,
         riderId,
       });
     } catch (_e) {
@@ -854,13 +867,47 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
 
   const riderFullName =
     riderProfile?.name || currentUser?.name || 'Jherico Maurin';
-  const riderFirstName = getFirstName(riderFullName, 'Jherico');
   const riderAvatar = riderProfile?.avatar || currentUser?.avatar || '';
+  const [mapOrder, setMapOrder] = useState(null);
 
-  // Reusable Filter Tabs & Search Block (shared across Home & Orders tabs)
-  const renderFiltersAndSearch = () => {
+  const openOrderMap = useCallback(
+    (delivery) => {
+      if (!delivery) return;
+      setSelectedOrder(null);
+      setMapOrder({
+        id: delivery.orderId,
+        order_id: delivery.orderId,
+        status: delivery.deliveryStatus || 'Assigned',
+        customer_name: delivery.customerName || 'Customer',
+        customer_address: delivery.customerAddress || '',
+        shipping_address: delivery.customerAddress || '',
+        customer_phone: delivery.customerPhone || '',
+        delivery_lat: delivery.lat,
+        delivery_lng: delivery.lng,
+        total: delivery.totalAmount,
+        grand_total: delivery.totalAmount,
+        payment_method: delivery.paymentMethod,
+        items: delivery.items,
+        items_summary: delivery.itemsSummary,
+        rider_name: riderFullName,
+        rider_phone: riderProfile?.phone || currentUser?.phone || '',
+        rider_vehicle: riderProfile?.vehicleInfo || '',
+        rider_plate: riderProfile?.plateNumber || '',
+        rider_avatar: riderAvatar || '',
+      });
+    },
+    [riderFullName, riderProfile, currentUser, riderAvatar]
+  );
+
+  // Reusable Filter Tabs & Search Block (Customer Orders layout: Search bar above horizontal status pills)
+  const renderFiltersAndSearch = (showSearchInput = true, showAreaToggle = false) => {
     const tabs = [
       { id: 'all', label: 'All', count: deliveries.length },
+      {
+        id: 'needs_pickup',
+        label: 'Needs pickup',
+        count: needsPickupOrders.length,
+      },
       {
         id: 'to_confirm',
         label: 'To confirm',
@@ -871,12 +918,52 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
 
     return (
       <View style={styles.filtersBlock}>
-        {/* Segmented Filter Tabs */}
-        <View
-          style={[
-            styles.filterTrack,
-            { backgroundColor: palette.isDark ? palette.bgMuted : '#F1F3F5' },
-          ]}
+        {/* Rounded Search Input (Matching Customer Orders) */}
+        {showSearchInput ? (
+          <View
+            style={[
+              styles.searchFieldWrap,
+              {
+                backgroundColor: palette.isDark ? '#1C1F23' : '#FFFFFF',
+                borderColor: palette.isDark ? '#2B3035' : '#EDE9E0',
+              },
+            ]}
+          >
+            <BootstrapIcon
+              name="search"
+              size={16}
+              color={palette.isDark ? '#94A3B8' : '#9CA3AF'}
+            />
+            <TextInput
+              style={[styles.searchInput, { color: palette.textPrimary }]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search order number, customer, or item"
+              placeholderTextColor={palette.isDark ? '#6B7280' : '#9CA3AF'}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {searchQuery ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                style={styles.clearSearchBtn}
+                accessibilityLabel="Clear search"
+              >
+                <BootstrapIcon
+                  name="x-circle-fill"
+                  size={16}
+                  color={palette.isDark ? '#94A3B8' : '#9CA3AF'}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Horizontal Filter Pills Row (Matching Customer Orders) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterTrack}
         >
           {tabs.map((t) => {
             const active = orderFilter === t.id;
@@ -885,16 +972,28 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                 key={t.id}
                 style={[
                   styles.filterTab,
-                  active && [
-                    styles.filterTabActive,
-                    { backgroundColor: palette.bgCard },
-                  ],
+                  {
+                    backgroundColor: active
+                      ? palette.isDark
+                        ? '#EA580C'
+                        : '#141414'
+                      : palette.isDark
+                        ? '#1C1F23'
+                        : '#FFFFFF',
+                    borderColor: active
+                      ? palette.isDark
+                        ? '#EA580C'
+                        : '#141414'
+                      : palette.isDark
+                        ? '#2B3035'
+                        : '#EDE9E0',
+                  },
                 ]}
                 onPress={() => {
                   setOrderFilter(t.id);
                   setOrdersSubFilter('all');
                 }}
-                activeOpacity={0.82}
+                activeOpacity={0.8}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
@@ -902,68 +1001,64 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                   style={[
                     styles.filterTabLabel,
                     {
-                      color: active ? palette.textPrimary : palette.textMuted,
+                      color: active
+                        ? '#FFFFFF'
+                        : palette.isDark
+                          ? '#E5E7EB'
+                          : '#52525B',
                       fontWeight: active ? '600' : '500',
                     },
                   ]}
                 >
-                  {t.label}
-                </Text>
-                <Text
-                  style={[
-                    styles.filterTabCount,
-                    {
-                      color:
-                        active && t.id === 'to_confirm'
-                          ? palette.orange
-                          : active
-                            ? palette.textMuted
-                            : palette.textSubtle,
-                      fontWeight: active ? '700' : '600',
-                    },
-                  ]}
-                >
-                  {t.count}
+                  {t.label} ({t.count})
                 </Text>
               </TouchableOpacity>
             );
           })}
-        </View>
 
-        {/* Search Input */}
-        <View
-          style={[
-            styles.searchFieldWrap,
-            {
-              backgroundColor: palette.bgInput,
-              borderColor: palette.border,
-            },
-          ]}
-        >
-          <BootstrapIcon name="search" size={15} color={palette.textSubtle} />
-          <TextInput
-            style={[styles.searchInput, { color: palette.textPrimary }]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search orders..."
-            placeholderTextColor={palette.textSubtle}
-            autoCapitalize="none"
-            returnKeyType="search"
-          />
-          {searchQuery ? (
+          {showAreaToggle ? (
             <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              style={styles.clearSearchBtn}
-              accessibilityLabel="Clear search"
+              style={[
+                styles.filterTab,
+                {
+                  backgroundColor: groupByAreaMode
+                    ? palette.orangeSoft
+                    : palette.isDark
+                      ? '#1C1F23'
+                      : '#FFFFFF',
+                  borderColor: groupByAreaMode
+                    ? palette.orangeBorder
+                    : palette.isDark
+                      ? '#2B3035'
+                      : '#EDE9E0',
+                },
+              ]}
+              onPress={() => setGroupByAreaMode((v) => !v)}
+              activeOpacity={0.8}
             >
               <BootstrapIcon
-                name="x-circle-fill"
-                size={15}
-                color={palette.textSubtle}
+                name="geo-alt"
+                size={12}
+                color={groupByAreaMode ? palette.orange : palette.textSecondary}
               />
+              <Text
+                style={[
+                  styles.filterTabLabel,
+                  {
+                    color: groupByAreaMode
+                      ? palette.orangeText
+                      : palette.isDark
+                        ? '#E5E7EB'
+                        : '#52525B',
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                By area
+              </Text>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </ScrollView>
       </View>
     );
   };
@@ -971,35 +1066,38 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   const renderOrderCardsList = () => {
     if (filteredOrders.length === 0) {
       return (
-        <View style={styles.emptyOrdersBox}>
-          <View
-            style={[
-              styles.emptyIconCircle,
-              { backgroundColor: palette.bgMuted },
-            ]}
-          >
-            <BootstrapIcon
-              name={orderFilter === 'delivered' ? 'check-circle' : 'box-seam'}
-              size={24}
-              color={palette.textSubtle}
-            />
+        <View style={styles.emptyDarkBanner}>
+          <View style={styles.emptyDarkIconOuter}>
+            <View style={styles.emptyDarkIconInner}>
+              <BootstrapIcon
+                name={orderFilter === 'delivered' ? 'check-circle' : 'bag-check-fill'}
+                size={18}
+                color="#38BDF8"
+              />
+            </View>
           </View>
-          <Text style={[styles.emptyTitle, { color: palette.textPrimary }]}>
-            {searchQuery.trim()
-              ? 'No matching orders'
-              : orderFilter === 'delivered'
-                ? 'No delivered orders yet'
-                : orderFilter === 'to_confirm'
-                  ? 'All deliveries confirmed'
-                  : 'No assigned orders today'}
-          </Text>
-          <Text style={[styles.emptySubtitle, { color: palette.textMuted }]}>
-            {searchQuery.trim()
-              ? 'Try searching a different order number, customer name, or barangay.'
-              : orderFilter === 'delivered'
-                ? 'Orders you scan and confirm at drop-off will appear here.'
-                : 'New MotoTrack dispatches assigned to you will appear here automatically.'}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.emptyDarkTitle}>
+              {searchQuery.trim()
+                ? 'No matching orders'
+                : orderFilter === 'needs_pickup'
+                  ? 'No orders needing pickup'
+                  : orderFilter === 'delivered'
+                    ? 'No delivered orders'
+                    : orderFilter === 'to_confirm'
+                      ? 'All deliveries confirmed'
+                      : 'No related orders'}
+            </Text>
+            <Text style={styles.emptyDarkSub}>
+              {searchQuery.trim()
+                ? 'Try searching a different order number, customer, or area'
+                : orderFilter === 'needs_pickup'
+                  ? 'Assigned orders waiting for rider pickup appear here'
+                  : orderFilter === 'delivered'
+                    ? 'Orders you scan and confirm at drop-off appear here'
+                    : 'New MotoTrack dispatches assigned to you will appear here'}
+            </Text>
+          </View>
         </View>
       );
     }
@@ -1032,6 +1130,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
               key={d.orderId}
               delivery={d}
               palette={palette}
+              onViewMap={openOrderMap}
               onViewDetails={(order) => {
                 setPodPhoto(null);
                 setSelectedOrder(order);
@@ -1052,6 +1151,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         key={d.orderId}
         delivery={d}
         palette={palette}
+        onViewMap={openOrderMap}
         onViewDetails={(order) => {
           setPodPhoto(null);
           setSelectedOrder(order);
@@ -1111,19 +1211,38 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         ]}
       >
         <StatusBar
-          style="light"
+          style={palette.isDark ? 'light' : 'dark'}
           translucent
           backgroundColor="transparent"
         />
 
-        {/* Compact Sticky MotoTrack Header */}
+        {/* Customer-Styled MotoTrack Header */}
         <RiderTopHeader
           palette={palette}
+          activeTab={mainTab}
           riderName={riderFullName}
           riderAvatar={riderAvatar}
           unreadCount={unreadNotifCount}
+          activeOrderCount={needConfirmationOrders.length}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onCycleFilter={() => {
+            setOrderFilter((prev) =>
+              prev === 'all'
+                ? 'to_confirm'
+                : prev === 'to_confirm'
+                  ? 'delivered'
+                  : 'all'
+            );
+            setOrdersSubFilter('all');
+          }}
           onPressLogo={() => setMainTab('home')}
           onPressNotifications={() => setNotificationsOpen(true)}
+          onPressOrders={() => setMainTab('orders')}
+          onPressScanQr={() => {
+            setVerified(null);
+            setScanOrder({ unbound: true });
+          }}
           onPressProfile={() => setProfileMenuOpen(true)}
         />
       </SafeAreaView>
@@ -1205,191 +1324,22 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             {/* ─── TAB 1: HOME DASHBOARD ─── */}
             {mainTab === 'home' ? (
               <>
-                {/* Personalized Greeting & Date */}
-                <View style={styles.heroGreetingBlock}>
-                  <Text
-                    style={[styles.dateOverline, { color: palette.orange }]}
-                  >
-                    {formatHeroDate()}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.greetingTitle,
-                      { color: palette.textPrimary },
-                    ]}
-                  >
-                    {getGreetingByHour()}, {riderFirstName}
-                  </Text>
-                  <Text
-                    style={[styles.greetingSub, { color: palette.textMuted }]}
-                  >
-                    {needConfirmationOrders.length > 0
-                      ? `Here's what's happening with your deliveries today.`
-                      : 'All assigned routes are up to date today.'}
-                  </Text>
-                </View>
-
-                {/* 3 Summary KPI Cards */}
-                <View style={styles.summaryRow}>
-                  {/* Card 1: Needs confirmation */}
-                  <TouchableOpacity
-                    style={[
-                      styles.summaryCard,
-                      !palette.isDark && cardShadowStyle,
-                      {
-                        backgroundColor: palette.bgCard,
-                        borderColor:
-                          orderFilter === 'to_confirm'
-                            ? palette.orangeBorder
-                            : palette.border,
-                      },
-                    ]}
-                    onPress={() => setOrderFilter('to_confirm')}
-                    activeOpacity={0.82}
-                  >
-                    <View
-                      style={[
-                        styles.summaryIconBox,
-                        { backgroundColor: palette.orangeSoft },
-                      ]}
-                    >
-                      <BootstrapIcon
-                        name="clock"
-                        size={17}
-                        color={palette.orange}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.summaryLabel,
-                        { color: palette.textSecondary },
-                      ]}
-                      numberOfLines={2}
-                    >
-                      Needs confirmation
-                    </Text>
-                    <Text
-                      style={[
-                        styles.summaryFigure,
-                        { color: palette.textPrimary },
-                      ]}
-                    >
-                      {needConfirmationOrders.length}
-                    </Text>
-                    <Text
-                      style={[styles.summaryHint, { color: palette.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      Ready to complete
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Card 2: Completed deliveries */}
-                  <TouchableOpacity
-                    style={[
-                      styles.summaryCard,
-                      !palette.isDark && cardShadowStyle,
-                      {
-                        backgroundColor: palette.bgCard,
-                        borderColor:
-                          orderFilter === 'delivered'
-                            ? palette.borderStrong
-                            : palette.border,
-                      },
-                    ]}
-                    onPress={() => setOrderFilter('delivered')}
-                    activeOpacity={0.82}
-                  >
-                    <View
-                      style={[
-                        styles.summaryIconBox,
-                        { backgroundColor: palette.completedIconBg },
-                      ]}
-                    >
-                      <BootstrapIcon
-                        name="check"
-                        size={17}
-                        color={palette.completedIconColor}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.summaryLabel,
-                        { color: palette.textSecondary },
-                      ]}
-                      numberOfLines={2}
-                    >
-                      Delivered
-                    </Text>
-                    <Text
-                      style={[
-                        styles.summaryFigure,
-                        { color: palette.textPrimary },
-                      ]}
-                    >
-                      {deliveredOrders.length}
-                    </Text>
-                    <Text
-                      style={[styles.summaryHint, { color: palette.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      This week
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Card 3: Weekly earnings */}
-                  <TouchableOpacity
-                    style={[
-                      styles.summaryCard,
-                      !palette.isDark && cardShadowStyle,
-                      {
-                        backgroundColor: palette.bgCard,
-                        borderColor: palette.border,
-                      },
-                    ]}
-                    onPress={() => setMainTab('earnings')}
-                    activeOpacity={0.82}
-                  >
-                    <View
-                      style={[
-                        styles.summaryIconBox,
-                        { backgroundColor: palette.completedIconBg },
-                      ]}
-                    >
-                      <BootstrapIcon
-                        name="wallet2"
-                        size={17}
-                        color={palette.completedIconColor}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.summaryLabel,
-                        { color: palette.textSecondary },
-                      ]}
-                      numberOfLines={2}
-                    >
-                      Weekly earnings
-                    </Text>
-                    <Text
-                      style={[
-                        styles.summaryFigure,
-                        { color: palette.textPrimary },
-                      ]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
-                    >
-                      {formatPhp(weekEarnings)}
-                    </Text>
-                    <Text
-                      style={[styles.summaryHint, { color: palette.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {weeklyEarningsSub}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                {/* Interactive Map of Orders That Need to Be Delivered */}
+                <RiderHomeDeliveryMapCard
+                  deliveries={needConfirmationOrders}
+                  palette={palette}
+                  riderName={riderFullName}
+                  onOpenFullMap={openOrderMap}
+                  onScanConfirm={(order) => {
+                    setVerified(null);
+                    setScanOrder(order);
+                  }}
+                  onViewDetails={(order) => {
+                    setPodPhoto(null);
+                    setSelectedOrder(order);
+                    setVerified(null);
+                  }}
+                />
 
                 {/* Today's Orders Rounded Surface */}
                 <View
@@ -1428,144 +1378,79 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                     </View>
                   </View>
 
-                  {renderFiltersAndSearch()}
+                  {renderFiltersAndSearch(false)}
                   {renderOrderCardsList()}
                 </View>
               </>
             ) : null}
 
-            {/* ─── TAB 2: ORDERS & ROUTE DISPATCH ─── */}
+            {/* ─── TAB 2: ORDERS (Matching Customer Orders Screen Layout) ─── */}
             {mainTab === 'orders' ? (
               <View style={styles.ordersPageWrap}>
-                <View style={styles.ordersPageHeader}>
-                  <View>
-                    <Text
-                      style={[
-                        styles.pageHeading,
-                        { color: palette.textPrimary },
-                      ]}
-                    >
-                      Delivery orders
-                    </Text>
-                    <Text
-                      style={[styles.pageSubheading, { color: palette.textMuted }]}
-                    >
-                      {needConfirmationOrders.length} active ·{' '}
-                      {deliveredOrders.length} delivered
-                    </Text>
-                  </View>
+                {renderFiltersAndSearch(true, true)}
 
-                  <TouchableOpacity
-                    style={[
-                      styles.areaToggleBtn,
+                {orderFilter === 'to_confirm' &&
+                needConfirmationOrders.length > 0 ? (
+                  <View style={styles.subChipRow}>
+                    {[
                       {
-                        backgroundColor: groupByAreaMode
-                          ? palette.orangeSoft
-                          : palette.bgCard,
-                        borderColor: groupByAreaMode
-                          ? palette.orangeBorder
-                          : palette.border,
+                        id: 'all',
+                        label: `All active (${needConfirmationOrders.length})`,
                       },
-                    ]}
-                    onPress={() => setGroupByAreaMode((v) => !v)}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon
-                      name="geo-alt"
-                      size={13}
-                      color={
-                        groupByAreaMode ? palette.orange : palette.textSecondary
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.areaToggleText,
-                        {
-                          color: groupByAreaMode
-                            ? palette.orangeText
-                            : palette.textSecondary,
-                        },
-                      ]}
-                    >
-                      By area
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View
-                  style={[
-                    styles.ordersPageCard,
-                    {
-                      backgroundColor: palette.bgSheet,
-                      borderColor: palette.border,
-                    },
-                  ]}
-                >
-                  {renderFiltersAndSearch()}
-
-                  {orderFilter === 'to_confirm' &&
-                  needConfirmationOrders.length > 0 ? (
-                    <View style={styles.subChipRow}>
-                      {[
-                        {
-                          id: 'all',
-                          label: `All active (${needConfirmationOrders.length})`,
-                        },
-                        ...(outForDeliveryCount > 0
-                          ? [
-                              {
-                                id: 'out',
-                                label: `Out for delivery (${outForDeliveryCount})`,
-                              },
-                            ]
-                          : []),
-                        ...(assignedCount > 0
-                          ? [
-                              {
-                                id: 'assigned',
-                                label: `Assigned (${assignedCount})`,
-                              },
-                            ]
-                          : []),
-                      ].map((chip) => {
-                        const active = ordersSubFilter === chip.id;
-                        return (
-                          <TouchableOpacity
-                            key={chip.id}
+                      ...(outForDeliveryCount > 0
+                        ? [
+                            {
+                              id: 'out',
+                              label: `Out for delivery (${outForDeliveryCount})`,
+                            },
+                          ]
+                        : []),
+                      ...(assignedCount > 0
+                        ? [
+                            {
+                              id: 'assigned',
+                              label: `Assigned (${assignedCount})`,
+                            },
+                          ]
+                        : []),
+                    ].map((chip) => {
+                      const active = ordersSubFilter === chip.id;
+                      return (
+                        <TouchableOpacity
+                          key={chip.id}
+                          style={[
+                            styles.subChip,
+                            {
+                              backgroundColor: active
+                                ? palette.charcoal
+                                : palette.bgCard,
+                              borderColor: active
+                                ? palette.charcoal
+                                : palette.border,
+                            },
+                          ]}
+                          onPress={() => setOrdersSubFilter(chip.id)}
+                          activeOpacity={0.8}
+                        >
+                          <Text
                             style={[
-                              styles.subChip,
+                              styles.subChipText,
                               {
-                                backgroundColor: active
-                                  ? palette.charcoal
-                                  : palette.bgMuted,
-                                borderColor: active
-                                  ? palette.charcoal
-                                  : palette.border,
+                                color: active
+                                  ? '#FFFFFF'
+                                  : palette.textSecondary,
                               },
                             ]}
-                            onPress={() => setOrdersSubFilter(chip.id)}
-                            activeOpacity={0.8}
                           >
-                            <Text
-                              style={[
-                                styles.subChipText,
-                                {
-                                  color: active
-                                    ? '#FFFFFF'
-                                    : palette.textSecondary,
-                                },
-                              ]}
-                            >
-                              {chip.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : null}
+                            {chip.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
 
-                  {renderOrderCardsList()}
-                </View>
+                {renderOrderCardsList()}
               </View>
             ) : null}
 
@@ -1609,12 +1494,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Floating QR Scan Button (Thumb-Accessible Bottom Right) */}
+      {/* Floating QR Scan Button (Thumb-Accessible Above Floating Pill Nav) */}
       <TouchableOpacity
         style={[
           styles.floatingQrFab,
           {
             backgroundColor: palette.orange,
+            borderColor: palette.bgCanvas,
           },
         ]}
         onPress={() => {
@@ -1625,99 +1511,47 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         accessibilityRole="button"
         accessibilityLabel="Scan delivery QR code"
       >
-        <BootstrapIcon name="qr-code-scan" size={22} color="#FFFFFF" />
+        <BootstrapIcon name="qr-code-scan" size={21} color="#FFFFFF" />
       </TouchableOpacity>
 
-      {/* Persistent 4-Tab Bottom Navigation */}
-      <View
-        style={[
-          styles.bottomNavWrap,
+      {/* Customer-Style Floating Charcoal Pill Bottom Navigation */}
+      <MobileBottomNavBar
+        activeTab={mainTab}
+        onTabChange={(nextId) => setMainTab(String(nextId).toLowerCase())}
+        tabs={[
           {
-            backgroundColor: palette.bgNav,
-            borderTopColor: palette.border,
+            id: 'home',
+            label: 'Home',
+            icon: 'house',
+            activeIcon: 'house-fill',
+            isActive: mainTab === 'home',
+          },
+          {
+            id: 'orders',
+            label:
+              needConfirmationOrders.length > 0
+                ? `Orders (${needConfirmationOrders.length})`
+                : 'Orders',
+            icon: 'box-seam',
+            activeIcon: 'box-seam-fill',
+            isActive: mainTab === 'orders',
+          },
+          {
+            id: 'earnings',
+            label: 'Earnings',
+            icon: 'wallet2',
+            activeIcon: 'wallet2',
+            isActive: mainTab === 'earnings',
+          },
+          {
+            id: 'account',
+            label: 'Account',
+            icon: 'person',
+            activeIcon: 'person-fill',
+            isActive: mainTab === 'account',
           },
         ]}
-      >
-        <View style={styles.bottomNavInner}>
-          {[
-            {
-              id: 'home',
-              label: 'Home',
-              icon: 'grid',
-              activeIcon: 'grid-fill',
-              badge: 0,
-            },
-            {
-              id: 'orders',
-              label: 'Orders',
-              icon: 'receipt',
-              activeIcon: 'receipt',
-              badge: needConfirmationOrders.length,
-            },
-            {
-              id: 'earnings',
-              label: 'Earnings',
-              icon: 'currency-dollar',
-              activeIcon: 'currency-dollar',
-              badge: 0,
-            },
-            {
-              id: 'account',
-              label: 'Account',
-              icon: 'person',
-              activeIcon: 'person-fill',
-              badge: 0,
-            },
-          ].map((nav) => {
-            const active = mainTab === nav.id;
-            return (
-              <TouchableOpacity
-                key={nav.id}
-                style={styles.bottomNavItem}
-                onPress={() => setMainTab(nav.id)}
-                activeOpacity={0.75}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={nav.label}
-              >
-                <View style={styles.navIconContainer}>
-                  <BootstrapIcon
-                    name={active ? nav.activeIcon : nav.icon}
-                    size={20}
-                    color={active ? palette.orange : palette.textMuted}
-                  />
-                  {nav.badge > 0 ? (
-                    <View
-                      style={[
-                        styles.navCountBadge,
-                        {
-                          backgroundColor: palette.orange,
-                          borderColor: palette.bgNav,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.navCountBadgeText}>
-                        {nav.badge > 99 ? '99+' : nav.badge}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text
-                  style={[
-                    styles.bottomNavLabel,
-                    {
-                      color: active ? palette.orange : palette.textMuted,
-                      fontWeight: active ? '600' : '500',
-                    },
-                  ]}
-                >
-                  {nav.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      />
 
       {/* Profile Quick Menu */}
       <RiderProfileMenuModal
@@ -1778,6 +1612,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         }}
         onStartRoute={handleOutForDelivery}
         onScanConfirm={openScannerFromDetail}
+        onViewMap={openOrderMap}
         onPickPodPhoto={handlePickPodPhoto}
         onSavePodPhoto={handleSavePodPhoto}
         onClearPodPhoto={() => setPodPhoto(null)}
@@ -1822,9 +1657,21 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         confirming={confirming}
         error={confirmError}
         success={confirmed}
+        proofPhoto={podPhoto}
+        onPickProofPhoto={handlePickPodPhoto}
+        onClearProofPhoto={() => setPodPhoto(null)}
         onCancel={closeConfirmPopup}
         onConfirm={handleConfirmDelivery}
         onDone={handleConfirmFinished}
+      />
+
+      {/* Customer-Style Live Route & Tracking Map Modal */}
+      <LiveOrderTrackingMapModal
+        visible={Boolean(mapOrder)}
+        order={mapOrder}
+        onClose={() => setMapOrder(null)}
+        showToast={showFeedback}
+        isDarkMode={isDarkMode}
       />
     </View>
   );
@@ -1889,7 +1736,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   scrollContent: {
-    paddingBottom: 112,
+    paddingBottom: 132,
   },
   mobileColumn: {
     width: '100%',
@@ -1913,90 +1760,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '500',
   },
-  heroGreetingBlock: {
+  ordersSheetContainer: {
+    marginHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1,
     paddingHorizontal: 16,
     paddingTop: 18,
     paddingBottom: 14,
-  },
-  dateOverline: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: '700',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  greetingTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 23,
-    lineHeight: 29,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-    marginTop: 4,
-  },
-  greetingSub: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    lineHeight: 19,
-    fontWeight: '400',
-    marginTop: 4,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 18,
-  },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 13,
-    minHeight: 146,
-    justifyContent: 'space-between',
-  },
-  summaryIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  summaryLabel: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500',
-    minHeight: 32,
-  },
-  summaryFigure: {
-    fontFamily: RIDER_FONT,
-    fontSize: 22,
-    lineHeight: 27,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  summaryHint: {
-    fontFamily: RIDER_FONT,
-    fontSize: 10.5,
-    lineHeight: 14,
-    fontWeight: '400',
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  ordersSheetContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 12,
-    minHeight: 360,
+    minHeight: 340,
   },
   ordersSheetHead: {
     flexDirection: 'row',
@@ -2006,10 +1777,10 @@ const styles = StyleSheet.create({
   },
   ordersSheetTitle: {
     fontFamily: RIDER_FONT,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   orderCountChip: {
     paddingHorizontal: 11,
@@ -2024,134 +1795,106 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   filtersBlock: {
-    gap: 11,
-    marginBottom: 14,
+    gap: 14,
+    marginBottom: 16,
   },
   filterTrack: {
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 2,
   },
   filterTab: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 9,
+    borderRadius: 9999,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 6,
-  },
-  filterTabActive: {
-    shadowColor: '#202426',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8.5,
   },
   filterTabLabel: {
     fontFamily: RIDER_FONT,
     fontSize: 12.5,
     lineHeight: 16,
   },
-  filterTabCount: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    lineHeight: 15,
-    fontVariant: ['tabular-nums'],
-  },
   searchFieldWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 16,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingHorizontal: 14,
+    gap: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   searchInput: {
     flex: 1,
     fontFamily: RIDER_FONT,
     fontSize: 13.5,
     fontWeight: '400',
-    paddingVertical: 8,
+    height: '100%',
   },
   clearSearchBtn: {
     padding: 4,
   },
-  emptyOrdersBox: {
+  emptyDarkBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 38,
-    paddingHorizontal: 20,
-  },
-  emptyIconCircle: {
-    width: 52,
-    height: 52,
+    backgroundColor: '#11141C',
     borderRadius: 16,
-    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#1E2536',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+    marginTop: 6,
+  },
+  emptyDarkIconOuter: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#161B26',
     justifyContent: 'center',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginRight: 14,
+    borderWidth: 1,
+    borderColor: '#2A364F',
   },
-  emptyTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '600',
-    textAlign: 'center',
+  emptyDarkIconInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  emptySubtitle: {
+  emptyDarkTitle: {
     fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: '400',
-    textAlign: 'center',
-    marginTop: 4,
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+    marginBottom: 3,
+  },
+  emptyDarkSub: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 16,
   },
   ordersPageWrap: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 12,
-  },
-  ordersPageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  pageHeading: {
-    fontFamily: RIDER_FONT,
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: '700',
-    letterSpacing: -0.25,
-  },
-  pageSubheading: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontWeight: '400',
-    marginTop: 2,
-    fontVariant: ['tabular-nums'],
-  },
-  areaToggleBtn: {
-    minHeight: 38,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  areaToggleText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  ordersPageCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 15,
+    paddingTop: 10,
   },
   subChipRow: {
     flexDirection: 'row',
@@ -2202,71 +1945,19 @@ const styles = StyleSheet.create({
   floatingQrFab: {
     position: 'absolute',
     right: 18,
-    bottom: Platform.OS === 'ios' ? 96 : 80 + ANDROID_BOTTOM_INSET,
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    bottom: Platform.OS === 'ios' ? 98 : 88 + ANDROID_BOTTOM_INSET,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 25,
-    shadowColor: '#FF4D00',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.34,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 7,
-  },
-  bottomNavWrap: {
-    borderTopWidth: 1,
-    paddingTop: 7,
-    paddingBottom:
-      Platform.OS === 'ios' ? 24 : Math.max(10, ANDROID_BOTTOM_INSET + 6),
-  },
-  bottomNavInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    maxWidth: 560,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  bottomNavItem: {
-    flex: 1,
-    minHeight: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  navIconContainer: {
-    position: 'relative',
-    width: 28,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navCountBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    paddingHorizontal: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navCountBadgeText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 9.5,
-    lineHeight: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontVariant: ['tabular-nums'],
-  },
-  bottomNavLabel: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    lineHeight: 14,
   },
   checkingScrim: {
     ...StyleSheet.absoluteFillObject,

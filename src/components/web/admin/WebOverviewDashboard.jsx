@@ -200,27 +200,27 @@ export default function WebOverviewDashboard({
     if (isDarkMode) {
       return {
         bg: '#111315',
-        cardBg: '#18181B',
-        cardBorder: 'rgba(255, 255, 255, 0.08)',
-        textPrimary: '#F4F4F5',
-        textMuted: '#A1A1AA',
-        textSecondary: '#D4D4D8',
-        brandGreen: '#EA580C',
+        cardBg: '#191A1D',
+        cardBorder: '#303236',
+        textPrimary: '#F2F2F3',
+        textMuted: '#71717A',
+        textSecondary: '#A1A1AA',
+        brandGreen: '#FF5A00',
         brandDarkGreen: '#18181B',
-        pillBg: '#27272A',
-        pillActiveBg: '#3F3F46',
+        pillBg: '#202124',
+        pillActiveBg: '#3A241B',
         pillActiveText: '#FFFFFF',
         pillInactiveText: '#A1A1AA',
-        chartStroke: '#EA580C',
-        chartGradStart: '#EA580C',
-        chartGradEnd: 'rgba(234, 88, 12, 0.02)',
+        chartStroke: '#FF5A00',
+        chartGradStart: '#FF5A00',
+        chartGradEnd: 'rgba(255, 90, 0, 0.02)',
         avgLineColor: '#71717A',
-        sparklineStroke: '#EA580C',
-        borderSubtle: 'rgba(255, 255, 255, 0.08)',
-        tableRowHover: '#27272A',
-        badgeGreenBg: 'rgba(16, 185, 129, 0.15)',
-        badgeGreenText: '#34D399',
-        badgeGreenBorder: 'rgba(52, 211, 153, 0.25)',
+        sparklineStroke: '#FF5A00',
+        borderSubtle: '#292B2F',
+        tableRowHover: '#292B2F',
+        badgeGreenBg: 'rgba(0, 201, 141, 0.14)',
+        badgeGreenText: '#00C98D',
+        badgeGreenBorder: 'rgba(0, 201, 141, 0.28)',
       };
     }
     return {
@@ -731,7 +731,7 @@ export default function WebOverviewDashboard({
                 <path
                   d="M 0,22 Q 35,26 60,14 T 120,8 T 140,4"
                   fill="none"
-                  stroke="#EA580C"
+                  stroke={isDarkMode ? '#FF5A00' : '#EA580C'}
                   strokeWidth="2"
                   strokeLinecap="round"
                 />
@@ -810,7 +810,7 @@ export default function WebOverviewDashboard({
                 style={{
                   flex: 1,
                   height: `${h}%`,
-                  backgroundColor: i >= 4 ? '#EA580C' : isDarkMode ? '#3F3F46' : '#E4E4E7',
+                  backgroundColor: i >= 4 ? (isDarkMode ? '#FF5A00' : '#EA580C') : isDarkMode ? '#292B2F' : '#E4E4E7',
                   borderRadius: 2,
                 }}
               />
@@ -873,7 +873,7 @@ export default function WebOverviewDashboard({
             style={{
               height: 3,
               borderRadius: 2,
-              backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+              backgroundColor: isDarkMode ? '#292B2F' : '#F4F4F5',
               overflow: 'hidden',
               marginTop: 22,
             }}
@@ -882,7 +882,7 @@ export default function WebOverviewDashboard({
               style={{
                 height: '100%',
                 width: `${Math.min(100, Math.max(15, profitOverview.soldMargin || 75))}%`,
-                backgroundColor: '#EA580C',
+                backgroundColor: isDarkMode ? '#FF5A00' : '#EA580C',
                 borderRadius: 2,
               }}
             />
@@ -908,7 +908,7 @@ export default function WebOverviewDashboard({
             <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textMuted }}>Avg. order</Text>
             <View
               style={{
-                backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
                 paddingHorizontal: 8,
                 paddingVertical: 2.5,
                 borderRadius: 999,
@@ -944,7 +944,7 @@ export default function WebOverviewDashboard({
             style={{
               height: 3,
               borderRadius: 2,
-              backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+              backgroundColor: isDarkMode ? '#292B2F' : '#F4F4F5',
               overflow: 'hidden',
               marginTop: 22,
             }}

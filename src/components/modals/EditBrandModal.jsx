@@ -111,10 +111,10 @@ export default function EditBrandModal({
             width: '100%',
             maxWidth: 620,
             maxHeight: '92%',
-            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+            backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
             borderRadius: 20,
             borderWidth: 1,
-            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+            borderColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
             boxShadow: '0 20px 45px -10px rgba(0, 0, 0, 0.45)',
             overflow: 'hidden',
             display: 'flex',
@@ -130,8 +130,8 @@ export default function EditBrandModal({
               paddingHorizontal: 22,
               paddingVertical: 18,
               borderBottomWidth: 1,
-              borderBottomColor: isDarkMode ? '#334155' : '#E2E8F0',
-              backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+              borderBottomColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
+              backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -140,7 +140,7 @@ export default function EditBrandModal({
                   width: 42,
                   height: 42,
                   borderRadius: 12,
-                  backgroundColor: isDarkMode ? '#132A26' : '#FFF7ED',
+                  backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -148,10 +148,10 @@ export default function EditBrandModal({
                 <BootstrapIcon name="palette" size={20} color="#EA580C" />
               </View>
               <View>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                   Edit System Name & Logo
                 </Text>
-                <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', marginTop: 2 }}>
                   Customize application title, tagline, and brand logo mark.
                 </Text>
               </View>
@@ -163,14 +163,14 @@ export default function EditBrandModal({
                 width: 34,
                 height: 34,
                 borderRadius: 17,
-                backgroundColor: isDarkMode ? '#334155' : '#E2E8F0',
+                backgroundColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
               }}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#F8FAFC' : '#475569'} />
+              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#F2F2F3' : '#475569'} />
             </TouchableOpacity>
           </View>
 
@@ -186,7 +186,7 @@ export default function EditBrandModal({
                 style={{
                   fontSize: 12,
                   fontWeight: '600',
-                  color: isDarkMode ? '#94A3B8' : '#475569',
+                  color: isDarkMode ? '#A1A1AA' : '#475569',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                 }}
@@ -195,22 +195,22 @@ export default function EditBrandModal({
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
                   borderRadius: 10,
                   borderWidth: 1.5,
-                  borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 15,
                   fontWeight: '700',
-                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                 }}
                 value={storeName}
                 onChangeText={setStoreName}
                 placeholder="e.g. MotoTrack"
                 placeholderTextColor="#94A3B8"
               />
-              <Text style={{ fontSize: 11, color: isDarkMode ? '#64748B' : '#94A3B8' }}>
+              <Text style={{ fontSize: 11, color: isDarkMode ? '#71717A' : '#94A3B8' }}>
                 Main title displayed on top navigation, sidebar, invoices, and browser tab.
               </Text>
             </View>
@@ -221,7 +221,7 @@ export default function EditBrandModal({
                 style={{
                   fontSize: 12,
                   fontWeight: '600',
-                  color: isDarkMode ? '#94A3B8' : '#475569',
+                  color: isDarkMode ? '#A1A1AA' : '#475569',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                 }}
@@ -230,22 +230,22 @@ export default function EditBrandModal({
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
                   borderRadius: 10,
                   borderWidth: 1.5,
-                  borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   paddingHorizontal: 14,
                   paddingVertical: 10,
                   fontSize: 14,
                   fontWeight: '600',
-                  color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                  color: isDarkMode ? '#F2F2F3' : '#0F172A',
                 }}
                 value={storeTagline}
                 onChangeText={setStoreTagline}
                 placeholder="e.g. MOTORPARTS & ACCESSORIES (or leave blank for none)"
                 placeholderTextColor="#94A3B8"
               />
-              <Text style={{ fontSize: 11, color: isDarkMode ? '#64748B' : '#94A3B8' }}>
+              <Text style={{ fontSize: 11, color: isDarkMode ? '#71717A' : '#94A3B8' }}>
                 Optional: Leave blank if your brand has no second name or subtitle.
               </Text>
             </View>
@@ -256,7 +256,7 @@ export default function EditBrandModal({
                 style={{
                   fontSize: 12,
                   fontWeight: '600',
-                  color: isDarkMode ? '#94A3B8' : '#475569',
+                  color: isDarkMode ? '#A1A1AA' : '#475569',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                 }}
@@ -268,9 +268,9 @@ export default function EditBrandModal({
                 style={{
                   padding: 16,
                   borderRadius: 12,
-                  backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
                   borderWidth: 1.5,
-                  borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                  borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 16,
@@ -283,7 +283,7 @@ export default function EditBrandModal({
                       width: 60,
                       height: 60,
                       borderRadius: 12,
-                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
                       borderWidth: 1,
                       borderColor: '#CBD5E1',
                     }}
@@ -295,11 +295,11 @@ export default function EditBrandModal({
                       width: 60,
                       height: 60,
                       borderRadius: 12,
-                      backgroundColor: isDarkMode ? '#132A26' : '#FFF7ED',
+                      backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderWidth: 1,
-                      borderColor: isDarkMode ? '#EA580C' : '#A7F3D0',
+                      borderColor: isDarkMode ? '#FF5A00' : '#A7F3D0',
                     }}
                   >
                     <Image
@@ -310,10 +310,10 @@ export default function EditBrandModal({
                 )}
 
                 <View style={{ flex: 1, gap: 8 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                     {storeLogoUrl ? 'Custom Logo Asset Active' : 'Default MotoTrack Emblem Active'}
                   </Text>
-                  <Text style={{ fontSize: 11.5, color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                  <Text style={{ fontSize: 11.5, color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
                     {storeLogoUrl
                       ? 'Custom image uploaded from your device or link.'
                       : 'Standard red helmet & speed stripes emblem.'}
@@ -349,7 +349,7 @@ export default function EditBrandModal({
                           paddingHorizontal: 12,
                           paddingVertical: 8,
                           borderRadius: 8,
-                          backgroundColor: isDarkMode ? '#334155' : '#FEE2E2',
+                          backgroundColor: isDarkMode ? '#3A3B40' : '#FEE2E2',
                           cursor: 'pointer',
                         }}
                         activeOpacity={0.85}
@@ -366,19 +366,19 @@ export default function EditBrandModal({
 
               {/* Direct Image URL input */}
               <View style={{ gap: 4, marginTop: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#A1A1AA' : '#64748B' }}>
                   Or enter direct Image URL:
                 </Text>
                 <TextInput
                   style={{
-                    backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                    backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
                     borderRadius: 8,
                     borderWidth: 1,
-                    borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                    borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     fontSize: 12.5,
-                    color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                    color: isDarkMode ? '#F2F2F3' : '#0F172A',
                   }}
                   value={storeLogoUrl}
                   onChangeText={setStoreLogoUrl}
@@ -399,8 +399,8 @@ export default function EditBrandModal({
               paddingHorizontal: 22,
               paddingVertical: 16,
               borderTopWidth: 1,
-              borderTopColor: isDarkMode ? '#334155' : '#E2E8F0',
-              backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+              borderTopColor: isDarkMode ? '#3A3B40' : '#E2E8F0',
+              backgroundColor: isDarkMode ? '#191A1D' : '#F8FAFC',
             }}
           >
             <TouchableOpacity
@@ -409,12 +409,12 @@ export default function EditBrandModal({
                 paddingHorizontal: 18,
                 paddingVertical: 10,
                 borderRadius: 10,
-                backgroundColor: isDarkMode ? '#1E293B' : '#E2E8F0',
+                backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
                 cursor: 'pointer',
               }}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#475569' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#475569' }}>
                 Cancel
               </Text>
             </TouchableOpacity>

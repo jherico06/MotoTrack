@@ -686,7 +686,7 @@ export default function LiveOrderTrackingMapModal({
           {/* ─── 1. TOP HEADER ─── */}
           <View style={[styles.headerRow, windowWidth < 400 && { paddingHorizontal: 12, paddingVertical: 12 }]}>
             <TouchableOpacity style={[styles.closeBtn, windowWidth < 400 && { marginRight: 8 }]} onPress={onClose} activeOpacity={0.8}>
-              <BootstrapIcon name="x-lg" size={15} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+              <BootstrapIcon name="x-lg" size={15} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
             </TouchableOpacity>
 
             <View style={styles.headerTextWrap}>
@@ -786,10 +786,10 @@ export default function LiveOrderTrackingMapModal({
                 <View style={styles.mapToolbarRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={styles.mapHudLiveDot} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
                       Live GPS Tracking
                     </Text>
-                    <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', fontWeight: '600' }}>
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', fontWeight: '600' }}>
                       • City of Naga
                     </Text>
                   </View>
@@ -834,7 +834,7 @@ export default function LiveOrderTrackingMapModal({
                         {
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
                         },
                       ]}
                     >
@@ -849,7 +849,7 @@ export default function LiveOrderTrackingMapModal({
                         {
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
                         },
                       ]}
                     >
@@ -943,7 +943,7 @@ export default function LiveOrderTrackingMapModal({
                   activeOpacity={0.8}
                 >
                   <Text style={styles.browseShopText}>Browse shop</Text>
-                  <BootstrapIcon name="chevron-right" size={12} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                  <BootstrapIcon name="chevron-right" size={12} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -1019,7 +1019,7 @@ export default function LiveOrderTrackingMapModal({
                   <Text style={styles.orderNumberValue}>
                     {activeOrder?.order_id || activeOrder?.id || '—'}
                   </Text>
-                  <BootstrapIcon name="copy" size={13} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+                  <BootstrapIcon name="copy" size={13} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -1044,7 +1044,7 @@ export default function LiveOrderTrackingMapModal({
                   <BootstrapIcon
                     name={isSummaryExpanded ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={isDarkMode ? '#94A3B8' : '#64748B'}
+                    color={isDarkMode ? '#A1A1AA' : '#64748B'}
                     style={{ marginLeft: 4 }}
                   />
                 </TouchableOpacity>
@@ -1092,7 +1092,7 @@ export default function LiveOrderTrackingMapModal({
                   convenience (30-day policy)
                 </Text>
               </View>
-              <BootstrapIcon name="chevron-right" size={13} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+              <BootstrapIcon name="chevron-right" size={13} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
             </TouchableOpacity>
             )}
           </ScrollView>
@@ -1203,10 +1203,10 @@ export default function LiveOrderTrackingMapModal({
                 <View style={{ alignItems: 'center', marginBottom: 10 }}>
                   <BootstrapIcon name="exclamation-triangle-fill" size={32} color="#DC2626" />
                 </View>
-                <Text style={[styles.editAddressTitle, { textAlign: 'center', color: isDarkMode ? '#F87171' : '#DC2626' }]}>
+                <Text style={[styles.editAddressTitle, { textAlign: 'center', color: isDarkMode ? '#F04444' : '#DC2626' }]}>
                   Cancel Order #{activeOrder?.order_id || activeOrder?.id}?
                 </Text>
-                <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#64748B', textAlign: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#64748B', textAlign: 'center', marginBottom: 12 }}>
                   Please select a reason for cancellation. Once cancelled, this action cannot be undone.
                 </Text>
                 {[
@@ -1237,8 +1237,7 @@ export default function LiveOrderTrackingMapModal({
                           ? isDarkMode
                             ? '#EF4444'
                             : '#FCA5A5'
-                          : isDarkMode
-                            ? '#282D34'
+                          : isDarkMode ? '#303236'
                             : '#E2E8F0',
                     }}
                     onPress={() => setCancelReason(reason)}
@@ -1247,7 +1246,7 @@ export default function LiveOrderTrackingMapModal({
                     <BootstrapIcon
                       name={cancelReason === reason ? 'check-circle-fill' : 'circle'}
                       size={15}
-                      color={cancelReason === reason ? (isDarkMode ? '#F87171' : '#DC2626') : '#94A3B8'}
+                      color={cancelReason === reason ? (isDarkMode ? '#F04444' : '#DC2626') : '#94A3B8'}
                     />
                     <Text
                       style={{
@@ -1259,8 +1258,7 @@ export default function LiveOrderTrackingMapModal({
                             ? isDarkMode
                               ? '#FCA5A5'
                               : '#991B1B'
-                            : isDarkMode
-                              ? '#CBD5E1'
+                            : isDarkMode ? '#A1A1AA'
                               : '#334155',
                       }}
                     >
@@ -1301,7 +1299,7 @@ export default function LiveOrderTrackingMapModal({
                 <Text style={[styles.editAddressTitle, { textAlign: 'center' }]}>
                   Request Return & Refund
                 </Text>
-                <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#64748B', textAlign: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#A1A1AA' : '#64748B', textAlign: 'center', marginBottom: 12 }}>
                   30-day hassle-free return policy. Select a reason and add optional details:
                 </Text>
                 {[
@@ -1329,11 +1327,9 @@ export default function LiveOrderTrackingMapModal({
                       borderWidth: 1,
                       borderColor:
                         returnReason === reason
-                          ? isDarkMode
-                            ? '#4ADE80'
+                          ? isDarkMode ? '#00C98D'
                             : '#86EFAC'
-                          : isDarkMode
-                            ? '#282D34'
+                          : isDarkMode ? '#303236'
                             : '#E2E8F0',
                     }}
                     onPress={() => setReturnReason(reason)}
@@ -1354,8 +1350,7 @@ export default function LiveOrderTrackingMapModal({
                             ? isDarkMode
                               ? '#86EFAC'
                               : '#065F46'
-                            : isDarkMode
-                              ? '#CBD5E1'
+                            : isDarkMode ? '#A1A1AA'
                               : '#334155',
                       }}
                     >
@@ -1408,7 +1403,7 @@ export default function LiveOrderTrackingMapModal({
                         {
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
                         },
                       ]}
                     >
@@ -1450,9 +1445,9 @@ const createStyles = (isDarkMode) =>
     },
     modalContainer: {
       width: '100%',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       maxHeight: '94%',
@@ -1470,7 +1465,7 @@ const createStyles = (isDarkMode) =>
       maxHeight: '90%',
       marginBottom: 24,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
 
     // 1. Header
@@ -1481,16 +1476,16 @@ const createStyles = (isDarkMode) =>
       paddingTop: 18,
       paddingBottom: 14,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderBottomColor: isDarkMode ? '#303236' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     },
     closeBtn: {
       width: 34,
       height: 34,
       borderRadius: 17,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 14,
@@ -1501,7 +1496,7 @@ const createStyles = (isDarkMode) =>
     headerMainTitle: {
       fontSize: 18,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       letterSpacing: -0.3,
     },
     headerSubtitleText: {
@@ -1532,18 +1527,18 @@ const createStyles = (isDarkMode) =>
       paddingTop: 16,
       paddingBottom: 24,
       gap: 12,
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     },
 
     // 2. Timeline Stepper
     stepperCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
       borderRadius: 20,
       paddingHorizontal: 16,
       paddingTop: 20,
       paddingBottom: 16,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     stepperTrackRow: {
       flexDirection: 'row',
@@ -1558,7 +1553,7 @@ const createStyles = (isDarkMode) =>
       left: 0,
       right: 0,
       height: 2.5,
-      backgroundColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#303236' : '#E2E8F0',
       top: 15,
       zIndex: 1,
     },
@@ -1600,7 +1595,7 @@ const createStyles = (isDarkMode) =>
       width: 12,
       height: 12,
       borderRadius: 6,
-      backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
       borderWidth: 2,
       borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
     },
@@ -1621,7 +1616,7 @@ const createStyles = (isDarkMode) =>
       fontWeight: '600',
     },
     stepLabelTextCompleted: {
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       fontWeight: '700',
     },
 
@@ -1648,11 +1643,11 @@ const createStyles = (isDarkMode) =>
 
     // 4. Google Maps Section
     googleMapSectionCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
       borderRadius: 20,
       padding: 12,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: isDarkMode ? 0.25 : 0.05,
@@ -1668,7 +1663,7 @@ const createStyles = (isDarkMode) =>
     mapModePills: {
       flexDirection: 'row',
       gap: 6,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       padding: 3,
       borderRadius: 12,
     },
@@ -1681,7 +1676,7 @@ const createStyles = (isDarkMode) =>
       borderRadius: 9,
     },
     mapModePillActive: {
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: isDarkMode ? 0.35 : 0.1,
@@ -1722,7 +1717,7 @@ const createStyles = (isDarkMode) =>
       position: 'relative',
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#CBD5E1',
+      borderColor: isDarkMode ? '#303236' : '#CBD5E1',
     },
     iframeMapContainer: {
       width: '100%',
@@ -1767,12 +1762,12 @@ const createStyles = (isDarkMode) =>
       shadowRadius: 4,
       elevation: 3,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     googleMapLiveText: {
       fontSize: 10.5,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
 
     mapRealisticTerrain: {
@@ -2089,7 +2084,7 @@ const createStyles = (isDarkMode) =>
       borderRadius: 14,
       padding: 10,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       marginTop: 10,
     },
     riderAvatarSmall: {
@@ -2100,7 +2095,7 @@ const createStyles = (isDarkMode) =>
     riderNameSmall: {
       fontSize: 12.5,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     riderPlateText: {
       fontSize: 10.5,
@@ -2124,11 +2119,11 @@ const createStyles = (isDarkMode) =>
 
     // 6. Address Card
     addressCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
       borderRadius: 18,
       padding: 14,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       gap: 8,
     },
     addressHeaderRow: {
@@ -2142,7 +2137,7 @@ const createStyles = (isDarkMode) =>
     addressRecipientName: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     addressPhone: {
       fontSize: 12,
@@ -2151,7 +2146,7 @@ const createStyles = (isDarkMode) =>
     },
     addressDetailText: {
       fontSize: 12,
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
       marginTop: 3,
       lineHeight: 17,
     },
@@ -2168,11 +2163,11 @@ const createStyles = (isDarkMode) =>
 
     // 7. Order Items Card
     orderItemsCard: {
-      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
       borderRadius: 18,
       padding: 14,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
       gap: 12,
     },
     storeHeaderRow: {
@@ -2181,7 +2176,7 @@ const createStyles = (isDarkMode) =>
       justifyContent: 'space-between',
       paddingBottom: 10,
       borderBottomWidth: 1,
-      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      borderBottomColor: isDarkMode ? '#303236' : '#F1F5F9',
     },
     storeHeaderLeft: {
       flexDirection: 'row',
@@ -2199,7 +2194,7 @@ const createStyles = (isDarkMode) =>
     storeNameText: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     browseShopBtn: {
       flexDirection: 'row',
@@ -2221,7 +2216,7 @@ const createStyles = (isDarkMode) =>
       width: 58,
       height: 58,
       borderRadius: 12,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
     },
     itemInfoCol: {
       flex: 1,
@@ -2236,14 +2231,14 @@ const createStyles = (isDarkMode) =>
     itemNameText: {
       fontSize: 12.5,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       flex: 1,
       lineHeight: 16,
     },
     itemPriceText: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     itemMetaRow: {
       flexDirection: 'row',
@@ -2278,12 +2273,12 @@ const createStyles = (isDarkMode) =>
       fontWeight: '600',
     },
     genuinePill: {
-      backgroundColor: isDarkMode ? '#252A30' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
       paddingHorizontal: 6,
       paddingVertical: 1.5,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     genuinePillText: {
       fontSize: 9.5,
@@ -2297,7 +2292,7 @@ const createStyles = (isDarkMode) =>
       alignItems: 'center',
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      borderTopColor: isDarkMode ? '#303236' : '#F1F5F9',
     },
     orderNumberLabel: {
       fontSize: 12,
@@ -2311,7 +2306,7 @@ const createStyles = (isDarkMode) =>
     orderNumberValue: {
       fontSize: 12,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
 
     paymentMethodRow: {
@@ -2320,7 +2315,7 @@ const createStyles = (isDarkMode) =>
       alignItems: 'center',
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      borderTopColor: isDarkMode ? '#303236' : '#F1F5F9',
     },
     paymentBadgeWrap: {
       flexDirection: 'row',
@@ -2340,7 +2335,7 @@ const createStyles = (isDarkMode) =>
     },
     paymentMethodLabel: {
       fontSize: 12,
-      color: isDarkMode ? '#CBD5E1' : '#475569',
+      color: isDarkMode ? '#A1A1AA' : '#475569',
       fontWeight: '600',
     },
     totalExpandWrap: {
@@ -2374,7 +2369,7 @@ const createStyles = (isDarkMode) =>
     priceBreakdownVal: {
       fontSize: 11.5,
       fontWeight: '700',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
 
     // 8. Free Returns Bar
@@ -2405,24 +2400,24 @@ const createStyles = (isDarkMode) =>
       paddingHorizontal: 18,
       paddingTop: 12,
       paddingBottom: 16,
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderTopWidth: 1,
-      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      borderTopColor: isDarkMode ? '#303236' : '#F1F5F9',
     },
     secondaryBottomBtn: {
       flex: 1,
-      backgroundColor: isDarkMode ? '#252A30' : '#F8FAFC',
+      backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
       paddingVertical: 13,
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     secondaryBottomBtnText: {
       fontSize: 13,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     primaryCancelBtn: {
       flex: 1,
@@ -2452,9 +2447,9 @@ const createStyles = (isDarkMode) =>
     editAddressCard: {
       width: '100%',
       maxWidth: 420,
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       borderRadius: 20,
       padding: 20,
       gap: 12,
@@ -2467,7 +2462,7 @@ const createStyles = (isDarkMode) =>
     editAddressTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     editAddressInput: {
       backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
@@ -2476,7 +2471,7 @@ const createStyles = (isDarkMode) =>
       borderRadius: 12,
       padding: 12,
       fontSize: 13,
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
       minHeight: 70,
       textAlignVertical: 'top',
     },
@@ -2487,7 +2482,7 @@ const createStyles = (isDarkMode) =>
     },
     editAddressCancelBtn: {
       flex: 1,
-      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
       paddingVertical: 11,
       borderRadius: 10,
       alignItems: 'center',
@@ -2522,9 +2517,9 @@ const createStyles = (isDarkMode) =>
     callDialogCard: {
       width: '100%',
       maxWidth: 340,
-      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderWidth: isDarkMode ? 1 : 0,
-      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderColor: isDarkMode ? '#303236' : 'transparent',
       borderRadius: 24,
       padding: 24,
       alignItems: 'center',
@@ -2553,7 +2548,7 @@ const createStyles = (isDarkMode) =>
     callRiderName: {
       fontSize: 17,
       fontWeight: '600',
-      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     callRiderPhone: {
       fontSize: 13,

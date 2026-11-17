@@ -1,12 +1,13 @@
 // =========================================================================
 // MotoTrack Customer Booking - Screen 5: Downpayment Checkout
-// Matches payment gateway design: GCash, Maya, Bank Transfer with live deposit settlement
+// GCash-only payment gateway checkout via Xendit with live deposit settlement
 // =========================================================================
 
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 import { GARAGE_BRANCHES } from '../../../services/bookings/garageService.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
@@ -45,9 +46,15 @@ export default function BookingPaymentScreen({
   onCompletePayment,
   showToast,
 }) {
-  const [selectedChannel, setSelectedChannel] = useState('GCash');
-  const [bankRef, setBankRef] = useState('');
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const [isProcessingLocal, setIsProcessingLocal] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [pendingInvoice, setPendingInvoice] = useState(null);
+  const [paymentFeedback, setPaymentFeedback] = useState('');
+  const [paymentFailed, setPaymentFailed] = useState(false);
+  const attemptKeyRef = useRef(`bk-dp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const submittedRef = useRef(false);
 
   const subtotal = pricingData?.subtotal ?? 0;
   const adminSettings = systemSettingsService.getSettings();
@@ -74,53 +81,126 @@ export default function BookingPaymentScreen({
     address: 'Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu',
   };
 
+  const openCheckoutTab = useCallback((url) => {
+    if (!url || typeof window === 'undefined') return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const verifyCheckoutStatus = useCallback(
+    async (invoiceId, { silentPending = false } = {}) => {
+      if (!invoiceId || submittedRef.current) return;
+      setIsVerifying(true);
+      try {
+        const res = await xenditPaymentService.verifyInvoicePayment(invoiceId);
+        if (res?.paid) {
+          submittedRef.current = true;
+          setPaymentFailed(false);
+          setPaymentFeedback('GCash payment verified via Xendit. Submitting your booking...');
+          await onCompletePayment?.({
+            downpaymentPercent,
+            downpaymentAmount: calculatedDownpayment,
+            remainingBalance: calculatedRemainingBalance,
+            paymentMethod: 'GCash (Xendit)',
+            paymentStatus: 'paid',
+            depositPaid: true,
+            transactionRef: res.invoiceId || invoiceId,
+            referenceNumber: res.externalId || pendingInvoice?.externalId,
+            xenditPaymentId: res.paymentId || pendingInvoice?.paymentId,
+            xenditInvoiceId: res.invoiceId || invoiceId,
+            xenditInvoiceUrl: res.invoiceUrl || pendingInvoice?.invoiceUrl,
+          });
+          return;
+        }
+
+        if (res?.expired || res?.paymentStatus === 'Failed') {
+          setPaymentFailed(true);
+          setPaymentFeedback('Xendit checkout expired or failed. Click Cancel and start a new payment.');
+          return;
+        }
+
+        if (!silentPending) {
+          setPaymentFailed(false);
+          setPaymentFeedback(
+            'Payment is still Pending in Xendit. Complete GCash checkout in the opened tab, then click Verify Payment.'
+          );
+        }
+      } catch (err) {
+        if (!silentPending) {
+          setPaymentFeedback(err?.message || 'Could not verify Xendit payment status.');
+        }
+      } finally {
+        setIsVerifying(false);
+      }
+    },
+    [
+      calculatedDownpayment,
+      calculatedRemainingBalance,
+      downpaymentPercent,
+      onCompletePayment,
+      pendingInvoice,
+    ]
+  );
+
+  // Auto-verify once when user returns to this browser tab after paying in Xendit
+  useEffect(() => {
+    if (!pendingInvoice?.invoiceId || paymentFailed || typeof window === 'undefined') return undefined;
+    const onFocus = () => {
+      verifyCheckoutStatus(pendingInvoice.invoiceId, { silentPending: true });
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [pendingInvoice?.invoiceId, paymentFailed, verifyCheckoutStatus]);
+
   const handlePay = async () => {
-    if (selectedChannel === 'Bank Transfer' && !bankRef.trim()) {
-      showToast?.('Please enter your bank transfer reference number.');
-      return;
-    }
-
     setIsProcessingLocal(true);
+    setPaymentFailed(false);
+    setPaymentFeedback('');
     try {
-      const payerName = `${_firstName} ${_lastName}`.trim() || _currentUser?.name || _currentUser?.fullName || 'Guest Rider';
+      const payerName =
+        `${_firstName} ${_lastName}`.trim() || _currentUser?.name || _currentUser?.fullName || 'Guest Rider';
       const payerEmail = _email || _currentUser?.email || 'customer@mototrack.ph';
-      const payerPhone = _mobileNumber || _currentUser?.phone || '0917-882-9102';
+      const payerPhone = _mobileNumber || _currentUser?.phone || '09170000000';
 
-      // 1. Process payment via Xendit API & record transaction in Supabase
-      const xenditRes = await xenditPaymentService.processBookingDownpayment({
+      const invoice = await xenditPaymentService.createBookingCheckout({
+        customerId: _currentUser?.customer_id || _currentUser?.id || null,
         amount: calculatedDownpayment,
-        paymentMethod: selectedChannel,
+        paymentType: 'DOWNPAYMENT',
         description: `Downpayment for ${serviceTitle} (${bikeTitle})`,
         customerName: payerName,
         customerEmail: payerEmail,
         customerPhone: payerPhone,
+        idempotencyKey: attemptKeyRef.current,
       });
 
-      const generatedRef =
-        selectedChannel === 'Bank Transfer'
-          ? bankRef.trim()
-          : xenditRes?.transactionRef || xenditRes?.referenceNumber;
+      if (invoice?.paid) {
+        await verifyCheckoutStatus(invoice.invoiceId);
+        return;
+      }
 
-      await onCompletePayment?.({
-        downpaymentPercent,
-        downpaymentAmount: calculatedDownpayment,
-        remainingBalance: calculatedRemainingBalance,
-        paymentMethod: `${selectedChannel} (Xendit)`,
-        paymentStatus: 'paid',
-        depositPaid: true,
-        transactionRef: generatedRef,
-        xenditInvoiceId: xenditRes?.invoice?.invoiceId,
-        xenditInvoiceUrl: xenditRes?.invoice?.invoiceUrl,
-      });
+      setPendingInvoice(invoice);
+      openCheckoutTab(invoice.invoiceUrl);
+      setPaymentFeedback(
+        'GCash checkout opened in a new tab. Complete your payment there, then click Verify Payment.'
+      );
     } catch (err) {
       console.error('[BookingPaymentScreen] Payment error:', err);
-      showToast?.(err?.message || 'Payment processing failed. Please try again.');
+      const msg = err?.message || 'Could not start Xendit GCash checkout. Please try again.';
+      setPaymentFeedback(msg);
+      showToast?.(msg);
     } finally {
       setIsProcessingLocal(false);
     }
   };
 
-  const isBusy = isSubmitting || isProcessingLocal;
+  const handleResetCheckout = () => {
+    submittedRef.current = false;
+    attemptKeyRef.current = `bk-dp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPendingInvoice(null);
+    setPaymentFailed(false);
+    setPaymentFeedback('');
+  };
+
+  const isBusy = isSubmitting || isProcessingLocal || isVerifying;
 
   return (
     <View style={{ width: '100%', maxWidth: 1040, marginHorizontal: 'auto', paddingBottom: 60 }}>
@@ -240,10 +320,10 @@ export default function BookingPaymentScreen({
       {/* ─── WHITE PAYMENT CARD CONTAINER (MATCHES IMAGE) ─── */}
       <View
         style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
           borderRadius: 16,
           borderWidth: 1,
-          borderColor: '#E4E4E7',
+          borderColor: isDarkMode ? '#303236' : '#E4E4E7',
           padding: 24,
           shadowColor: '#000000',
           shadowOpacity: 0.04,
@@ -269,7 +349,7 @@ export default function BookingPaymentScreen({
               letterSpacing: 0.8,
             }}
           >
-            Choose Payment Channel
+            Payment Method
           </Text>
 
           <View
@@ -277,7 +357,7 @@ export default function BookingPaymentScreen({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 5,
-              backgroundColor: '#ECFDF5',
+              backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
               paddingHorizontal: 10,
               paddingVertical: 4,
               borderRadius: 20,
@@ -292,28 +372,23 @@ export default function BookingPaymentScreen({
           </View>
         </View>
 
-        {/* ─── 3 PAYMENT CHANNEL CARDS ROW ─── */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-          {/* Channel 1: GCash */}
-          <TouchableOpacity
+        {/* ─── GCASH PAYMENT METHOD CARD ─── */}
+        <View style={{ flexDirection: 'row' }}>
+          <View
             style={{
               flex: 1,
-              minWidth: 200,
-              backgroundColor: selectedChannel === 'GCash' ? '#EFF6FF' : '#FFFFFF',
+              backgroundColor: '#EFF6FF',
               borderRadius: 14,
-              borderWidth: selectedChannel === 'GCash' ? 2 : 1,
-              borderColor: selectedChannel === 'GCash' ? '#2563EB' : '#E4E4E7',
+              borderWidth: 2,
+              borderColor: '#2563EB',
               padding: 18,
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
-              shadowColor: selectedChannel === 'GCash' ? '#2563EB' : 'transparent',
-              shadowOpacity: selectedChannel === 'GCash' ? 0.08 : 0,
+              shadowColor: '#2563EB',
+              shadowOpacity: 0.08,
               shadowRadius: 8,
               shadowOffset: { width: 0, height: 2 },
             }}
-            onPress={() => setSelectedChannel('GCash')}
-            activeOpacity={0.8}
           >
             <View
               style={{
@@ -326,11 +401,11 @@ export default function BookingPaymentScreen({
                 marginBottom: 10,
               }}
             >
-              <Text style={{ fontSize: 22, fontWeight: '900', color: '#FFFFFF', lineHeight: 24 }}>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#FFFFFF', lineHeight: 24 }}>
                 G
               </Text>
             </View>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>
               GCash
             </Text>
             <Text style={{ fontSize: 12, color: '#71717A', marginTop: 2 }}>
@@ -351,137 +426,21 @@ export default function BookingPaymentScreen({
                 via Xendit Gateway
               </Text>
             </View>
-          </TouchableOpacity>
-
-          {/* Channel 2: Maya */}
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              minWidth: 200,
-              backgroundColor: selectedChannel === 'Maya' ? '#F0FDF4' : '#FFFFFF',
-              borderRadius: 14,
-              borderWidth: selectedChannel === 'Maya' ? 2 : 1,
-              borderColor: selectedChannel === 'Maya' ? '#059669' : '#E4E4E7',
-              padding: 18,
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              shadowColor: selectedChannel === 'Maya' ? '#059669' : 'transparent',
-              shadowOpacity: selectedChannel === 'Maya' ? 0.08 : 0,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 2 },
-            }}
-            onPress={() => setSelectedChannel('Maya')}
-            activeOpacity={0.8}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: '#00D632',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5 }}>
-                maya
-              </Text>
-            </View>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
-              Maya
-            </Text>
-            <Text style={{ fontSize: 12, color: '#71717A', marginTop: 2 }}>
-              Maya App • QR Ph
-            </Text>
-            <View
-              style={{
-                marginTop: 8,
-                backgroundColor: '#ECFDF5',
-                paddingHorizontal: 8,
-                paddingVertical: 2.5,
-                borderRadius: 6,
-                borderWidth: 1,
-                borderColor: '#A7F3D0',
-              }}
-            >
-              <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#059669' }}>
-                via Xendit Gateway
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Channel 3: Bank Transfer */}
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              minWidth: 200,
-              backgroundColor: selectedChannel === 'Bank Transfer' ? '#FFFBEB' : '#FFFFFF',
-              borderRadius: 14,
-              borderWidth: selectedChannel === 'Bank Transfer' ? 2 : 1,
-              borderColor: selectedChannel === 'Bank Transfer' ? '#D97706' : '#E4E4E7',
-              padding: 18,
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              shadowColor: selectedChannel === 'Bank Transfer' ? '#D97706' : 'transparent',
-              shadowOpacity: selectedChannel === 'Bank Transfer' ? 0.08 : 0,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 2 },
-            }}
-            onPress={() => setSelectedChannel('Bank Transfer')}
-            activeOpacity={0.8}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: '#92400E',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <BootstrapIcon name="bank" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
-              Bank Transfer
-            </Text>
-            <Text style={{ fontSize: 12, color: '#71717A', marginTop: 2 }}>
-              BDO / BPI / UnionBank
-            </Text>
-            <View
-              style={{
-                marginTop: 8,
-                backgroundColor: '#FFFBEB',
-                paddingHorizontal: 8,
-                paddingVertical: 2.5,
-                borderRadius: 6,
-                borderWidth: 1,
-                borderColor: '#FEF3C7',
-              }}
-            >
-              <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#D97706' }}>
-                Online Banking / InstaPay
-              </Text>
-            </View>
-          </TouchableOpacity>
+          </View>
         </View>
 
-        {/* ─── ACTIVE CHANNEL INTERACTIVE ACTION BOX ─── */}
+        {/* ─── GCASH INTERACTIVE ACTION BOX ─── */}
         <View
           style={{
             marginTop: 18,
             backgroundColor: '#FAFAF9',
             borderRadius: 14,
             borderWidth: 1,
-            borderColor: '#E4E4E7',
+            borderColor: isDarkMode ? '#303236' : '#E4E4E7',
             padding: 20,
           }}
         >
-          {selectedChannel === 'GCash' && (
+          {!pendingInvoice ? (
             <View
               style={{
                 flexDirection: 'row',
@@ -504,16 +463,16 @@ export default function BookingPaymentScreen({
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#FFFFFF' }}>G</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF' }}>G</Text>
                   </View>
                   <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>
                         Pay with GCash
                       </Text>
                       <View
                         style={{
-                          backgroundColor: '#ECFDF5',
+                          backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
                           paddingHorizontal: 8,
                           paddingVertical: 2,
                           borderRadius: 4,
@@ -522,12 +481,12 @@ export default function BookingPaymentScreen({
                         }}
                       >
                         <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669' }}>
-                          Live Gateway In Use
+                          Xendit Verified
                         </Text>
                       </View>
                     </View>
-                    <Text style={{ fontSize: 12, color: '#52525B', marginTop: 2 }}>
-                      Click below to open the secure GCash checkout to settle your {formatPhp(calculatedDownpayment)} deposit.
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#52525B', marginTop: 2 }}>
+                      Opens secure Xendit GCash checkout to settle your {formatPhp(calculatedDownpayment)} deposit.
                     </Text>
                   </View>
                 </View>
@@ -535,7 +494,7 @@ export default function BookingPaymentScreen({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 }}>
                   <BootstrapIcon name="lock-fill" size={11} color="#71717A" />
                   <Text style={{ fontSize: 11, color: '#71717A' }}>
-                    256-Bit SSL Encrypted • Real-Time Supabase payment registration
+                    Server-verified Xendit checkout • Recorded in Supabase payments ledger
                   </Text>
                 </View>
               </View>
@@ -566,7 +525,7 @@ export default function BookingPaymentScreen({
                     <>
                       <ActivityIndicator size="small" color="#FFFFFF" />
                       <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                        Securing Pit Slot...
+                        Creating Checkout...
                       </Text>
                     </>
                   ) : (
@@ -578,118 +537,14 @@ export default function BookingPaymentScreen({
                     </>
                   )}
                 </TouchableOpacity>
-                <Text style={{ fontSize: 10.5, color: '#D97706', marginTop: 6, fontWeight: '500' }}>
-                  ⚡ Settled via live simulated sandbox
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {selectedChannel === 'Maya' && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 16,
-              }}
-            >
-              {/* Left Details */}
-              <View style={{ flex: 1, minWidth: 260 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: '#00D632',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF' }}>maya</Text>
-                  </View>
-                  <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
-                        Pay with Maya
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: '#ECFDF5',
-                          paddingHorizontal: 8,
-                          paddingVertical: 2,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: '#A7F3D0',
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669' }}>
-                          Live Gateway In Use
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={{ fontSize: 12, color: '#52525B', marginTop: 2 }}>
-                      Click below to scan Maya QR or open checkout to settle your {formatPhp(calculatedDownpayment)} deposit.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 }}>
-                  <BootstrapIcon name="lock-fill" size={11} color="#71717A" />
-                  <Text style={{ fontSize: 11, color: '#71717A' }}>
-                    256-Bit SSL Encrypted • Real-Time Supabase payment registration
+                {paymentFeedback ? (
+                  <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 6, fontWeight: '500' }}>
+                    {paymentFeedback}
                   </Text>
-                </View>
-              </View>
-
-              {/* Right Action Button */}
-              <View style={{ alignItems: 'flex-end', minWidth: 200 }}>
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: '#059669',
-                    paddingVertical: 12,
-                    paddingHorizontal: 22,
-                    borderRadius: 8,
-                    cursor: isBusy ? 'not-allowed' : 'pointer',
-                    opacity: isBusy ? 0.75 : 1,
-                    shadowColor: '#059669',
-                    shadowOpacity: 0.2,
-                    shadowRadius: 8,
-                    shadowOffset: { width: 0, height: 3 },
-                  }}
-                  disabled={isBusy}
-                  onPress={handlePay}
-                  activeOpacity={0.85}
-                >
-                  {isBusy ? (
-                    <>
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                        Securing Pit Slot...
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <BootstrapIcon name="lock-fill" size={13} color="#FFFFFF" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                        Pay {formatPhp(calculatedDownpayment)} via Maya →
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <Text style={{ fontSize: 10.5, color: '#D97706', marginTop: 6, fontWeight: '500' }}>
-                  ⚡ Settled via live simulated sandbox
-                </Text>
+                ) : null}
               </View>
             </View>
-          )}
-
-          {selectedChannel === 'Bank Transfer' && (
+          ) : (
             <View style={{ gap: 14 }}>
               <View
                 style={{
@@ -697,117 +552,114 @@ export default function BookingPaymentScreen({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   flexWrap: 'wrap',
-                  gap: 16,
+                  gap: 12,
                 }}
               >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flex: 1, minWidth: 240 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>
+                      {paymentFailed ? 'GCash Payment Expired / Failed' : 'Awaiting GCash Payment Verification'}
+                    </Text>
                     <View
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: '#92400E',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        backgroundColor: paymentFailed ? '#FEF2F2' : '#FFFBEB',
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: paymentFailed ? '#FECACA' : '#FDE68A',
                       }}
                     >
-                      <BootstrapIcon name="bank" size={18} color="#FFFFFF" />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
-                          Pay with Bank Transfer
-                        </Text>
-                        <View
-                          style={{
-                            backgroundColor: '#FFFBEB',
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderRadius: 4,
-                            borderWidth: 1,
-                            borderColor: '#FEF3C7',
-                          }}
-                        >
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>
-                            Direct Bank Transfer
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 12, color: '#52525B', marginTop: 2 }}>
-                        Transfer to BDO (Acct: 0048-2819-4820 D'Blockchain Motorparts) or BPI (Acct: 2819-4920-11).
+                      <Text
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: '700',
+                          color: paymentFailed ? '#DC2626' : '#B45309',
+                        }}
+                      >
+                        {paymentFailed ? 'Failed' : 'Pending'}
                       </Text>
                     </View>
                   </View>
-                </View>
-
-                {/* Right Action Button */}
-                <View style={{ alignItems: 'flex-end', minWidth: 200 }}>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      backgroundColor: '#1E2227',
-                      paddingVertical: 12,
-                      paddingHorizontal: 22,
-                      borderRadius: 8,
-                      cursor: isBusy ? 'not-allowed' : 'pointer',
-                      opacity: isBusy ? 0.75 : 1,
-                      shadowColor: '#000000',
-                      shadowOpacity: 0.15,
-                      shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 3 },
-                    }}
-                    disabled={isBusy}
-                    onPress={handlePay}
-                    activeOpacity={0.85}
-                  >
-                    {isBusy ? (
-                      <>
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                          Verifying...
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <BootstrapIcon name="check-circle-fill" size={13} color="#FFFFFF" />
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                          Settle {formatPhp(calculatedDownpayment)} via Bank →
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                  <Text style={{ fontSize: 10.5, color: '#71717A', marginTop: 6, fontWeight: '500' }}>
-                    ⚡ Verified upon receipt submission
+                  <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#52525B', marginTop: 4 }}>
+                    Ref: {pendingInvoice.externalId} • Amount: {formatPhp(calculatedDownpayment)}
                   </Text>
                 </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  {!paymentFailed && (
+                    <TouchableOpacity
+                      onPress={() => openCheckoutTab(pendingInvoice.invoiceUrl)}
+                      style={{
+                        paddingVertical: 9,
+                        paddingHorizontal: 14,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#BFDBFE',
+                        backgroundColor: '#EFF6FF',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#1D4ED8' }}>
+                        Open GCash Checkout
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {!paymentFailed && (
+                    <TouchableOpacity
+                      disabled={isBusy}
+                      onPress={() => verifyCheckoutStatus(pendingInvoice.invoiceId)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingVertical: 9,
+                        paddingHorizontal: 16,
+                        borderRadius: 8,
+                        backgroundColor: '#EA580C',
+                        cursor: isBusy ? 'not-allowed' : 'pointer',
+                        opacity: isBusy ? 0.75 : 1,
+                      }}
+                    >
+                      {isBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' }}>
+                        {isVerifying ? 'Verifying...' : 'Verify Payment'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    disabled={isSubmitting}
+                    onPress={handleResetCheckout}
+                    style={{
+                      paddingVertical: 9,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+                      backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#52525B' }}>
+                      {paymentFailed ? 'Try Again' : 'Cancel'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              {/* Reference input for bank transfer */}
-              <View style={{ marginTop: 8, backgroundColor: '#FFFFFF', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#E4E4E7' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#71717A', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                  Bank Reference Number / Transaction Code *
-                </Text>
-                <TextInput
+              {paymentFeedback ? (
+                <Text
                   style={{
-                    marginTop: 6,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    borderColor: '#D4D4D8',
-                    fontSize: 13,
-                    color: '#18181B',
-                    backgroundColor: '#FFFFFF',
+                    fontSize: 12,
+                    color: paymentFailed ? '#DC2626' : '#B45309',
+                    fontWeight: '500',
                   }}
-                  placeholder="e.g. BDO-9823419 or InstaPay Reference"
-                  placeholderTextColor="#A1A1AA"
-                  value={bankRef}
-                  onChangeText={setBankRef}
-                />
-              </View>
+                >
+                  {paymentFeedback}
+                </Text>
+              ) : null}
             </View>
           )}
         </View>
@@ -832,7 +684,7 @@ export default function BookingPaymentScreen({
               width: 28,
               height: 28,
               borderRadius: 14,
-              backgroundColor: '#FEF3C7',
+              backgroundColor: isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FEF3C7',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -865,14 +717,14 @@ export default function BookingPaymentScreen({
             borderRadius: 8,
             backgroundColor: '#F4F4F5',
             borderWidth: 1,
-            borderColor: '#E4E4E7',
+            borderColor: isDarkMode ? '#303236' : '#E4E4E7',
             cursor: 'pointer',
           }}
           onPress={onBack}
           activeOpacity={0.7}
         >
           <BootstrapIcon name="arrow-left" size={13} color="#18181B" />
-          <Text style={{ fontSize: 13, fontWeight: '600', color: '#18181B' }}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#18181B' }}>
             Back to Review
           </Text>
         </TouchableOpacity>

@@ -59,14 +59,14 @@ export default function ProductSpecsModal({
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   const { isDarkMode = false } = useTheme?.() || {};
-  const bgCard = isDarkMode ? '#1C2025' : '#FFFFFF';
-  const bgSub = isDarkMode ? '#181B1F' : '#F8FAFC';
-  const bgElevated = isDarkMode ? '#252A30' : '#F1F5F9';
-  const border = isDarkMode ? '#282D34' : '#E2E8F0';
+  const bgCard = isDarkMode ? '#191A1D' : '#FFFFFF';
+  const bgSub = isDarkMode ? '#18181B' : '#F8FAFC';
+  const bgElevated = isDarkMode ? '#202124' : '#F1F5F9';
+  const border = isDarkMode ? '#303236' : '#E2E8F0';
   const borderLight = isDarkMode ? '#242930' : '#F1F5F9';
-  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDarkMode ? '#CBD5E1' : '#334155';
-  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const textPrimary = isDarkMode ? '#F2F2F3' : '#0F172A';
+  const textSecondary = isDarkMode ? '#A1A1AA' : '#334155';
+  const textMuted = isDarkMode ? '#A1A1AA' : '#64748B';
   const productSoldOut = isProductSoldOut(product);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -232,7 +232,7 @@ export default function ProductSpecsModal({
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#F87171' : '#DC2626' }}>SOLD OUT</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#F04444' : '#DC2626' }}>SOLD OUT</Text>
                   </View>
                 ) : null}
               </View>

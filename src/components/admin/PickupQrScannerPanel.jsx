@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
 import { formatPhp } from '../../utils/serviceQuotation.js';
-import { getThemeTokens } from '../../styles/theme.js';
+import { getAdminThemeTokens as getThemeTokens } from '../../styles/web/admin.web.styles.js';
 
 export default function PickupQrScannerPanel({ onToast, onCompleted, style, verifiedBy = 'admin', isDarkMode = false }) {
   const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
@@ -148,13 +148,13 @@ function createStyles(t, isDark) {
       outlineStyle: 'none',
     },
     btn: {
-      backgroundColor: isDark ? '#EA580C' : '#EA580C',
+      backgroundColor: isDark ? '#FF5A00' : '#EA580C',
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',
     },
     confirmBtn: {
-      backgroundColor: isDark ? '#EA580C' : '#059669',
+      backgroundColor: isDark ? '#FF5A00' : '#059669',
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',

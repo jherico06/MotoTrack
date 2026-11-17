@@ -18,6 +18,7 @@ import staffRouter from './routes/staff.js';
 import notifyRouter from './routes/notify.js';
 import bannerRouter from './routes/banner.js';
 import forecastRouter from './routes/forecast.js';
+import paymentsRouter from './routes/payments.js';
 import { startForecastScheduler } from './services/forecastScheduler.js';
 import { multerErrorHandler } from './middleware/upload.js';
 
@@ -68,6 +69,10 @@ app.get('/', (_req, res) => {
       staffVerify: 'POST /api/staff/verify',
       staffList: 'GET /api/staff',
       notifyEmail: 'POST /api/notify/email',
+      xenditCreateInvoice: 'POST /api/payments/xendit/create-invoice',
+      xenditVerifyInvoice: 'GET /api/payments/xendit/invoice/:invoiceId/verify',
+      xenditLinkBooking: 'POST /api/payments/xendit/link-booking',
+      xenditWebhook: 'POST /api/payments/xendit/webhook',
       forecastDaily: 'GET /api/forecast/:productId?period=daily',
       forecastWeekly: 'GET /api/forecast/:productId?period=weekly',
       forecastMonthly: 'GET /api/forecast/:productId?period=monthly',
@@ -97,6 +102,8 @@ app.use('/api/notify', notifyRouter);
 app.use('/notify', notifyRouter);
 app.use('/api/banner', bannerRouter);
 app.use('/banner', bannerRouter);
+app.use('/api/payments', paymentsRouter);
+app.use('/payments', paymentsRouter);
 app.use(multerErrorHandler);
 
 app.use((err, _req, res, _next) => {

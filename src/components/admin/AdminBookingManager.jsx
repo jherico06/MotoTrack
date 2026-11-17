@@ -566,7 +566,7 @@ export default function AdminBookingManager({
                   ) : null}
                   <View style={s.cardActions}>
                     <TouchableOpacity
-                      style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#EA580C' : stage.color }]}
+                      style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#FF5A00' : stage.color }]}
                       onPress={() => runAction(b, action.id)}
                       disabled={!!isBusy}
                     >
@@ -701,7 +701,7 @@ export default function AdminBookingManager({
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                       <TouchableOpacity
-                        style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#EA580C' : '#EA580C' }]}
+                        style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#FF5A00' : '#EA580C' }]}
                         onPress={() => runAction(selected, 'approve')}
                       >
                         <Text style={s.primaryBtnText}>Approve Booking</Text>
@@ -814,7 +814,7 @@ function createStyles(t, isDark) {
       gap: 6,
       paddingHorizontal: 12,
       paddingVertical: 8,
-      borderRadius: 10,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: isDark ? t.accentBorder : '#EA580C',
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
@@ -855,7 +855,7 @@ function createStyles(t, isDark) {
       backgroundColor: isDark ? t.inputBg : '#FFFFFF',
       borderWidth: 1,
       borderColor: isDark ? t.borderInput : '#E2E8F0',
-      borderRadius: 12,
+      borderRadius: 8,
       paddingHorizontal: 12,
       paddingVertical: 8,
       marginBottom: 12,
@@ -971,7 +971,7 @@ function createStyles(t, isDark) {
       backgroundColor: isDark ? t.bgSub : '#F1F5F9',
       marginRight: 8,
     },
-    mechChipOn: { backgroundColor: isDark ? '#EA580C' : '#EA580C' },
+    mechChipOn: { backgroundColor: isDark ? '#FF5A00' : '#EA580C' },
     mechChipText: { fontSize: 12, fontWeight: '700', color: isDark ? t.textSecondary : '#334155' },
     input: {
       borderWidth: 1,

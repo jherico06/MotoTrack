@@ -4,6 +4,7 @@
 // =========================================================================
 
 import React from 'react';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { BootstrapIcon } from '../../common';
 
@@ -20,6 +21,8 @@ export default function BookingProgressIndicator({
   onStepClick,
   canNavigateToStep,
 }) {
+  const { isDarkMode } = useTheme();
+  const progressStyles = get_progressStyles(isDarkMode);
   const { width: windowWidth } = useWindowDimensions();
   const isNarrow = windowWidth < 540;
   const isTiny = windowWidth < 380;
@@ -101,7 +104,13 @@ export default function BookingProgressIndicator({
   );
 }
 
-const progressStyles = StyleSheet.create({
+let _light_progressStyles = null;
+let _dark_progressStyles = null;
+function get_progressStyles(isDarkMode) {
+  if (isDarkMode && _dark_progressStyles) return _dark_progressStyles;
+  if (!isDarkMode && _light_progressStyles) return _light_progressStyles;
+  const created = StyleSheet.create({
+
   wrapper: {
     maxWidth: 820,
     marginHorizontal: 'auto',
@@ -110,10 +119,10 @@ const progressStyles = StyleSheet.create({
     paddingVertical: 24,
   },
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -144,7 +153,7 @@ const progressStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E4E4E7',
+    borderColor: isDarkMode ? '#303236' : '#E4E4E7',
   },
   stepCircleActive: {
     backgroundColor: '#EA580C',
@@ -170,7 +179,7 @@ const progressStyles = StyleSheet.create({
   },
   stepLabelActive: {
     fontWeight: '700',
-    color: '#18181B',
+    color: isDarkMode ? '#F2F2F3' : '#18181B',
   },
   stepLabelCompleted: {
     color: '#27272A',
@@ -185,5 +194,10 @@ const progressStyles = StyleSheet.create({
   connectorCompleted: {
     backgroundColor: '#1E2227',
   },
-});
+
+  });
+  if (isDarkMode) _dark_progressStyles = created;
+  else _light_progressStyles = created;
+  return created;
+}
 

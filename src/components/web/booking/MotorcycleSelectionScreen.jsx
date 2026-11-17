@@ -7,7 +7,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, Linking, useWindowDimensions } from 'react-native';
 import { BootstrapIcon } from '../../common';
-import { packageBookingStyles as styles } from '../../../styles/web/packageBooking.web.styles.js';
+import { getPackageBookingStyles } from '../../../styles/web/packageBooking.web.styles.js';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { MOTORCYCLE_PHOTO_PRESETS, motorcycleService } from '../../../services/products/motorcycleService.js';
 import { calculatePackagePriceForCc } from './bookingPackagesData.js';
 
@@ -27,6 +28,8 @@ export default function MotorcycleSelectionScreen({
   currentUser,
   onNavigateToLogin,
 }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getPackageBookingStyles(isDarkMode), [isDarkMode]);
   const availableMotorcycles = useMemo(() => {
     if (Array.isArray(motorcycles) && motorcycles.length > 0) return motorcycles;
     if (Array.isArray(garageMotorcycles) && garageMotorcycles.length > 0) return garageMotorcycles;
@@ -227,7 +230,7 @@ export default function MotorcycleSelectionScreen({
       {!currentUser && (
         <View
           style={{
-            backgroundColor: '#FFF7ED',
+            backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
             borderWidth: 1,
             borderColor: '#FFEDD5',
             borderRadius: 12,
@@ -314,7 +317,7 @@ export default function MotorcycleSelectionScreen({
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                     <View style={styles.motoCcBadge}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E293B' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#1E293B' }}>
                         {ccValue} CC
                       </Text>
                     </View>
@@ -330,8 +333,8 @@ export default function MotorcycleSelectionScreen({
                           paddingVertical: 2,
                           borderRadius: 6,
                           borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          backgroundColor: '#F8FAFC',
+                          borderColor: isDarkMode ? '#303236' : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 3,
@@ -346,7 +349,7 @@ export default function MotorcycleSelectionScreen({
                         activeOpacity={0.7}
                       >
                         <BootstrapIcon name="star" size={9} color="#64748B" />
-                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#475569' }}>Set Primary</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: isDarkMode ? '#A1A1AA' : '#475569' }}>Set Primary</Text>
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -392,14 +395,14 @@ export default function MotorcycleSelectionScreen({
               alignItems: 'center',
               justifyContent: 'center',
               width: '100%',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
               borderRadius: 12,
               borderWidth: 1,
-              borderColor: '#E4E4E7',
+              borderColor: isDarkMode ? '#303236' : '#E4E4E7',
             }}
           >
             <BootstrapIcon name="bicycle" size={32} color="#94A3B8" />
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B', marginTop: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#18181B', marginTop: 12 }}>
               No Motorcycles Found in Garage
             </Text>
             <Text style={{ fontSize: 13, color: '#71717A', marginTop: 4, textAlign: 'center', maxWidth: 360 }}>
@@ -412,7 +415,7 @@ export default function MotorcycleSelectionScreen({
       {/* ─── WORKSHOP LOCATION & STREET VIEW CARD (MATCHING REFERENCE UI) ─── */}
       <View
         style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
           borderRadius: 24,
           borderWidth: 1.5,
           borderColor: '#F3E8D6',
@@ -446,7 +449,7 @@ export default function MotorcycleSelectionScreen({
                 style={{
                   fontSize: 22,
                   fontWeight: '600',
-                  color: '#18181B',
+                  color: isDarkMode ? '#F2F2F3' : '#18181B',
                   letterSpacing: -0.3,
                 }}
               >
@@ -466,7 +469,7 @@ export default function MotorcycleSelectionScreen({
               {/* Information Box */}
               <View
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
                   borderRadius: 16,
                   borderWidth: 1,
                   borderColor: '#EFECE6',
@@ -510,7 +513,7 @@ export default function MotorcycleSelectionScreen({
                         width: 30,
                         height: 30,
                         borderRadius: 10,
-                        backgroundColor: '#FFF7ED',
+                        backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
@@ -521,7 +524,7 @@ export default function MotorcycleSelectionScreen({
                       <Text style={{ fontSize: 11, fontWeight: '500', color: '#A1A1AA', letterSpacing: 0.3 }}>
                         {row.label}
                       </Text>
-                      <Text style={{ fontSize: 13, fontWeight: '500', color: '#18181B', marginTop: 2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? '#F2F2F3' : '#18181B', marginTop: 2 }}>
                         {row.lines[0]}
                       </Text>
                       <Text style={{ fontSize: 12, color: '#71717A', marginTop: 1 }}>{row.lines[1]}</Text>
@@ -693,7 +696,7 @@ export default function MotorcycleSelectionScreen({
                 borderRadius: 16,
                 overflow: 'hidden',
                 borderWidth: 1,
-                borderColor: '#E4E4E7',
+                borderColor: isDarkMode ? '#303236' : '#E4E4E7',
                 backgroundColor: '#0F172A',
                 position: 'relative',
               }}

@@ -189,8 +189,8 @@ export default function NotificationsPage({
       await notificationService.markAllAdminAsRead();
       setNotifications(notificationService.getAdminNotifications());
     } else {
-      await notificationService.markAllCustomerAsRead(currentUser?.id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      await notificationService.markAllCustomerAsRead(currentUser || currentUser?.id);
+      setNotifications(notificationService.getCustomerNotifications(currentUser || currentUser?.id));
     }
   };
 
@@ -328,22 +328,47 @@ export default function NotificationsPage({
   }, [notifications]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: '#24272B' }]}>
-      <StatusBar style="light" translucent backgroundColor="transparent" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
-      {/* Top Header (Matching Garage Native Header) */}
-      <View style={[styles.header, isDarkMode && { backgroundColor: '#24272B' }]}>
+      {/* Top Header */}
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: isDarkMode ? '#121518' : '#F7F5F0',
+            borderBottomWidth: 1,
+            borderBottomColor: isDarkMode ? '#2B3035' : '#EDE9E0',
+          },
+        ]}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {onNavigateBack && (
-            <TouchableOpacity onPress={onNavigateBack} style={styles.backBtn} activeOpacity={0.7} accessibilityLabel="Back">
-              <BootstrapIcon name="chevron-left" size={16} color="#FFFFFF" />
+            <TouchableOpacity
+              onPress={onNavigateBack}
+              style={[
+                styles.backBtn,
+                !isDarkMode && { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
+              ]}
+              activeOpacity={0.7}
+              accessibilityLabel="Back"
+            >
+              <BootstrapIcon name="chevron-left" size={16} color={isDarkMode ? '#FFFFFF' : '#0F172A'} />
             </TouchableOpacity>
           )}
-          <Text style={styles.title}>Notifications</Text>
+          <Text style={[styles.title, !isDarkMode && { color: '#0F172A' }]}>Notifications</Text>
         </View>
 
         {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAllRead} style={styles.readAllBtn} activeOpacity={0.7} accessibilityLabel="Mark all read">
+          <TouchableOpacity
+            onPress={handleMarkAllRead}
+            style={[
+              styles.readAllBtn,
+              !isDarkMode && { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+            ]}
+            activeOpacity={0.7}
+            accessibilityLabel="Mark all read"
+          >
             <BootstrapIcon name="check2-all" size={13} color="#EA580C" />
             <Text style={styles.readAllText}>Mark all read</Text>
           </TouchableOpacity>
@@ -351,8 +376,8 @@ export default function NotificationsPage({
       </View>
 
       {/* Search Bar matching Web */}
-      <View style={[styles.searchWrapper, isDarkMode && { backgroundColor: '#181A1D' }]}>
-        <View style={[styles.searchContainer, isDarkMode && { backgroundColor: '#23272B', borderColor: '#2B3035' }]}>
+      <View style={[styles.searchWrapper, { backgroundColor: isDarkMode ? '#181A1D' : '#F7F5F0' }]}>
+        <View style={[styles.searchContainer, isDarkMode ? { backgroundColor: '#23272B', borderColor: '#2B3035' } : { backgroundColor: '#FFFFFF', borderColor: '#EDE9E0' }]}>
           <BootstrapIcon name="search" size={14} color="#94A3B8" />
           <TextInput
             style={[styles.searchInput, isDarkMode && { color: '#F9FAFB' }]}
@@ -370,7 +395,7 @@ export default function NotificationsPage({
       </View>
 
       {/* Filter Tabs matching Web */}
-      <View style={[styles.filtersScroll, isDarkMode && { backgroundColor: '#181A1D', borderBottomColor: '#2B3035' }]}>
+      <View style={[styles.filtersScroll, { backgroundColor: isDarkMode ? '#181A1D' : '#F7F5F0', borderBottomColor: isDarkMode ? '#2B3035' : '#EDE9E0' }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
           {[
             { id: 'all', label: `All (${notifications.length})` },
@@ -408,10 +433,10 @@ export default function NotificationsPage({
 
       {/* Grouped Notifications List matching Web */}
       <ScrollView
-        style={{ flex: 1, backgroundColor: isDarkMode ? '#121518' : '#F8FAFC' }}
+        style={{ flex: 1, backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }}
         contentContainerStyle={[
           styles.content,
-          { flexGrow: 1, backgroundColor: isDarkMode ? '#121518' : '#F8FAFC' },
+          { flexGrow: 1, backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' },
         ]}
         showsVerticalScrollIndicator={false}
       >

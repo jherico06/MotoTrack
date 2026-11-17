@@ -92,10 +92,26 @@ export default function ViewReportDetailsModal({
     : null;
 
   const statusColors = {
-    New: { bg: '#FEF3C7', text: '#92400E', border: '#FDE68A' },
-    'Under Review': { bg: '#EFF6FF', text: '#1E40AF', border: '#BFDBFE' },
-    Resolved: { bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0' },
-    Dismissed: { bg: '#F1F5F9', text: '#475569', border: '#E2E8F0' },
+    New: {
+      bg: isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FEF3C7',
+      text: isDarkMode ? '#F5B942' : '#92400E',
+      border: isDarkMode ? 'rgba(245, 185, 66, 0.28)' : '#FDE68A',
+    },
+    'Under Review': {
+      bg: isDarkMode ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF',
+      text: isDarkMode ? '#3B82F6' : '#1E40AF',
+      border: isDarkMode ? 'rgba(59, 130, 246, 0.28)' : '#BFDBFE',
+    },
+    Resolved: {
+      bg: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+      text: isDarkMode ? '#00C98D' : '#065F46',
+      border: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
+    },
+    Dismissed: {
+      bg: isDarkMode ? '#202124' : '#F1F5F9',
+      text: isDarkMode ? '#A1A1AA' : '#475569',
+      border: isDarkMode ? '#303236' : '#E2E8F0',
+    },
   };
 
   return (
@@ -105,11 +121,26 @@ export default function ViewReportDetailsModal({
           {/* ─── MODAL HEADER ─── */}
           <View style={[styles.header, isDarkMode && styles.headerDark]}>
             <View style={styles.headerLeft}>
-              <View style={[styles.headerIconWrap, { backgroundColor: isReport ? '#FEE2E2' : '#FEF3C7' }]}>
+              <View
+                style={[
+                  styles.headerIconWrap,
+                  {
+                    backgroundColor: isReport
+                      ? isDarkMode
+                        ? 'rgba(240, 68, 68, 0.14)'
+                        : '#FEE2E2'
+                      : isDarkMode
+                        ? 'rgba(245, 185, 66, 0.14)'
+                        : '#FEF3C7',
+                    borderWidth: isDarkMode ? 1 : 0,
+                    borderColor: isReport ? 'rgba(240, 68, 68, 0.28)' : 'rgba(245, 185, 66, 0.28)',
+                  },
+                ]}
+              >
                 <BootstrapIcon
                   name={isReport ? 'exclamation-triangle-fill' : 'star-fill'}
                   size={16}
-                  color={isReport ? '#DC2626' : '#D97706'}
+                  color={isReport ? (isDarkMode ? '#F04444' : '#DC2626') : isDarkMode ? '#F5B942' : '#D97706'}
                 />
               </View>
               <View>
@@ -121,22 +152,43 @@ export default function ViewReportDetailsModal({
                     style={[
                       styles.typeBadge,
                       {
-                        backgroundColor: isReport ? '#FEF2F2' : '#FFFBEB',
-                        borderColor: isReport ? '#FECACA' : '#FDE68A',
+                        backgroundColor: isReport
+                          ? isDarkMode
+                            ? 'rgba(240, 68, 68, 0.14)'
+                            : '#FEF2F2'
+                          : isDarkMode
+                            ? 'rgba(245, 185, 66, 0.14)'
+                            : '#FFFBEB',
+                        borderColor: isReport
+                          ? isDarkMode
+                            ? 'rgba(240, 68, 68, 0.28)'
+                            : '#FECACA'
+                          : isDarkMode
+                            ? 'rgba(245, 185, 66, 0.28)'
+                            : '#FDE68A',
                       },
                     ]}
                   >
-                    <Text style={[styles.typeBadgeText, { color: isReport ? '#DC2626' : '#B45309' }]}>
+                    <Text
+                      style={[
+                        styles.typeBadgeText,
+                        { color: isReport ? (isDarkMode ? '#F04444' : '#DC2626') : isDarkMode ? '#F5B942' : '#B45309' },
+                      ]}
+                    >
                       {isReport ? 'REPORT / COMPLAINT' : 'RATING & REVIEW'}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.modalSub}>Submission ID: {submission.id}</Text>
+                <Text style={[styles.modalSub, isDarkMode && { color: '#A1A1AA' }]}>Submission ID: {submission.id}</Text>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75}>
-              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
+            <TouchableOpacity
+              style={[styles.closeBtn, isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' }]}
+              onPress={onClose}
+              activeOpacity={0.75}
+            >
+              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
@@ -147,18 +199,38 @@ export default function ViewReportDetailsModal({
               <View
                 style={[
                   styles.feedbackBanner,
-                  feedbackMsg.startsWith('Failed') ? styles.bannerError : styles.bannerSuccess,
+                  feedbackMsg.startsWith('Failed')
+                    ? isDarkMode
+                      ? { backgroundColor: 'rgba(240, 68, 68, 0.14)', borderColor: 'rgba(240, 68, 68, 0.28)' }
+                      : styles.bannerError
+                    : isDarkMode
+                      ? { backgroundColor: 'rgba(0, 201, 141, 0.14)', borderColor: 'rgba(0, 201, 141, 0.28)' }
+                      : styles.bannerSuccess,
                 ]}
               >
                 <BootstrapIcon
                   name={feedbackMsg.startsWith('Failed') ? 'exclamation-circle-fill' : 'check-circle-fill'}
                   size={14}
-                  color={feedbackMsg.startsWith('Failed') ? '#DC2626' : '#15803D'}
+                  color={
+                    feedbackMsg.startsWith('Failed')
+                      ? isDarkMode
+                        ? '#F04444'
+                        : '#DC2626'
+                      : isDarkMode
+                        ? '#00C98D'
+                        : '#15803D'
+                  }
                 />
                 <Text
                   style={[
                     styles.feedbackBannerText,
-                    feedbackMsg.startsWith('Failed') ? styles.textError : styles.textSuccess,
+                    feedbackMsg.startsWith('Failed')
+                      ? isDarkMode
+                        ? { color: '#F04444' }
+                        : styles.textError
+                      : isDarkMode
+                        ? { color: '#00C98D' }
+                        : styles.textSuccess,
                   ]}
                 >
                   {feedbackMsg}
@@ -355,15 +427,27 @@ export default function ViewReportDetailsModal({
                       key={s.key}
                       style={[
                         styles.statusBtn,
+                        isDarkMode && { backgroundColor: '#202124', borderColor: '#303236' },
                         isSelected && styles.statusBtnSelected,
-                        isSelected && { borderColor: '#EA580C', backgroundColor: '#EA580C10' },
+                        isSelected && {
+                          borderColor: '#FF5A00',
+                          backgroundColor: isDarkMode ? '#3A241B' : '#EA580C10',
+                        },
                       ]}
                       onPress={() => setSelectedStatus(s.key)}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name={s.icon} size={12} color={isSelected ? '#EA580C' : '#64748B'} />
+                      <BootstrapIcon
+                        name={s.icon}
+                        size={12}
+                        color={isSelected ? '#FF5A00' : isDarkMode ? '#A1A1AA' : '#64748B'}
+                      />
                       <Text
-                        style={[styles.statusBtnText, isSelected && { color: '#EA580C', fontWeight: '600' }]}
+                        style={[
+                          styles.statusBtnText,
+                          isDarkMode && { color: '#A1A1AA' },
+                          isSelected && { color: '#FF5A00', fontWeight: '600' },
+                        ]}
                       >
                         {s.label}
                       </Text>
@@ -381,7 +465,7 @@ export default function ViewReportDetailsModal({
                   <TextInput
                     style={[styles.textInput, styles.dismissedInput, isDarkMode && styles.textInputDark]}
                     placeholder="e.g. Inconclusive report, duplicate submission, or resolved verbally with customer..."
-                    placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+                    placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
                     value={dismissedReason}
                     onChangeText={setDismissedReason}
                   />
@@ -397,7 +481,7 @@ export default function ViewReportDetailsModal({
                 <TextInput
                   style={[styles.textInput, styles.notesInput, isDarkMode && styles.textInputDark]}
                   placeholder="Record investigation findings, customer contact outcomes, or replacement parts dispatched..."
-                  placeholderTextColor={isDarkMode ? '#64748B' : '#94A3B8'}
+                  placeholderTextColor={isDarkMode ? '#71717A' : '#94A3B8'}
                   multiline={true}
                   numberOfLines={4}
                   value={adminNotes}
@@ -420,8 +504,15 @@ export default function ViewReportDetailsModal({
 
           {/* ─── FOOTER CONTROLS ─── */}
           <View style={[styles.footer, isDarkMode && styles.footerDark]}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
-              <Text style={styles.cancelBtnText}>Close</Text>
+            <TouchableOpacity
+              style={[
+                styles.cancelBtn,
+                isDarkMode && { backgroundColor: '#202124', borderWidth: 1, borderColor: '#303236' },
+              ]}
+              onPress={onClose}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.cancelBtnText, isDarkMode && { color: '#F2F2F3' }]}>Close</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -472,8 +563,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   modalCardDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
   },
   header: {
     flexDirection: 'row',
@@ -486,8 +577,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   headerDark: {
-    backgroundColor: '#1E293B',
-    borderBottomColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderBottomColor: '#303236',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -547,8 +638,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionCardDark: {
-    backgroundColor: '#0F172A40',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#303236',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -660,8 +751,8 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   messageBoxDark: {
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
+    backgroundColor: '#202124',
+    borderColor: '#303236',
   },
   messageText: {
     fontFamily: 'Inter',
@@ -674,8 +765,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7ED40',
   },
   adminWorkflowCardDark: {
-    borderColor: '#EA580C40',
-    backgroundColor: '#1E293B',
+    borderColor: '#8A3D19',
+    backgroundColor: '#202124',
   },
   currentStatusPill: {
     paddingHorizontal: 8,
@@ -736,9 +827,9 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   textInputDark: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
-    color: '#F8FAFC',
+    backgroundColor: '#202124',
+    borderColor: '#3A3B40',
+    color: '#F2F2F3',
   },
   notesInput: {
     minHeight: 85,
@@ -795,8 +886,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   footerDark: {
-    backgroundColor: '#1E293B',
-    borderTopColor: '#334155',
+    backgroundColor: '#191A1D',
+    borderTopColor: '#303236',
   },
   cancelBtn: {
     paddingHorizontal: 16,
@@ -817,7 +908,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 6,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FF5A00',
   },
   saveBtnText: {
     fontFamily: 'Inter',
@@ -826,6 +917,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   textLight: {
-    color: '#F8FAFC',
+    color: '#F5F5F5',
   },
 });

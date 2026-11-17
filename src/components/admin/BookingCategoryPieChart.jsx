@@ -106,15 +106,15 @@ export default function BookingCategoryPieChart({
   const colors = useMemo(() => {
     if (isDark) {
       return {
-        cardBg: '#141A18',
-        border: '#272930',
-        textPrimary: '#F8FAFC',
-        textMuted: '#94A3B8',
-        chipBg: '#1E293B',
-        chipBorder: '#334155',
-        hoverBg: 'rgba(255, 255, 255, 0.06)',
-        hoverBorder: '#334155',
-        emptyTrack: '#272930',
+        cardBg: '#191A1D',
+        border: '#303236',
+        textPrimary: '#F2F2F3',
+        textMuted: '#A1A1AA',
+        chipBg: '#202124',
+        chipBorder: '#303236',
+        hoverBg: '#292B2F',
+        hoverBorder: '#3A3B40',
+        emptyTrack: '#292B2F',
       };
     }
     return {
@@ -423,7 +423,7 @@ export default function BookingCategoryPieChart({
                 style={{
                   fontSize: 10.5,
                   fontWeight: '700',
-                  color: isDark ? '#34D399' : '#065F46',
+                  color: isDark ? '#00C98D' : '#065F46',
                 }}
               >
                 Live ({liveBookings.length})
@@ -440,9 +440,9 @@ export default function BookingCategoryPieChart({
                 borderRadius: 6,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                backgroundColor: isDark ? '#202124' : '#F1F5F9',
                 borderWidth: 1,
-                borderColor: isDark ? '#334155' : '#E2E8F0',
+                borderColor: isDark ? '#3A3B40' : '#E2E8F0',
                 cursor: 'pointer',
                 transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease',
                 ...(syncing ? { animation: 'reloadSpin 0.9s linear infinite' } : {}),
@@ -472,11 +472,11 @@ export default function BookingCategoryPieChart({
           style={{
             position: 'relative',
             flexDirection: 'row',
-            backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+            backgroundColor: isDark ? '#202124' : '#F1F5F9',
             borderRadius: 8,
             padding: 3,
             borderWidth: 1,
-            borderColor: isDark ? '#334155' : '#E2E8F0',
+            borderColor: isDark ? '#3A3B40' : '#E2E8F0',
             width: isDesktop ? 220 : '100%',
           }}
         >

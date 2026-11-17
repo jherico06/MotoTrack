@@ -86,6 +86,74 @@ export const colors = {
  */
 export function getThemeTokens(isDark = false) {
   if (isDark) {
+    if (typeof document !== 'undefined') {
+      return {
+        isDark: true,
+        // Surfaces — MotoTrack Global Dark Mode Palette
+        bgMain: '#111315',
+        bgContent: '#18181B',
+        bgCard: '#191A1D',
+        bgSub: '#202124',
+        bgSubtle: '#202124',
+        bgHover: '#292B2F',
+        bgElevated: '#202124',
+        border: '#303236',
+        borderLight: '#292B2F',
+        divider: '#303236',
+        borderInput: '#3A3B40',
+        // Type
+        textPrimary: '#F2F2F3',
+        textHeading: '#F5F5F5',
+        textSecondary: '#A1A1AA',
+        textMuted: '#71717A',
+        textDisabled: '#52525B',
+        textSubtle: '#71717A',
+        placeholder: '#71717A',
+        // Chrome
+        sidebarBg: '#18181B',
+        topBarBg: '#111315',
+        inputBg: '#202124',
+        modalBg: '#191A1D',
+        modalOverlay: 'rgba(0, 0, 0, 0.78)',
+        cardShadow: '#000000',
+        // Brand / accent — Racing Orange
+        accent: '#FF5A00',
+        accentBrand: '#FF5A00',
+        accentBg: '#3A241B',
+        accentBorder: '#8A3D19',
+        ctaBg: '#FF5A00',
+        ctaHover: '#E95000',
+        navActiveBg: '#FF5A00',
+        navActiveText: '#FFFFFF',
+        navInactiveIcon: '#A1A1AA',
+        navInactiveText: '#A1A1AA',
+        // Table
+        tableHeaderBg: '#202124',
+        tableRowBg: '#191A1D',
+        tableRowAlt: '#202124',
+        tableRowBorder: '#303236',
+        tableRowHighlight: '#3A241B',
+        tableRowDanger: 'rgba(240, 68, 68, 0.14)',
+        // Chips / badges
+        chipBg: '#202124',
+        chipBorder: '#303236',
+        chipText: '#F2F2F3',
+        badgeNeutralBg: '#202124',
+        badgeNeutralText: '#A1A1AA',
+        statusSuccessBg: 'rgba(0, 201, 141, 0.15)',
+        statusSuccessText: '#00C98D',
+        statusWarningBg: 'rgba(245, 185, 66, 0.15)',
+        statusWarningText: '#F5B942',
+        statusDangerBg: 'rgba(240, 68, 68, 0.15)',
+        statusDangerText: '#F04444',
+        statusInfoBg: 'rgba(59, 130, 246, 0.15)',
+        statusInfoText: '#3B82F6',
+        statusPurpleBg: 'rgba(167, 139, 250, 0.16)',
+        statusPurpleText: '#C4B5FD',
+        focusRing: 'rgba(255, 90, 0, 0.50)',
+        money: '#FF5A00',
+      };
+    }
     return {
       isDark: true,
       // Surfaces — charcoal hierarchy

@@ -51,8 +51,8 @@ const styles = StyleSheet.create({
       : {}),
   },
   outerDark: {
-    backgroundColor: '#1A1D23',
-    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: '#191A1D',
+    borderColor: '#303236',
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 18px 40px rgba(0, 0, 0, 0.45)' }
       : {}),
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#111827',
+    backgroundColor: '#111315',
     minHeight: 460,
   },
   hero: {

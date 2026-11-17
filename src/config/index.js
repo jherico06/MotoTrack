@@ -35,7 +35,8 @@ export const APP_CONFIG = {
     clientKey: env.EXPO_PUBLIC_GCASH_CLIENT_KEY || 'gcash-sandbox-key',
   },
   xendit: {
-    secretKey: env.EXPO_PUBLIC_XENDIT_SECRET_KEY || env.XENDIT_SECRET_KEY || '',
+    // Client must NOT embed Xendit secrets. Use server XENDIT_SECRET_KEY + /api/payments/xendit/*.
+    secretKey: '',
   },
   demo: {
     // Set EXPO_PUBLIC_ENABLE_DEMO_LOGINS=false to disable the one-click demo /

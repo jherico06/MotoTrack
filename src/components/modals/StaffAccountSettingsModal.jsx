@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import {
   Modal,
   View,
@@ -18,6 +19,8 @@ import { useAuth } from '../../context';
  * Admin cannot change these credentials after account creation.
  */
 export default function StaffAccountSettingsModal({ visible, onClose, onSaved }) {
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => getModalStyles(isDarkMode), [isDarkMode]);
   const { currentUser, updateProfile, changePassword } = useAuth();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -227,7 +230,8 @@ export default function StaffAccountSettingsModal({ visible, onClose, onSaved })
   );
 }
 
-const styles = StyleSheet.create({
+function getRawModalStyles() {
+  return {
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
@@ -343,4 +347,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveText: { color: '#FFFFFF', fontWeight: '600' },
-});
+  };
+}
+
+function remapModalDark(obj) {
+const DARK_BG = {
+  '#FFFFFF': '#191A1D', '#F8FAFC': '#202124', '#F1F5F9': '#202124', '#FAFAFA': '#202124',
+  '#FFF7ED': '#3A241B', '#FFFBEB': 'rgba(245, 185, 66, 0.14)', '#FEF3C7': 'rgba(245, 185, 66, 0.18)',
+  '#FEF2F2': 'rgba(240, 68, 68, 0.14)', '#ECFDF5': 'rgba(0, 201, 141, 0.14)', '#EFF6FF': 'rgba(59, 130, 246, 0.14)',
+  '#EA580C': '#FF5A00', '#1E293B': '#202124', '#0F172A': '#202124',
+};
+const DARK_BORDER = {
+  '#E2E8F0': '#303236', '#E4E4E7': '#303236', '#E5E7EB': '#303236', '#CBD5E1': '#3A3B40', '#F1F5F9': '#292B2F',
+  '#FED7AA': '#8A3D19', '#FDE68A': 'rgba(245, 185, 66, 0.35)', '#FECACA': 'rgba(240, 68, 68, 0.35)',
+};
+const DARK_TEXT = {
+  '#0F172A': '#F5F5F5', '#111827': '#F5F5F5', '#18181B': '#F2F2F3', '#1E293B': '#F2F2F3',
+  '#334155': '#F2F2F3', '#475569': '#A1A1AA', '#52525B': '#A1A1AA', '#64748B': '#A1A1AA', '#94A3B8': '#71717A',
+  '#EA580C': '#FF5A00', '#DC2626': '#F04444', '#B45309': '#F5B942', '#92400E': '#F5B942',
+};
+
+  if (Array.isArray(obj)) return obj.map(remapModalDark);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    Object.keys(obj).forEach((k) => {
+      const v = obj[k];
+      if (typeof v === 'string') {
+        const u = v.toUpperCase();
+        if (k === 'backgroundColor') out[k] = DARK_BG[u] || v;
+        else if (k.toLowerCase().includes('bordercolor')) out[k] = DARK_BORDER[u] || v;
+        else if (k === 'color') out[k] = DARK_TEXT[u] || v;
+        else out[k] = v;
+      } else out[k] = remapModalDark(v);
+    });
+    return out;
+  }
+  return obj;
+}
+let _lightModalStyles = null;
+let _darkModalStyles = null;
+function getModalStyles(isDark) {
+  if (!_lightModalStyles) {
+    const raw = getRawModalStyles();
+    _lightModalStyles = StyleSheet.create(raw);
+    _darkModalStyles = StyleSheet.create(remapModalDark(raw));
+  }
+  return isDark ? _darkModalStyles : _lightModalStyles;
+}

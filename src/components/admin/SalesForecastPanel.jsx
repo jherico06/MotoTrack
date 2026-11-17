@@ -228,15 +228,15 @@ export default function SalesForecastPanel({
     const isSnapMatch = String(liveInventorySnapshot.productId) === String(selectedProductId);
     const reservedStock = isSnapMatch
       ? Math.max(
-          Number(baseSelectedProduct.reserved_stock ?? baseSelectedProduct.reservedStock) || 0,
-          liveInventorySnapshot.reservedStock
-        )
+        Number(baseSelectedProduct.reserved_stock ?? baseSelectedProduct.reservedStock) || 0,
+        liveInventorySnapshot.reservedStock
+      )
       : Number(baseSelectedProduct.reserved_stock ?? baseSelectedProduct.reservedStock) || 0;
     const incomingStock = isSnapMatch
       ? Math.max(
-          Number(baseSelectedProduct.incoming_stock ?? baseSelectedProduct.incomingStock) || 0,
-          liveInventorySnapshot.incomingStock
-        )
+        Number(baseSelectedProduct.incoming_stock ?? baseSelectedProduct.incomingStock) || 0,
+        liveInventorySnapshot.incomingStock
+      )
       : Number(baseSelectedProduct.incoming_stock ?? baseSelectedProduct.incomingStock) || 0;
     const leadTimeDays =
       (isSnapMatch && liveInventorySnapshot.leadTimeDays) ||
@@ -596,107 +596,168 @@ export default function SalesForecastPanel({
         {/* Card 1: Predicted Demand */}
         <View style={[styles.kpiCard, !isDesktop && styles.kpiCardMobile]}>
           <View style={styles.kpiTopRow}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: tokens.blueSoft }]}>
-              <BootstrapIcon name="graph-up" size={15} color={tokens.blue} />
-            </View>
             <Text style={styles.kpiLabel} numberOfLines={1}>
               {activePeriod.kpiDemandLabel}
             </Text>
+            <View
+              style={[
+                styles.kpiHeaderPill,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                  borderColor: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
+                },
+              ]}
+            >
+              <Text style={[styles.kpiHeaderPillText, { color: tokens.success }]}>
+                +{demandPctChange > 0 ? `${demandPctChange}%` : '12.5%'}
+              </Text>
+            </View>
           </View>
-          <View style={styles.kpiValueRow}>
-            <Text style={styles.kpiValue}>{totalPredictedDemand}</Text>
-            <Text style={styles.kpiUnit}>units</Text>
+          <View style={styles.kpiValueBlock}>
+            <View style={styles.kpiValueRow}>
+              <Text style={styles.kpiValue}>{totalPredictedDemand}</Text>
+              <Text style={styles.kpiUnit}>units</Text>
+            </View>
+            <Text style={styles.kpiSubText}>vs. previous period</Text>
           </View>
-          <View style={[styles.kpiSubBadge, { backgroundColor: tokens.successSoft }]}>
-            <BootstrapIcon name="arrow-up-short" size={13} color={tokens.success} />
-            <Text style={[styles.kpiSubBadgeText, { color: tokens.success }]}>
-              {demandPctChange > 0 ? `${demandPctChange}%` : '12.5%'} vs. previous period
-            </Text>
+          <View style={styles.kpiTrack}>
+            <View style={[styles.kpiTrackFill, { width: '78%', backgroundColor: tokens.primary }]} />
           </View>
         </View>
 
         {/* Card 2: Regression Slope */}
         <View style={[styles.kpiCard, !isDesktop && styles.kpiCardMobile]}>
           <View style={styles.kpiTopRow}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: tokens.blueSoft }]}>
-              <BootstrapIcon name="activity" size={15} color={tokens.blue} />
-            </View>
-            <Text style={styles.kpiLabel}>Regression Slope</Text>
-          </View>
-          <View style={styles.kpiValueRow}>
-            <Text style={styles.kpiValue}>{Number(slopeVal).toFixed(1)}</Text>
-            <Text style={styles.kpiUnit}>{activePeriod.slopeUnit}</Text>
-          </View>
-          <View
-            style={[
-              styles.kpiSubBadge,
-              { backgroundColor: slopeVal >= 0 ? tokens.successSoft : tokens.warningSoft },
-            ]}
-          >
-            <BootstrapIcon
-              name={slopeVal >= 0 ? 'arrow-up-short' : 'arrow-down-short'}
-              size={13}
-              color={slopeVal >= 0 ? tokens.success : tokens.warning}
-            />
-            <Text
-              style={[styles.kpiSubBadgeText, { color: slopeVal >= 0 ? tokens.success : tokens.warning }]}
+            <Text style={styles.kpiLabel} numberOfLines={1}>Regression slope</Text>
+            <View
+              style={[
+                styles.kpiHeaderPill,
+                {
+                  backgroundColor: slopeVal >= 0
+                    ? isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5'
+                    : isDarkMode ? 'rgba(245, 185, 66, 0.14)' : '#FFFBEB',
+                  borderColor: slopeVal >= 0
+                    ? isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0'
+                    : isDarkMode ? 'rgba(245, 185, 66, 0.28)' : '#FDE68A',
+                },
+              ]}
             >
-              {slopeVal > 0 ? 'Increasing demand' : slopeVal < 0 ? 'Decreasing demand' : 'Stable demand'}
+              <Text style={[styles.kpiHeaderPillText, { color: slopeVal >= 0 ? tokens.success : tokens.warning }]}>
+                {slopeVal > 0 ? 'Rising' : slopeVal < 0 ? 'Declining' : 'Stable'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.kpiValueBlock}>
+            <View style={styles.kpiValueRow}>
+              <Text style={styles.kpiValue}>{Number(slopeVal).toFixed(1)}</Text>
+              <Text style={styles.kpiUnit}>{activePeriod.slopeUnit}</Text>
+            </View>
+            <Text style={styles.kpiSubText}>
+              {slopeVal > 0 ? 'Increasing demand' : slopeVal < 0 ? 'Decreasing demand' : 'Steady trajectory'}
             </Text>
+          </View>
+          <View style={styles.kpiTrack}>
+            <View style={[styles.kpiTrackFill, { width: slopeVal >= 0 ? '70%' : '45%', backgroundColor: slopeVal >= 0 ? tokens.success : tokens.warning }]} />
           </View>
         </View>
 
         {/* Card 3: Regression Intercept */}
         <View style={[styles.kpiCard, !isDesktop && styles.kpiCardMobile]}>
           <View style={styles.kpiTopRow}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: tokens.blueSoft }]}>
-              <BootstrapIcon name="arrow-up-right" size={15} color={tokens.blue} />
+            <Text style={styles.kpiLabel} numberOfLines={1}>Regression intercept</Text>
+            <View
+              style={[
+                styles.kpiHeaderPill,
+                {
+                  backgroundColor: isDarkMode ? '#202124' : '#F4F4F5',
+                  borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+                },
+              ]}
+            >
+              <Text style={[styles.kpiHeaderPillText, { color: tokens.mutedForeground }]}>
+                Baseline
+              </Text>
             </View>
-            <Text style={styles.kpiLabel}>Regression Intercept</Text>
           </View>
-          <View style={styles.kpiValueRow}>
-            <Text style={styles.kpiValue}>{Number(interceptVal).toFixed(1)}</Text>
-            <Text style={styles.kpiUnit}>units</Text>
+          <View style={styles.kpiValueBlock}>
+            <View style={styles.kpiValueRow}>
+              <Text style={styles.kpiValue}>{Number(interceptVal).toFixed(1)}</Text>
+              <Text style={styles.kpiUnit}>units</Text>
+            </View>
+            <Text style={styles.kpiSubText}>Starting baseline units</Text>
           </View>
-          <Text style={styles.kpiSubText}>units</Text>
+          <View style={styles.kpiTrack}>
+            <View style={[styles.kpiTrackFill, { width: '58%', backgroundColor: tokens.blue }]} />
+          </View>
         </View>
 
         {/* Card 4: R² (Goodness of Fit) */}
         <View style={[styles.kpiCard, !isDesktop && styles.kpiCardMobile]}>
           <View style={styles.kpiTopRow}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: tokens.successSoft }]}>
-              <BootstrapIcon name="bullseye" size={15} color={tokens.success} />
+            <Text style={styles.kpiLabel} numberOfLines={1}>R² (Goodness of fit)</Text>
+            <View
+              style={[
+                styles.kpiHeaderPill,
+                {
+                  backgroundColor: isDarkMode ? 'rgba(0, 201, 141, 0.14)' : '#ECFDF5',
+                  borderColor: isDarkMode ? 'rgba(0, 201, 141, 0.28)' : '#A7F3D0',
+                },
+              ]}
+            >
+              <Text style={[styles.kpiHeaderPillText, { color: tokens.success }]}>
+                {Number(rSquaredVal) >= 0.75
+                  ? 'Excellent fit'
+                  : Number(rSquaredVal) >= 0.5
+                    ? 'Good fit'
+                    : 'Moderate fit'}
+              </Text>
             </View>
-            <Text style={styles.kpiLabel}>R² (Goodness of Fit)</Text>
           </View>
-          <View style={styles.kpiValueRow}>
+          <View style={styles.kpiValueBlock}>
             <Text style={styles.kpiValue}>{rSquaredVal}</Text>
+            <Text style={styles.kpiSubText}>Model fit confidence</Text>
           </View>
-          <View style={[styles.kpiSubBadge, { backgroundColor: tokens.successSoft }]}>
-            <BootstrapIcon name="check2" size={12} color={tokens.success} />
-            <Text style={[styles.kpiSubBadgeText, { color: tokens.success }]}>
-              {Number(rSquaredVal) >= 0.75
-                ? 'Excellent fit'
-                : Number(rSquaredVal) >= 0.5
-                  ? 'Good fit'
-                  : 'Moderate fit'}
-            </Text>
+          <View style={styles.kpiTrack}>
+            <View
+              style={[
+                styles.kpiTrackFill,
+                {
+                  width: `${Math.min(100, Math.max(18, Math.round((Number(rSquaredVal) || 0.65) * 100)))}%`,
+                  backgroundColor: tokens.success,
+                },
+              ]}
+            />
           </View>
         </View>
 
         {/* Card 5: Forecast Accuracy (MAE) */}
         <View style={[styles.kpiCard, !isDesktop && styles.kpiCardMobile]}>
           <View style={styles.kpiTopRow}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: tokens.blueSoft }]}>
-              <BootstrapIcon name="check2-square" size={15} color={tokens.blue} />
+            <Text style={styles.kpiLabel} numberOfLines={1}>Forecast accuracy (MAE)</Text>
+            <View
+              style={[
+                styles.kpiHeaderPill,
+                {
+                  backgroundColor: isDarkMode ? '#3A241B' : '#FFF7ED',
+                  borderColor: isDarkMode ? '#8A3D19' : '#FED7AA',
+                },
+              ]}
+            >
+              <Text style={[styles.kpiHeaderPillText, { color: tokens.primary }]}>
+                Mean error
+              </Text>
             </View>
-            <Text style={styles.kpiLabel}>Forecast Accuracy (MAE)</Text>
           </View>
-          <View style={styles.kpiValueRow}>
-            <Text style={styles.kpiValue}>{effectiveMae}</Text>
-            <Text style={styles.kpiUnit}>units</Text>
+          <View style={styles.kpiValueBlock}>
+            <View style={styles.kpiValueRow}>
+              <Text style={styles.kpiValue}>{effectiveMae}</Text>
+              <Text style={styles.kpiUnit}>units</Text>
+            </View>
+            <Text style={styles.kpiSubText}>Average absolute error</Text>
           </View>
-          <Text style={styles.kpiSubText}>units</Text>
+          <View style={styles.kpiTrack}>
+            <View style={[styles.kpiTrackFill, { width: '64%', backgroundColor: tokens.primary }]} />
+          </View>
         </View>
       </View>
 
@@ -815,7 +876,7 @@ export default function SalesForecastPanel({
                     ? 'Demand is Decreasing'
                     : 'Demand is Stable'}
               </Text>
-              <Text style={[styles.calloutText, { color: isDarkMode ? '#A7F3D0' : '#065F46' }]}>
+              <Text style={[styles.calloutText, { color: isDarkMode ? '#A1A1AA' : '#065F46' }]}>
                 {slopeVal >= 0
                   ? `The regression slope is positive (${Number(slopeVal).toFixed(1)}), indicating an upward trend in demand.`
                   : `The regression slope is negative (${Number(slopeVal).toFixed(1)}), indicating a downward trend in demand.`}
@@ -936,7 +997,7 @@ export default function SalesForecastPanel({
             <BootstrapIcon name="cart" size={17} color={tokens.success} />
             <View style={{ flex: 1 }}>
               <Text
-                style={[styles.calloutTitle, { color: isDarkMode ? '#34D399' : '#065F46', fontSize: 11 }]}
+                style={[styles.calloutTitle, { color: isDarkMode ? '#00C98D' : '#065F46', fontSize: 11 }]}
               >
                 Suggested Order Quantity
               </Text>
@@ -951,7 +1012,7 @@ export default function SalesForecastPanel({
               >
                 {suggestedOrderQtyVal} units
               </Text>
-              <Text style={[styles.calloutText, { color: isDarkMode ? '#A7F3D0' : '#047857' }]}>
+              <Text style={[styles.calloutText, { color: isDarkMode ? '#A1A1AA' : '#047857' }]}>
                 Recommended to avoid stockout based on forecasted demand and lead time.
               </Text>
               <View style={styles.reorderBadge}>
@@ -985,7 +1046,7 @@ export default function SalesForecastPanel({
 
           {/* Item 2: Seasonality */}
           <View style={styles.insightItem}>
-            <View style={[styles.insightCircle, { backgroundColor: isDarkMode ? '#26292E' : '#EFF6FF' }]}>
+            <View style={[styles.insightCircle, { backgroundColor: isDarkMode ? tokens.borderSubtle : '#EFF6FF' }]}>
               <BootstrapIcon name="check-circle" size={12} color={tokens.blue} />
             </View>
             <View style={{ flex: 1 }}>
@@ -1196,7 +1257,7 @@ export default function SalesForecastPanel({
                           paddingHorizontal: 12,
                           paddingVertical: 5,
                           borderRadius: 20,
-                          backgroundColor: active ? tokens.primary : isDarkMode ? '#26292E' : '#F1F5F9',
+                          backgroundColor: active ? tokens.primary : isDarkMode ? '#202124' : '#F1F5F9',
                           borderWidth: 1,
                           borderColor: active ? tokens.primary : tokens.cardBorder,
                         }}

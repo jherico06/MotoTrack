@@ -129,7 +129,7 @@ export default function ProductColorsEditor({
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={formLabelStyle}>Colors & Preview Images</Text>
-          <Text style={{ fontSize: 11, color: isDark ? '#AAB4B0' : '#64748B', marginBottom: 8 }}>
+          <Text style={{ fontSize: 11, color: isDark ? '#A1A1AA' : '#64748B', marginBottom: 8 }}>
         Add each color with a name, then upload a photo for that finish. Customers see the matching
         photo when they pick the color. Color names are required when a photo is set.
       </Text>
@@ -142,8 +142,8 @@ export default function ProductColorsEditor({
             padding: 12,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
-            backgroundColor: isDark ? '#1A2320' : '#F8FAFC',
+            borderColor: isDark ? '#303236' : '#E2E8F0',
+            backgroundColor: isDark ? '#202124' : '#F8FAFC',
             gap: 10,
           }}
         >
@@ -155,7 +155,7 @@ export default function ProductColorsEditor({
                 borderRadius: 8,
                 backgroundColor: row.hex || '#CBD5E1',
                 borderWidth: 1,
-                borderColor: '#E2E8F0',
+                borderColor: isDark ? '#3A3B40' : '#E2E8F0',
               }}
             />
             <View style={{ flex: 1 }}>
@@ -165,7 +165,7 @@ export default function ProductColorsEditor({
                 value={row.label}
                 onChangeText={(val) => updateRow(index, { label: val })}
                 placeholder="e.g. Matte Black"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={isDark ? '#71717A' : '#94A3B8'}
               />
             </View>
             <TouchableOpacity
@@ -174,13 +174,15 @@ export default function ProductColorsEditor({
                 width: 34,
                 height: 34,
                 borderRadius: 10,
-                backgroundColor: '#FEF2F2',
+                backgroundColor: isDark ? 'rgba(240, 68, 68, 0.14)' : '#FEF2F2',
+                borderWidth: isDark ? 1 : 0,
+                borderColor: isDark ? 'rgba(240, 68, 68, 0.28)' : 'transparent',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
               accessibilityLabel="Remove color"
             >
-              <BootstrapIcon name="trash" size={14} color="#DC2626" />
+              <BootstrapIcon name="trash" size={14} color={isDark ? '#F04444' : '#DC2626'} />
             </TouchableOpacity>
           </View>
 
@@ -217,7 +219,7 @@ export default function ProductColorsEditor({
                 gap: 12,
                 alignItems: 'center',
                 padding: 10,
-                backgroundColor: isDark ? '#151C19' : '#FFFFFF',
+                backgroundColor: isDark ? '#191A1D' : '#FFFFFF',
                 borderRadius: 12,
                 borderWidth: 1,
                 borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
@@ -230,9 +232,9 @@ export default function ProductColorsEditor({
                     width: 72,
                     height: 72,
                     borderRadius: 10,
-                    backgroundColor: isDark ? '#1A2320' : '#E2E8F0',
+                    backgroundColor: isDark ? '#202124' : '#E2E8F0',
                     borderWidth: 1,
-                    borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#CBD5E1',
+                    borderColor: isDark ? '#303236' : '#CBD5E1',
                   }}
                   resizeMode="cover"
                 />
@@ -242,14 +244,14 @@ export default function ProductColorsEditor({
                     width: 72,
                     height: 72,
                     borderRadius: 10,
-                    backgroundColor: isDark ? '#1A2320' : '#E2E8F0',
+                    backgroundColor: isDark ? '#202124' : '#E2E8F0',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1,
-                    borderColor: '#CBD5E1',
+                    borderColor: isDark ? '#303236' : '#CBD5E1',
                   }}
                 >
-                  <BootstrapIcon name="image" size={22} color="#94A3B8" />
+                  <BootstrapIcon name="image" size={22} color={isDark ? '#71717A' : '#94A3B8'} />
                 </View>
               )}
 
@@ -260,7 +262,7 @@ export default function ProductColorsEditor({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    backgroundColor: '#EA580C',
+                    backgroundColor: isDark ? '#FF5A00' : '#EA580C',
                     paddingVertical: 10,
                     paddingHorizontal: 12,
                     borderRadius: 10,
