@@ -806,6 +806,7 @@ export default function WishlistPage({
       )}
 
       {/* ─── MODAL 1: PRODUCT SPECS QUICK VIEW MODAL ─── */}
+      {isSpecsModalOpen && (
       <Modal visible={isSpecsModalOpen} transparent animationType="slide">
         <View
           style={{
@@ -942,8 +943,10 @@ export default function WishlistPage({
           </View>
         </View>
       </Modal>
+      )}
 
       {/* ─── MODAL 2: CONFIRM CLEAR WISHLIST ─── */}
+      {isClearModalOpen && (
       <Modal visible={isClearModalOpen} transparent animationType="slide">
         <View
           style={{
@@ -1033,8 +1036,10 @@ export default function WishlistPage({
           </View>
         </View>
       </Modal>
+      )}
 
       {/* ─── BOOK INSTALLATION MODAL FOR AI PREVIEWS ─── */}
+      {Boolean(bookingTarget) && (
       <BookInstallationModal
         visible={Boolean(bookingTarget)}
         onClose={() => !bookingBusy && setBookingTarget(null)}
@@ -1061,6 +1066,7 @@ export default function WishlistPage({
         onConfirm={confirmInstallBooking}
         busy={bookingBusy}
       />
+      )}
 
       {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION ─── */}
       <MobileBottomNavBar

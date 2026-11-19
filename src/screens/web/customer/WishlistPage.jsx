@@ -19,7 +19,8 @@ import {
   NotificationDropdown,
   CustomerMobileNavDrawer,
 } from '../../../components/common';
-import { LiveOrderTrackingMapModal, ProductSpecsModal, CheckoutModal } from '../../../components/modals';
+import { LiveOrderTrackingMapModal, ProductSpecsModal } from '../../../components/modals';
+import { WebCheckoutModal } from '../../../components/web';
 import CartPage from './CartPage.jsx';
 import { createWishlistWebStyles } from '../../../styles/web/wishlistPage.web.styles.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
@@ -646,7 +647,7 @@ export default function WishlistPageWeb({
         onLogout={onLogout}
       />
 
-      <CheckoutModal
+      <WebCheckoutModal
         visible={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         onCompleteOrder={() => {

@@ -9,9 +9,64 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import BootstrapIcon from '../../common/BootstrapIcon.jsx';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { CATEGORY_PILLS } from '../../../data/motorParts.js';
-import { resolveCategoryIcon } from '../../../services/products/categoryService.js';
+import { DB_SEEDED_CATEGORIES, resolveCategoryIcon } from '../../../services/products/categoryService.js';
 import { useTheme } from '../../../context/ThemeContext.jsx';
+
+const CATEGORY_STRIP_ORDER = [
+  'accessories',
+  'brakes',
+  'drivetrain',
+  'engine',
+  'exhaust',
+  'maintenance',
+  'suspension',
+  'tires',
+];
+
+function MobileStripCategoryIcon({ name, isMore = false, color = '#475569', size = 21 }) {
+  if (isMore) {
+    return <Ionicons name="grid-outline" size={size - 1} color={color} />;
+  }
+  const norm = String(name || '').trim().toLowerCase();
+
+  if (norm.includes('access') || norm.includes('bag') || norm.includes('gear')) {
+    return <Ionicons name="bag-outline" size={size} color={color} />;
+  }
+  if (norm.includes('brake') || norm.includes('rotor') || norm.includes('caliper') || norm.includes('pad')) {
+    return <Ionicons name="disc-outline" size={size} color={color} />;
+  }
+  if (norm.includes('drivetrain') || norm.includes('chain') || norm.includes('sprocket')) {
+    return <MaterialCommunityIcons name="cog-outline" size={size + 1} color={color} />;
+  }
+  if (norm.includes('engine') || norm.includes('motor') || norm.includes('cylinder') || norm.includes('piston')) {
+    return <MaterialCommunityIcons name="engine-outline" size={size + 1} color={color} />;
+  }
+  if (norm.includes('exhaust') || norm.includes('pipe') || norm.includes('muffler')) {
+    return <Ionicons name="flame-outline" size={size} color={color} />;
+  }
+  if (norm.includes('maintenance') || norm.includes('oil') || norm.includes('service') || norm.includes('lubricant')) {
+    return <MaterialCommunityIcons name="wrench-outline" size={size} color={color} />;
+  }
+  if (norm.includes('suspension') || norm.includes('shock') || norm.includes('fork') || norm.includes('damper')) {
+    return (
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 1 }}>
+        <View style={{ width: 5, height: 5, borderRadius: 2.5, borderWidth: 1.5, borderColor: color }} />
+        <View style={{ width: 9, height: 1.5, backgroundColor: color, borderRadius: 1 }} />
+        <View style={{ width: 8, height: 1.6, backgroundColor: color, transform: [{ rotate: '-20deg' }] }} />
+        <View style={{ width: 8, height: 1.6, backgroundColor: color, transform: [{ rotate: '20deg' }] }} />
+        <View style={{ width: 8, height: 1.6, backgroundColor: color, transform: [{ rotate: '-20deg' }] }} />
+        <View style={{ width: 9, height: 1.5, backgroundColor: color, borderRadius: 1 }} />
+        <View style={{ width: 4, height: 4, borderRadius: 2, borderWidth: 1.5, borderColor: color }} />
+      </View>
+    );
+  }
+  if (norm.includes('tire') || norm.includes('wheel') || norm.includes('rim')) {
+    return <MaterialCommunityIcons name="tire" size={size + 1} color={color} />;
+  }
+  return <Ionicons name="grid-outline" size={size - 1} color={color} />;
+}
 
 export default function MobileFilterChips({
   selectedCategory = 'All',
@@ -97,6 +152,44 @@ export default function MobileFilterChips({
   }, [allCategories, selectedCategory]);
 
   const isCategoryActive = selectedCategory !== 'All';
+
+  const stripCategories = useMemo(() => {
+    const sourceList =
+      Array.isArray(categoriesList) && categoriesList.length > 0
+        ? categoriesList
+        : DB_SEEDED_CATEGORIES;
+
+    const seen = new Set();
+    const sorted = [...sourceList]
+      .filter((c) => {
+        const key = String(c?.name || '').trim().toLowerCase();
+        if (!key || key === 'all' || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => {
+        const idxA = CATEGORY_STRIP_ORDER.indexOf(String(a?.name || '').trim().toLowerCase());
+        const idxB = CATEGORY_STRIP_ORDER.indexOf(String(b?.name || '').trim().toLowerCase());
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return String(a?.name || '').localeCompare(String(b?.name || ''));
+      })
+      .map((cat) => ({
+        id: cat.category_id || cat.id || cat.name,
+        name: cat.name,
+        isMore: false,
+      }));
+
+    return [
+      ...sorted,
+      {
+        id: 'category-strip-more',
+        name: 'More',
+        isMore: true,
+      },
+    ];
+  }, [categoriesList]);
 
   return (
     <>
@@ -193,7 +286,77 @@ export default function MobileFilterChips({
         </TouchableOpacity>
       </View>
 
+      {/* Frameless Horizontal Category Strip matching Web */}
+      <View
+        style={[
+          styles.categoryStripWrap,
+          isDarkMode && { borderBottomColor: '#2B3035' },
+        ]}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryStripScrollContent}
+        >
+          {stripCategories.map((cat) => {
+            const isActive =
+              !cat.isMore &&
+              selectedCategory.toLowerCase() === String(cat.name || '').toLowerCase();
+            const itemColor = isActive
+              ? '#EA580C'
+              : isDarkMode
+                ? '#A1A1AA'
+                : '#475569';
+
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={styles.categoryStripItem}
+                onPress={() => {
+                  if (cat.isMore) {
+                    setIsCategoryModalOpen(true);
+                  } else if (isActive) {
+                    onSelectCategory('All');
+                  } else {
+                    onSelectCategory(cat.name);
+                  }
+                }}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={cat.isMore ? 'More categories' : `Filter by ${cat.name}`}
+              >
+                <View style={styles.categoryStripIconWrap}>
+                  <MobileStripCategoryIcon
+                    name={cat.name}
+                    isMore={cat.isMore}
+                    color={itemColor}
+                    size={21}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryStripLabel,
+                    { color: itemColor },
+                    isActive && styles.categoryStripLabelActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {cat.name}
+                </Text>
+                <View
+                  style={[
+                    styles.categoryStripIndicator,
+                    { backgroundColor: isActive ? '#EA580C' : 'transparent' },
+                  ]}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {/* Category Selection Sheet */}
+      {isCategoryModalOpen && (
       <Modal
         visible={isCategoryModalOpen}
         transparent={true}
@@ -341,6 +504,7 @@ export default function MobileFilterChips({
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+      )}
     </>
   );
 }
@@ -395,6 +559,48 @@ const styles = StyleSheet.create({
   chipBtnBikeTextActive: {
     color: '#EA580C',
     fontWeight: '700',
+  },
+  categoryStripWrap: {
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  categoryStripScrollContent: {
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    gap: 16,
+    alignItems: 'center',
+  },
+  categoryStripItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingTop: 4,
+    paddingBottom: 2,
+    minWidth: 64,
+  },
+  categoryStripIconWrap: {
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 5,
+  },
+  categoryStripLabel: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    textAlign: 'center',
+    letterSpacing: -0.1,
+  },
+  categoryStripLabelActive: {
+    fontWeight: '700',
+  },
+  categoryStripIndicator: {
+    marginTop: 6,
+    width: 22,
+    height: 2,
+    borderRadius: 1,
   },
 });
 

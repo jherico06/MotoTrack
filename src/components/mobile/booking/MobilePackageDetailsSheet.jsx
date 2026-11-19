@@ -17,7 +17,7 @@ export default function MobilePackageDetailsSheet({
   onClose,
   onBookPackage,
 }) {
-  if (!pkg) return null;
+  if (!visible || !pkg) return null;
 
   const rawCc =
     selectedMotorcycle?.engine_displacement ??

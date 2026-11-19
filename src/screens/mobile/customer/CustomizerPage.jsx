@@ -24,7 +24,6 @@ import { BootstrapIcon, ToastNotification, BrandLogo } from '../../../components
 import { RegisterMotorcycleModal, CheckoutModal, BookInstallationModal } from '../../../components/modals';
 import CustomizationWorkspace from '../../../components/customizer/CustomizationWorkspace.jsx';
 import AiMotorcycleInstallStudio from '../../../components/customizer/AiMotorcycleInstallStudio.jsx';
-import { useCustomizationBuilder } from '../../../hooks/useCustomizationBuilder.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
@@ -51,10 +50,22 @@ export default function CustomizerPage({
   // Parts Builder | Install Studio (Express Gemini/Imagen) | legacy AI Studio
   const [studioMode, setStudioMode] = useState('install'); // 'builder' | 'install' | 'studio'
   const [studioTab, setStudioTab] = useState('preview'); // 'preview' | 'selection'
-  const customizationBuilder = useCustomizationBuilder({
-    currentUser,
-    initialProduct: initialSelectedProduct,
-  });
+  const [isStudioReady, setIsStudioReady] = useState(Platform.OS === 'web');
+
+  useEffect(() => {
+    if (isStudioReady) return undefined;
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame(() => setIsStudioReady(true))
+        : setTimeout(() => setIsStudioReady(true), 0);
+    return () => {
+      if (typeof cancelAnimationFrame === 'function' && typeof requestAnimationFrame === 'function') {
+        cancelAnimationFrame(raf);
+      } else {
+        clearTimeout(raf);
+      }
+    };
+  }, [isStudioReady]);
 
   // ─── 1. WORKFLOW STEP STATE ───
   // 'bike' (1) -> 'parts' (2) -> 'review' (3) -> 'total' (4)
@@ -76,9 +87,6 @@ export default function CustomizerPage({
   const [isRegisterBikeModalOpen, setIsRegisterBikeModalOpen] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
-      motorcycleService.syncFromSupabase?.(currentUser).catch(() => { });
-    }
     const syncBikes = () => {
       if (!currentUser) {
         setRegisteredBikes([]);
@@ -153,14 +161,9 @@ export default function CustomizerPage({
   const [showAddMorePrompt, setShowAddMorePrompt] = useState(false);
 
   useEffect(() => {
-    productService.getProducts().then((data) => {
-      if (Array.isArray(data)) {
-        setCatalogProducts(data);
-        if (initialSelectedProduct) {
-          setSelectedParts([initialSelectedProduct]);
-        }
-      }
-    });
+    if (initialSelectedProduct) {
+      setSelectedParts([initialSelectedProduct]);
+    }
   }, [initialSelectedProduct]);
 
   const categoriesList = useMemo(() => {
@@ -569,6 +572,7 @@ export default function CustomizerPage({
         style={[styles.container, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}
         contentContainerStyle={[styles.scrollContent, { paddingTop: 10 }]}
         showsVerticalScrollIndicator={true}
+        removeClippedSubviews={Platform.OS === 'android'}
       >
         <View style={styles.maxContainer}>
           {/* Segmented Top Switcher Track (`Bike & parts` | `AI preview`) */}
@@ -628,27 +632,46 @@ export default function CustomizerPage({
             })}
           </View>
 
-          <AiMotorcycleInstallStudio
-            currentUser={currentUser}
-            initialSelectedProduct={initialSelectedProduct}
-            onRequireLogin={(promptPayload) => {
-              if (typeof onRequireLogin === 'function') {
-                onRequireLogin(promptPayload);
-                return;
-              }
-              setRedirectReason?.(promptPayload?.message || 'ai-install');
-              onNavigateToLogin?.();
-            }}
-            onNavigateToGarage={onNavigateToGarage}
-            onNavigateToWishlist={onNavigateToWishlist}
-            mobileTab={studioTab}
-            onMobileTabChange={setStudioTab}
-            hideMobileToolbar={true}
-          />
+          {isStudioReady ? (
+            <AiMotorcycleInstallStudio
+              currentUser={currentUser}
+              initialSelectedProduct={initialSelectedProduct}
+              onRequireLogin={(promptPayload) => {
+                if (typeof onRequireLogin === 'function') {
+                  onRequireLogin(promptPayload);
+                  return;
+                }
+                setRedirectReason?.(promptPayload?.message || 'ai-install');
+                onNavigateToLogin?.();
+              }}
+              onNavigateToGarage={onNavigateToGarage}
+              onNavigateToWishlist={onNavigateToWishlist}
+              mobileTab={studioTab}
+              onMobileTabChange={setStudioTab}
+              hideMobileToolbar={true}
+            />
+          ) : (
+            <View
+              style={{
+                height: 360,
+                borderRadius: 18,
+                backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#2B3035' : '#EDE9E0',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                Loading Moto Studio…
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       {/* ─── PART DETAILS & PRICE MODAL ─── */}
+      {viewingPartDetails !== null && (
       <Modal visible={viewingPartDetails !== null} transparent animationType="slide">
         <View style={styles.partModalOverlay}>
           {viewingPartDetails && (
@@ -759,8 +782,10 @@ export default function CustomizerPage({
           )}
         </View>
       </Modal>
+      )}
 
       {/* ─── CHECKOUT MODAL ─── */}
+      {isCheckoutModalOpen && (
       <CheckoutModal
         visible={isCheckoutModalOpen}
         onClose={() => setIsCheckoutModalOpen(false)}
@@ -774,8 +799,10 @@ export default function CustomizerPage({
           onNavigateToProfile?.('profile');
         }}
       />
+      )}
 
       {/* ─── FULL CART PAGE ─── */}
+      {isCartModalOpen && (
       <MobileCartPage
         visible={isCartModalOpen}
         onClose={() => setIsCartModalOpen(false)}
@@ -792,8 +819,10 @@ export default function CustomizerPage({
           onNavigateToStore?.();
         }}
       />
+      )}
 
       {/* ─── BOOKING MODAL (PITSTOP SERVICE) ─── */}
+      {isBookingModalOpen && (
       <BookInstallationModal
         visible={isBookingModalOpen}
         onClose={() => !isBookingSubmitting && setIsBookingModalOpen(false)}
@@ -806,6 +835,7 @@ export default function CustomizerPage({
             : 'Custom Parts Installation'
         }
         laborFeePhp={laborFeePhp}
+        partsCostPhp={partsTotalPhp}
         branches={GARAGE_BRANCHES}
         selectedBranch={bookingBranch}
         onSelectBranch={setBookingBranch}
@@ -819,13 +849,16 @@ export default function CustomizerPage({
         onConfirm={handleConfirmCustomBooking}
         busy={isBookingSubmitting}
       />
+      )}
 
       {/* ─── REGISTER MOTORCYCLE MODAL ─── */}
+      {isRegisterBikeModalOpen && (
       <RegisterMotorcycleModal
         visible={isRegisterBikeModalOpen}
         onClose={() => setIsRegisterBikeModalOpen(false)}
         onSave={handleSaveRegisteredBike}
       />
+      )}
 
       {/* Persistent Bottom Nav Bar */}
       <MobileBottomNavBar

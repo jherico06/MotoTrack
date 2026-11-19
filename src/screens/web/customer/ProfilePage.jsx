@@ -43,6 +43,8 @@ import {
   CustomerServiceBookingCard,
   CustomerMobileNavDrawer,
 } from '../../../components/common';
+import { WebLocationPicker, WebCheckoutModal } from '../../../components/web';
+import { parseLatLng } from '../../../utils/geo.js';
 import { normalizeBookingStatus } from '../../../utils/bookingWorkflow.js';
 import {
   LiveOrderTrackingMapModal,
@@ -51,7 +53,6 @@ import {
   EditCustomerSettingsModal,
   RateDeliveredOrderModal,
   CustomerSubmitReportModal,
-  CheckoutModal,
   GCashPaymentModal,
   ProductSpecsModal,
 } from '../../../components/modals';
@@ -439,10 +440,21 @@ export default function ProfilePage({
   const [address, setAddress] = useState(currentUser?.address || '');
   const [city, setCity] = useState(currentUser?.city || 'City of Naga');
   const [country, setCountry] = useState(currentUser?.country || 'Philippines');
+  const initialPin = parseLatLng(
+    currentUser?.latitude ?? currentUser?.delivery_lat,
+    currentUser?.longitude ?? currentUser?.delivery_lng
+  );
+  const [latitude, setLatitude] = useState(initialPin?.lat ?? null);
+  const [longitude, setLongitude] = useState(initialPin?.lng ?? null);
+  const [coordError, setCoordError] = useState('');
   const [bio, setBio] = useState(currentUser?.bio || 'Motorcycle Enthusiast & Customer');
-  const [deliveryNotes, setDeliveryNotes] = useState(currentUser?.deliveryNotes || 'Leave at front gate / contact on delivery');
+  const [deliveryNotes, setDeliveryNotes] = useState(
+    currentUser?.deliveryNotes || currentUser?.delivery_notes || ''
+  );
   const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
   const [isEditingGarageInfo, setIsEditingGarageInfo] = useState(false);
+  const [isEditingDeliveryPin, setIsEditingDeliveryPin] = useState(false);
+  const [isPinningInSettings, setIsPinningInSettings] = useState(false);
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [bikeBrand, setBikeBrand] = useState(currentUser?.bikeBrand || '');
   const [bikeModel, setBikeModel] = useState(currentUser?.bikeModel || '');
@@ -741,6 +753,16 @@ export default function ProfilePage({
       if (currentUser.bikeModel) setBikeModel(currentUser.bikeModel);
       if (currentUser.bikePlate) setBikePlate(currentUser.bikePlate);
       if (currentUser.bikeOdo) setBikeOdo(currentUser.bikeOdo);
+      if (currentUser.deliveryNotes || currentUser.delivery_notes) {
+        setDeliveryNotes(currentUser.deliveryNotes || currentUser.delivery_notes);
+      }
+      const syncedPin = parseLatLng(
+        currentUser.latitude ?? currentUser.delivery_lat,
+        currentUser.longitude ?? currentUser.delivery_lng
+      );
+      setLatitude(syncedPin?.lat ?? null);
+      setLongitude(syncedPin?.lng ?? null);
+      setCoordError('');
     }
   }, [currentUser]);
 
@@ -850,6 +872,8 @@ export default function ProfilePage({
       customerPhone,
       customerAddress,
       deliveryNotes,
+      deliveryLat,
+      deliveryLng,
       paymentMethod,
       gcashNumber,
       gcashReference,
@@ -882,6 +906,8 @@ export default function ProfilePage({
         customerEmail: currentUser?.email || null,
         customerAddress,
         deliveryNotes,
+        deliveryLat: deliveryLat ?? currentUser?.latitude ?? currentUser?.delivery_lat ?? null,
+        deliveryLng: deliveryLng ?? currentUser?.longitude ?? currentUser?.delivery_lng ?? null,
         paymentMethod,
         gcashNumber,
         gcashReference,
@@ -1344,6 +1370,14 @@ export default function ProfilePage({
       showToast('Please enter your name');
       return;
     }
+    const savedPin = parseLatLng(latitude, longitude);
+    if ((isEditingGarageInfo || isEditingDeliveryPin || isPinningInSettings) && !savedPin) {
+      const msg = 'Please set your exact house pin on the map before saving.';
+      setCoordError(msg);
+      showToast(msg);
+      return;
+    }
+    setCoordError('');
     setIsSaving(true);
     try {
       const res = await updateProfile({
@@ -1357,6 +1391,15 @@ export default function ProfilePage({
         country: country.trim(),
         bio: bio.trim(),
         deliveryNotes: deliveryNotes.trim(),
+        delivery_notes: deliveryNotes.trim(),
+        ...(savedPin
+          ? {
+              latitude: savedPin.lat,
+              longitude: savedPin.lng,
+              delivery_lat: savedPin.lat,
+              delivery_lng: savedPin.lng,
+            }
+          : {}),
         bikeBrand,
         bikeModel: bikeModel.trim(),
         bikePlate: bikePlate.trim(),
@@ -1366,6 +1409,8 @@ export default function ProfilePage({
         showToast('✓ Account profile successfully updated!');
         setIsEditingPersonalInfo(false);
         setIsEditingGarageInfo(false);
+        setIsEditingDeliveryPin(false);
+        setIsPinningInSettings(false);
         try {
           notificationService.notifyCustomerProfileUpdated({
             userId: currentUser?.id || currentUser?.user_id,
@@ -1394,7 +1439,15 @@ export default function ProfilePage({
       if (payload.city) setCity(payload.city);
       if (payload.country) setCountry(payload.country);
       if (payload.bio) setBio(payload.bio);
-      if (payload.deliveryNotes) setDeliveryNotes(payload.deliveryNotes);
+      if (payload.deliveryNotes !== undefined) setDeliveryNotes(payload.deliveryNotes);
+      const modalPin = parseLatLng(
+        payload.latitude ?? payload.delivery_lat,
+        payload.longitude ?? payload.delivery_lng
+      );
+      if (modalPin) {
+        setLatitude(modalPin.lat);
+        setLongitude(modalPin.lng);
+      }
       try {
         notificationService.notifyCustomerProfileUpdated({
           userId: currentUser?.id || currentUser?.user_id,
@@ -1406,6 +1459,100 @@ export default function ProfilePage({
     }
     return res;
   };
+
+  const activeSavedPin = parseLatLng(
+    latitude ?? currentUser?.latitude ?? currentUser?.delivery_lat,
+    longitude ?? currentUser?.longitude ?? currentUser?.delivery_lng
+  );
+
+  const renderDeliveryPinFields = () => (
+    <View style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 12 }}>
+        <View style={{ flex: 2 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 5 }}>
+            Delivery Street Address *
+          </Text>
+          <TextInput
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Street, Purok, Barangay, City, Province"
+            placeholderTextColor={tokens.textMuted}
+            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
+          />
+        </View>
+        <View style={{ flex: 1.4 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 5 }}>
+            Landmark / Delivery Notes
+          </Text>
+          <TextInput
+            value={deliveryNotes}
+            onChangeText={setDeliveryNotes}
+            placeholder="e.g. blue gate, beside the sari-sari store"
+            placeholderTextColor={tokens.textMuted}
+            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
+          />
+        </View>
+      </View>
+
+      <View>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 5 }}>
+          Exact House Pin Location *
+        </Text>
+        <WebLocationPicker
+          latitude={latitude}
+          longitude={longitude}
+          addressText={[address, city, country].filter(Boolean).join(', ')}
+          isDarkMode={isDarkMode}
+          height={235}
+          errorText={coordError}
+          onLocationChange={({ lat, lng }) => {
+            setLatitude(lat);
+            setLongitude(lng);
+            setCoordError('');
+          }}
+        />
+      </View>
+    </View>
+  );
+
+  const renderDeliveryPinEditor = ({ onCancel, title }) => (
+    <View
+      style={{
+        marginTop: 12,
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+        borderWidth: 1,
+        borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+        gap: 12,
+      }}
+    >
+      {title ? (
+        <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary }}>{title}</Text>
+      ) : null}
+      {renderDeliveryPinFields()}
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+        <TouchableOpacity style={styles.btnSecondary} onPress={onCancel} activeOpacity={0.8}>
+          <Text style={styles.btnSecondaryText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.btnPrimary}
+          onPress={handleSaveProfile}
+          disabled={isSaving}
+          activeOpacity={0.85}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <BootstrapIcon name="check2" size={13} color="#FFFFFF" />
+              <Text style={styles.btnPrimaryText}>Save Address & Pin</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const handleChangePassword = async () => {
     if (!currentPwd || !newPwd || !confirmPwd) {
@@ -4171,6 +4318,8 @@ export default function ProfilePage({
                             flexDirection: 'row',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 8,
                             marginBottom: 10,
                           }}
                         >
@@ -4189,19 +4338,81 @@ export default function ProfilePage({
                             </Text>
                           </View>
 
-                          <View
-                            style={{
-                              backgroundColor: tokens.statusNeutralBg,
-                              borderWidth: 1,
-                              borderColor: tokens.statusNeutralBorder,
-                              paddingHorizontal: 7,
-                              paddingVertical: 2,
-                              borderRadius: 5,
-                            }}
-                          >
-                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.statusNeutralText }}>
-                              Doorstep Shipping
-                            </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                backgroundColor: activeSavedPin
+                                  ? isDarkMode
+                                    ? 'rgba(22, 163, 74, 0.14)'
+                                    : '#F0FDF4'
+                                  : isDarkMode
+                                    ? 'rgba(245, 158, 11, 0.14)'
+                                    : '#FFFBEB',
+                                borderWidth: 1,
+                                borderColor: activeSavedPin
+                                  ? isDarkMode
+                                    ? 'rgba(34, 197, 94, 0.35)'
+                                    : '#BBF7D0'
+                                  : isDarkMode
+                                    ? 'rgba(245, 158, 11, 0.35)'
+                                    : '#FDE68A',
+                                paddingHorizontal: 8,
+                                paddingVertical: 2.5,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <BootstrapIcon
+                                name={activeSavedPin ? 'check-circle-fill' : 'exclamation-triangle-fill'}
+                                size={10.5}
+                                color={activeSavedPin ? '#16A34A' : '#D97706'}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: '600',
+                                  fontVariant: ['tabular-nums'],
+                                  color: activeSavedPin
+                                    ? isDarkMode
+                                      ? '#86EFAC'
+                                      : '#166534'
+                                    : isDarkMode
+                                      ? '#FCD34D'
+                                      : '#92400E',
+                                }}
+                              >
+                                {activeSavedPin
+                                  ? `Pin Set: ${activeSavedPin.lat.toFixed(5)}, ${activeSavedPin.lng.toFixed(5)}`
+                                  : 'Pin Not Set Yet'}
+                              </Text>
+                            </View>
+
+                            <TouchableOpacity
+                              onPress={() => setIsEditingDeliveryPin((prev) => !prev)}
+                              activeOpacity={0.8}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                paddingHorizontal: 9,
+                                paddingVertical: 4,
+                                borderRadius: 7,
+                                backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                                borderWidth: 1,
+                                borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#FED7AA',
+                              }}
+                            >
+                              <BootstrapIcon
+                                name={isEditingDeliveryPin ? 'x-lg' : 'pin-map-fill'}
+                                size={11}
+                                color={tokens.brandPrimary}
+                              />
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: tokens.brandPrimary }}>
+                                {isEditingDeliveryPin ? 'Close Map' : 'Pin Location on Map'}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
                         </View>
 
@@ -4209,19 +4420,19 @@ export default function ProfilePage({
                         <View style={{ display: 'flex', flexDirection: 'column' }}>
                           <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 16, paddingVertical: 8 }}>
                             <View style={{ flex: 1.5 }}>
-                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              <Text style={{ fontSize: 10.5, fontWeight: '600', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                                 Street Address
                               </Text>
-                              <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, lineHeight: 20 }}>
-                                {address || 'Purok Avocado 4, Inoburan, City of Naga, Cebu'}
+                              <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, lineHeight: 20 }}>
+                                {address || 'No street address saved yet'}
                               </Text>
                             </View>
 
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              <Text style={{ fontSize: 10.5, fontWeight: '600', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                                 City / Region
                               </Text>
-                              <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, lineHeight: 20 }}>
+                              <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, lineHeight: 20 }}>
                                 {city || 'City of Naga'}
                               </Text>
                             </View>
@@ -4231,24 +4442,29 @@ export default function ProfilePage({
 
                           <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 16, paddingVertical: 8 }}>
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              <Text style={{ fontSize: 10.5, fontWeight: '600', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                                 Delivery Contact Phone
                               </Text>
-                              <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary }}>
-                                {phone || '09614904841'}
+                              <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
+                                {phone || 'Not provided'}
                               </Text>
                             </View>
 
                             <View style={{ flex: 1.5 }}>
-                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              <Text style={{ fontSize: 10.5, fontWeight: '600', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                                 Delivery Instructions
                               </Text>
                               <Text style={{ fontSize: 13.5, fontWeight: '500', color: tokens.textSecondary, lineHeight: 19 }}>
-                                {deliveryNotes || 'Leave at front gate / contact on delivery'}
+                                {deliveryNotes || 'No landmark added yet — click "Pin Location on Map" to add one'}
                               </Text>
                             </View>
                           </View>
                         </View>
+
+                        {isEditingDeliveryPin &&
+                          renderDeliveryPinEditor({
+                            onCancel: () => setIsEditingDeliveryPin(false),
+                          })}
                       </View>
                     </View>
                   ) : (
@@ -4338,35 +4554,10 @@ export default function ProfilePage({
                       </View>
 
                       {/* Delivery Address */}
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary, marginTop: 4 }}>
-                        Delivery Destination & Instructions
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary, marginTop: 4 }}>
+                        Delivery Destination, Exact Pin & Landmark
                       </Text>
-                      <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 12 }}>
-                        <View style={{ flex: 2 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 5 }}>
-                            Delivery Street Address
-                          </Text>
-                          <TextInput
-                            value={address}
-                            onChangeText={setAddress}
-                            placeholder="Street, Barangay, City, Province"
-                            placeholderTextColor={tokens.textMuted}
-                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
-                          />
-                        </View>
-                        <View style={{ flex: 1.5 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 5 }}>
-                            Delivery Instructions
-                          </Text>
-                          <TextInput
-                            value={deliveryNotes}
-                            onChangeText={setDeliveryNotes}
-                            placeholder="e.g. Call before arrival"
-                            placeholderTextColor={tokens.textMuted}
-                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
-                          />
-                        </View>
-                      </View>
+                      {renderDeliveryPinFields()}
 
                       {/* Form Actions */}
                       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
@@ -5197,37 +5388,71 @@ export default function ProfilePage({
                       </View>
                     </View>
 
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingVertical: 6,
-                        paddingHorizontal: 14,
-                        borderRadius: 20,
-                        backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.border : '#D4D4D8',
-                        cursor: 'pointer',
-                      }}
-                      onPress={() => setIsEditSettingsModalOpen(true)}
-                      activeOpacity={0.75}
-                    >
-                      <BootstrapIcon
-                        name="pencil"
-                        size={11}
-                        color={isDarkMode ? tokens.textSecondary : '#52525B'}
-                      />
-                      <Text
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <TouchableOpacity
                         style={{
-                          fontSize: 12,
-                          fontWeight: '600',
-                          color: isDarkMode ? tokens.textPrimary : '#3F3F46',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingVertical: 6,
+                          paddingHorizontal: 14,
+                          borderRadius: 20,
+                          backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#FED7AA',
+                          cursor: 'pointer',
                         }}
+                        onPress={() => setIsPinningInSettings((prev) => !prev)}
+                        activeOpacity={0.75}
                       >
-                        Edit Information
-                      </Text>
-                    </TouchableOpacity>
+                        <BootstrapIcon
+                          name={isPinningInSettings ? 'x-lg' : 'pin-map-fill'}
+                          size={11}
+                          color={tokens.brandPrimary}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '600',
+                            color: tokens.brandPrimary,
+                          }}
+                        >
+                          {isPinningInSettings ? 'Close Map' : 'Pin Location on Map'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingVertical: 6,
+                          paddingHorizontal: 14,
+                          borderRadius: 20,
+                          backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.border : '#D4D4D8',
+                          cursor: 'pointer',
+                        }}
+                        onPress={() => setIsEditSettingsModalOpen(true)}
+                        activeOpacity={0.75}
+                      >
+                        <BootstrapIcon
+                          name="pencil"
+                          size={11}
+                          color={isDarkMode ? tokens.textSecondary : '#52525B'}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#3F3F46',
+                          }}
+                        >
+                          Edit Information
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {/* Section 1: Personal & Contact Details */}
@@ -5387,6 +5612,20 @@ export default function ProfilePage({
                           ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}`
                           : 'No street address saved'}
                       </Text>
+                      {parseLatLng(
+                        currentUser?.latitude ?? currentUser?.delivery_lat ?? latitude,
+                        currentUser?.longitude ?? currentUser?.delivery_lng ?? longitude
+                      ) ? (
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#16A34A', marginTop: 4, fontVariant: ['tabular-nums'] }}>
+                          ✓ Exact house pin: {Number(currentUser?.latitude ?? currentUser?.delivery_lat ?? latitude).toFixed(5)}, {Number(currentUser?.longitude ?? currentUser?.delivery_lng ?? longitude).toFixed(5)}
+                        </Text>
+                      ) : (
+                        <TouchableOpacity onPress={() => setIsPinningInSettings(true)} activeOpacity={0.8}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#D97706', marginTop: 4 }}>
+                            Pin not set yet — click here or "Pin Location on Map" to mark your house
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                     <View style={{ flex: 1, minWidth: 170 }}>
@@ -5399,7 +5638,7 @@ export default function ProfilePage({
                           letterSpacing: 0.6,
                         }}
                       >
-                        Courier Delivery Instructions
+                        Landmark / Delivery Notes
                       </Text>
                       <Text
                         style={{
@@ -5410,7 +5649,7 @@ export default function ProfilePage({
                           lineHeight: 19,
                         }}
                       >
-                        {currentUser?.deliveryNotes || deliveryNotes || 'Leave at front gate / contact on delivery'}
+                        {currentUser?.deliveryNotes || currentUser?.delivery_notes || deliveryNotes || 'No landmark added yet — click Edit to add one'}
                       </Text>
                     </View>
 
@@ -5439,6 +5678,12 @@ export default function ProfilePage({
                       </Text>
                     </View>
                   </View>
+
+                  {isPinningInSettings &&
+                    renderDeliveryPinEditor({
+                      title: 'Pin Your Exact Delivery House Location',
+                      onCancel: () => setIsPinningInSettings(false),
+                    })}
 
                   <View
                     style={{
@@ -6443,7 +6688,7 @@ export default function ProfilePage({
       />
 
       {/* Checkout Modal (Direct Ordering from Profile Page) */}
-      <CheckoutModal
+      <WebCheckoutModal
         visible={isCheckoutOpen}
         onClose={() => {
           setIsCheckoutOpen(false);

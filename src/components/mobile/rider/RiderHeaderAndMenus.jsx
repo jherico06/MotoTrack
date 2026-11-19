@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,19 @@ import {
   Modal,
   ScrollView,
   Image,
+  SafeAreaView,
   StyleSheet,
   Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import { RIDER_STATUSES } from '../../../services/staff/riderService.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
+import { stripEmojis } from '../../../services/notifications/notificationService.js';
+import { ANDROID_TOP_INSET } from '../../../utils/safeArea.js';
 import {
   RIDER_BRAND,
-  RIDER_FONT,
+  riderFont,
   getInitials,
   formatOrderCode,
 } from './riderTheme.js';
@@ -299,7 +303,9 @@ export function RiderTopHeader({
       ? 'Orders'
       : activeTab === 'earnings'
         ? 'Earnings'
-        : 'Account';
+        : activeTab === 'settings'
+          ? 'Settings'
+          : 'Account';
 
   return (
     <View
@@ -550,17 +556,17 @@ export function RiderProfileMenuModal({
             style={styles.menuItem}
             onPress={() => {
               onClose();
-              onNavigateAccountTab('preferences');
+              onNavigateMainTab('settings');
             }}
             activeOpacity={0.75}
           >
             <BootstrapIcon
-              name="sliders"
+              name="gear"
               size={16}
               color={palette.textSecondary}
             />
             <Text style={[styles.menuItemText, { color: palette.textPrimary }]}>
-              Notifications & dark mode
+              Settings &amp; preferences
             </Text>
             <BootstrapIcon
               name="chevron-right"
@@ -619,228 +625,747 @@ export function RiderProfileMenuModal({
   );
 }
 
+function parseRiderNotifDate(notif) {
+  const raw =
+    notif?.timestamp || notif?.created_at || notif?.createdAt || notif?.date;
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatRiderRelativeTime(notif) {
+  const date = parseRiderNotifDate(notif);
+  if (!date) return String(notif?.timeLabel || 'Recent');
+  const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatRiderFullDate(notif) {
+  const date = parseRiderNotifDate(notif);
+  if (!date) return String(notif?.timeLabel || 'Today');
+  const datePart = date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  const timePart = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${datePart} · ${timePart}`;
+}
+
+function getRiderNotifCategoryConfig(notif) {
+  const combined = `${notif?.type || ''} ${notif?.category || ''} ${
+    notif?.rawStatus || ''
+  } ${notif?.title || ''}`.toLowerCase();
+
+  if (combined.includes('deliver') || combined.includes('complete')) {
+    return {
+      icon: 'check-circle-fill',
+      color: '#059669',
+      bg: '#ECFDF5',
+      label: 'Delivered',
+    };
+  }
+  if (
+    combined.includes('cancel') ||
+    combined.includes('fail') ||
+    combined.includes('issue') ||
+    combined.includes('alert')
+  ) {
+    return {
+      icon: 'exclamation-circle',
+      color: '#DC2626',
+      bg: '#FEF2F2',
+      label: 'Alert',
+    };
+  }
+  if (
+    combined.includes('out') ||
+    combined.includes('transit') ||
+    combined.includes('drop-off') ||
+    combined.includes('shipped')
+  ) {
+    return {
+      icon: 'truck',
+      color: '#2563EB',
+      bg: '#EFF6FF',
+      label: 'In Transit',
+    };
+  }
+  if (
+    combined.includes('pickup') ||
+    combined.includes('assign') ||
+    combined.includes('ready') ||
+    combined.includes('confirm')
+  ) {
+    return {
+      icon: 'box-seam',
+      color: '#D97706',
+      bg: '#FDF4E7',
+      label: 'Needs Pickup',
+    };
+  }
+  if (
+    combined.includes('earn') ||
+    combined.includes('payout') ||
+    combined.includes('remit') ||
+    combined.includes('wallet')
+  ) {
+    return {
+      icon: 'wallet2',
+      color: '#059669',
+      bg: '#ECFDF5',
+      label: 'Earnings',
+    };
+  }
+  if (combined.includes('system') || combined.includes('account')) {
+    return {
+      icon: 'shield-check',
+      color: '#0D9488',
+      bg: '#F0FDFA',
+      label: 'System',
+    };
+  }
+  return {
+    icon: 'bell',
+    color: '#EA580C',
+    bg: '#FFF7ED',
+    label: 'Order Update',
+  };
+}
+
+function matchesRiderNotifFilter(notif, filter) {
+  if (filter === 'all') return true;
+  if (filter === 'unread') return Boolean(notif?.unread);
+
+  const combined = `${notif?.type || ''} ${notif?.category || ''} ${
+    notif?.rawStatus || ''
+  } ${notif?.title || ''}`.toLowerCase();
+
+  const isTransit =
+    combined.includes('out') ||
+    combined.includes('transit') ||
+    combined.includes('drop-off') ||
+    combined.includes('shipped');
+  if (filter === 'transit') return isTransit;
+
+  const isPickup =
+    combined.includes('pickup') ||
+    combined.includes('assign') ||
+    combined.includes('ready') ||
+    combined.includes('confirm');
+  if (filter === 'pickup') return isPickup;
+
+  return (
+    (!isTransit && !isPickup) ||
+    combined.includes('deliver') ||
+    combined.includes('earn') ||
+    combined.includes('payout') ||
+    combined.includes('system') ||
+    combined.includes('issue') ||
+    combined.includes('cancel')
+  );
+}
+
+function groupRiderNotifsByTime(list) {
+  const now = new Date();
+  const thisWeek = [];
+  const thisMonth = [];
+  const earlier = [];
+
+  list.forEach((n) => {
+    const date = parseRiderNotifDate(n);
+    if (!date) {
+      const label = String(n?.timeLabel || '').toLowerCase();
+      if (n?.isDispatch || label === 'today' || label === 'recent') {
+        thisWeek.push(n);
+      } else {
+        earlier.push(n);
+      }
+      return;
+    }
+    const diffDays = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays < 7) {
+      thisWeek.push(n);
+    } else if (diffDays < 30) {
+      thisMonth.push(n);
+    } else {
+      earlier.push(n);
+    }
+  });
+
+  const sections = [];
+  if (thisWeek.length > 0) sections.push({ title: 'THIS WEEK', data: thisWeek });
+  if (thisMonth.length > 0)
+    sections.push({ title: 'THIS MONTH', data: thisMonth });
+  if (earlier.length > 0) sections.push({ title: 'EARLIER', data: earlier });
+  if (sections.length === 0 && list.length > 0) {
+    sections.push({ title: 'ALL NOTIFICATIONS', data: list });
+  }
+  return sections;
+}
+
+/**
+ * Full-screen Rider Notifications modal matching the customer Notifications
+ * screen aesthetic, search/filter controls, time grouping, and expandable cards.
+ */
 export function RiderNotificationsModal({
   visible,
   onClose,
   palette,
+  isDark,
   notifications = [],
   unreadCount = 0,
+  onMarkRead,
   onMarkAllRead,
+  onDismiss,
   onSelectOrderFromNotif,
+  onViewOrders,
 }) {
+  const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedIds, setExpandedIds] = useState({});
+
+  const resolvedDark =
+    typeof isDark === 'boolean'
+      ? isDark
+      : Boolean(palette?.bg === '#121518' || palette?.bgCanvas === '#121518');
+
+  const theme = useMemo(
+    () =>
+      resolvedDark
+        ? {
+            bg: '#121518',
+            headerBorder: '#2B3035',
+            backBg: '#1E2124',
+            backBorder: '#363C44',
+            title: '#FFFFFF',
+            readAllBg: '#1E2124',
+            readAllBorder: '#363C44',
+            searchBg: '#23272B',
+            searchBorder: '#2B3035',
+            searchText: '#FFFFFF',
+            chipActiveBg: '#EA580C',
+            chipActiveBorder: '#EA580C',
+            chipActiveText: '#FFFFFF',
+            chipBg: '#23272B',
+            chipBorder: '#2B3035',
+            chipText: '#94A3B8',
+            sectionTitle: '#9CA3AF',
+            badgeBg: '#252A30',
+            badgeText: '#D1D5DB',
+            cardBg: '#1C1F23',
+            cardUnreadBg: '#20242B',
+            cardBorder: '#2B3035',
+            cardUnreadBorder: '#EA580C',
+            unreadDot: '#EA580C',
+            divider: '#2B3035',
+            textPrimary: '#FFFFFF',
+            textSecondary: '#D1D5DB',
+            textMuted: '#9CA3AF',
+            actionBtnBg: 'rgba(234,88,12,0.18)',
+            emptyIconBg: '#252A30',
+          }
+        : {
+            bg: '#F7F5F0',
+            headerBorder: '#EDE9E0',
+            backBg: '#FFFFFF',
+            backBorder: '#E2E8F0',
+            title: '#0F172A',
+            readAllBg: '#FFF7ED',
+            readAllBorder: '#FED7AA',
+            searchBg: '#FFFFFF',
+            searchBorder: '#EDE9E0',
+            searchText: '#0F172A',
+            chipActiveBg: '#18181B',
+            chipActiveBorder: '#18181B',
+            chipActiveText: '#FFFFFF',
+            chipBg: '#F1F5F9',
+            chipBorder: '#E2E8F0',
+            chipText: '#475569',
+            sectionTitle: '#71717A',
+            badgeBg: '#E4E4E7',
+            badgeText: '#3F3F46',
+            cardBg: '#FFFFFF',
+            cardUnreadBg: '#FFFFFF',
+            cardBorder: '#E4E4E7',
+            cardUnreadBorder: '#CBD5E1',
+            unreadDot: '#18181B',
+            divider: '#F1F5F9',
+            textPrimary: '#18181B',
+            textSecondary: '#3F3F46',
+            textMuted: '#71717A',
+            actionBtnBg: '#FFF7ED',
+            emptyIconBg: '#F1F5F9',
+          },
+    [resolvedDark]
+  );
+
+  const filterChips = useMemo(
+    () => [
+      { key: 'all', label: `All (${notifications.length})` },
+      { key: 'unread', label: `Unread (${unreadCount})` },
+      { key: 'transit', label: 'In Transit' },
+      { key: 'pickup', label: 'Pickup' },
+      { key: 'updates', label: 'Updates' },
+    ],
+    [notifications.length, unreadCount]
+  );
+
+  const filteredList = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return notifications.filter((n) => {
+      if (!matchesRiderNotifFilter(n, filter)) return false;
+      if (!q) return true;
+      const titleMatch = stripEmojis(n?.title || '')
+        .toLowerCase()
+        .includes(q);
+      const msgMatch = stripEmojis(n?.message || '')
+        .toLowerCase()
+        .includes(q);
+      const orderMatch = formatOrderCode(n?.orderId || '')
+        .toLowerCase()
+        .includes(q);
+      return titleMatch || msgMatch || orderMatch;
+    });
+  }, [notifications, filter, searchQuery]);
+
+  const groupedSections = useMemo(
+    () => groupRiderNotifsByTime(filteredList),
+    [filteredList]
+  );
+
+  const toggleExpand = (notif) => {
+    const id = String(notif?.id || '');
+    if (!id) return;
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+    if (notif?.unread) {
+      onMarkRead?.(notif);
+    }
+  };
+
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
+      presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <View style={[styles.sheetOverlay, { backgroundColor: palette.scrim }]}>
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={onClose}
+      <SafeAreaView
+        style={[
+          styles.notifSafeArea,
+          { backgroundColor: theme.bg, paddingTop: ANDROID_TOP_INSET },
+        ]}
+      >
+        <StatusBar
+          style={resolvedDark ? 'light' : 'dark'}
+          translucent
+          backgroundColor="transparent"
         />
+
+        {/* Header */}
         <View
           style={[
-            styles.notifSheet,
-            {
-              backgroundColor: palette.bgSheet,
-              borderColor: palette.border,
-            },
+            styles.notifScreenHeader,
+            { borderBottomColor: theme.headerBorder },
           ]}
         >
-          <View
-            style={[styles.dragHandle, { backgroundColor: palette.borderStrong }]}
-          />
-
-          <View
-            style={[
-              styles.notifSheetHeader,
-              { borderBottomColor: palette.border },
-            ]}
-          >
-            <View style={styles.notifHeaderLeft}>
-              <View
-                style={[
-                  styles.notifHeaderIcon,
-                  {
-                    backgroundColor: palette.orangeSoft,
-                    borderColor: palette.orangeBorder,
-                  },
-                ]}
-              >
-                <BootstrapIcon name="bell" size={17} color={palette.orange} />
-              </View>
-              <View>
-                <Text
-                  style={[styles.notifTitle, { color: palette.textPrimary }]}
-                >
-                  Dispatch notifications
-                </Text>
-                <Text
-                  style={[styles.notifSubtitle, { color: palette.textMuted }]}
-                >
-                  {unreadCount > 0
-                    ? `${unreadCount} unread delivery update${unreadCount === 1 ? '' : 's'}`
-                    : 'You are all caught up'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.notifHeaderRight}>
-              {unreadCount > 0 ? (
-                <TouchableOpacity
-                  onPress={onMarkAllRead}
-                  style={[
-                    styles.markReadBtn,
-                    { backgroundColor: palette.orangeSoft },
-                  ]}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[styles.markReadText, { color: palette.orangeText }]}
-                  >
-                    Mark read
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity
-                style={[
-                  styles.sheetCloseBtn,
-                  { backgroundColor: palette.bgMuted },
-                ]}
-                onPress={onClose}
-                activeOpacity={0.75}
-              >
-                <BootstrapIcon
-                  name="x-lg"
-                  size={14}
-                  color={palette.textMuted}
-                />
-              </TouchableOpacity>
-            </View>
+          <View style={styles.notifHeaderLeftRow}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.notifBackBtn,
+                {
+                  backgroundColor: theme.backBg,
+                  borderColor: theme.backBorder,
+                },
+              ]}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon
+                name="chevron-left"
+                size={16}
+                color={theme.title}
+              />
+            </TouchableOpacity>
+            <Text style={[styles.notifHeaderTitle, { color: theme.title }]}>
+              Notifications
+            </Text>
           </View>
 
-          <ScrollView
-            style={styles.notifList}
-            contentContainerStyle={styles.notifListContent}
-            showsVerticalScrollIndicator={false}
+          {unreadCount > 0 ? (
+            <TouchableOpacity
+              onPress={onMarkAllRead}
+              style={[
+                styles.notifReadAllBtn,
+                {
+                  backgroundColor: theme.readAllBg,
+                  borderColor: theme.readAllBorder,
+                },
+              ]}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon name="check2-all" size={13} color="#EA580C" />
+              <Text style={styles.notifReadAllText}>Mark all read</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.notifSearchWrapper}>
+          <View
+            style={[
+              styles.notifSearchBox,
+              {
+                backgroundColor: theme.searchBg,
+                borderColor: theme.searchBorder,
+              },
+            ]}
           >
-            {notifications.length === 0 ? (
-              <View style={styles.emptyNotifs}>
-                <View
+            <BootstrapIcon name="search" size={14} color="#94A3B8" />
+            <TextInput
+              style={[styles.notifSearchInput, { color: theme.searchText }]}
+              placeholder="Search notifications..."
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <BootstrapIcon name="x-circle-fill" size={15} color="#94A3B8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Filter Chips */}
+        <View
+          style={[
+            styles.notifFilterRow,
+            { borderBottomColor: theme.headerBorder },
+          ]}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.notifFilterScroll}
+          >
+            {filterChips.map((chip) => {
+              const active = filter === chip.key;
+              return (
+                <TouchableOpacity
+                  key={chip.key}
+                  onPress={() => setFilter(chip.key)}
                   style={[
-                    styles.emptyNotifIcon,
-                    { backgroundColor: palette.bgMuted },
+                    styles.notifFilterChip,
+                    {
+                      backgroundColor: active
+                        ? theme.chipActiveBg
+                        : theme.chipBg,
+                      borderColor: active
+                        ? theme.chipActiveBorder
+                        : theme.chipBorder,
+                    },
                   ]}
+                  activeOpacity={0.75}
                 >
-                  <BootstrapIcon
-                    name="bell"
-                    size={22}
-                    color={palette.textSubtle}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.emptyNotifTitle,
-                    { color: palette.textPrimary },
-                  ]}
-                >
-                  No notifications yet
-                </Text>
-                <Text
-                  style={[styles.emptyNotifSub, { color: palette.textMuted }]}
-                >
-                  New MotoTrack delivery assignments and payout confirmations
-                  will appear here.
-                </Text>
-              </View>
-            ) : (
-              notifications.map((item) => {
-                const isUnread = Boolean(item.unread);
-                return (
-                  <TouchableOpacity
-                    key={item.id}
+                  <Text
                     style={[
-                      styles.notifRow,
-                      {
-                        backgroundColor: isUnread
-                          ? palette.orangeSoft
-                          : palette.bgCard,
-                        borderColor: isUnread
-                          ? palette.orangeBorder
-                          : palette.border,
-                      },
+                      styles.notifFilterChipText,
+                      active
+                        ? styles.notifFilterChipTextActive
+                        : { color: theme.chipText },
                     ]}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      onSelectOrderFromNotif?.(item);
-                    }}
                   >
-                    <View
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Notifications List */}
+        <ScrollView
+          style={styles.notifScroll}
+          contentContainerStyle={styles.notifScrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {groupedSections.length === 0 ? (
+            <View
+              style={[
+                styles.notifEmptyContainer,
+                {
+                  backgroundColor: theme.cardBg,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.notifEmptyIconWrap,
+                  { backgroundColor: theme.emptyIconBg },
+                ]}
+              >
+                <BootstrapIcon name="bell-slash" size={24} color="#94A3B8" />
+              </View>
+              <Text
+                style={[styles.notifEmptyTitle, { color: theme.textPrimary }]}
+              >
+                No notifications
+              </Text>
+              <Text
+                style={[styles.notifEmptySubtitle, { color: theme.textMuted }]}
+              >
+                {searchQuery.trim()
+                  ? `No notifications matching "${searchQuery.trim()}". Try another keyword.`
+                  : filter !== 'all'
+                  ? `No ${filter} notifications right now.`
+                  : "You're all caught up! New delivery assignments, route alerts, and payout confirmations will appear here."}
+              </Text>
+              {filter === 'all' && !searchQuery.trim() && onViewOrders ? (
+                <TouchableOpacity
+                  onPress={onViewOrders}
+                  style={styles.notifEmptyActionBtn}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.notifEmptyActionText}>View Orders</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : (
+            groupedSections.map((section) => (
+              <View key={section.title} style={styles.notifSectionGroup}>
+                <View style={styles.notifSectionHeader}>
+                  <Text
+                    style={[
+                      styles.notifSectionTitle,
+                      { color: theme.sectionTitle },
+                    ]}
+                  >
+                    {section.title}
+                  </Text>
+                  <View
+                    style={[
+                      styles.notifSectionBadge,
+                      { backgroundColor: theme.badgeBg },
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.notifRowIcon,
+                        styles.notifSectionBadgeText,
+                        { color: theme.badgeText },
+                      ]}
+                    >
+                      {section.data.length}
+                    </Text>
+                  </View>
+                </View>
+
+                {section.data.map((item) => {
+                  const id = String(item.id);
+                  const isUnread = Boolean(item.unread);
+                  const isExpanded = Boolean(expandedIds[id]);
+                  const config = getRiderNotifCategoryConfig(item);
+                  const cleanTitle = stripEmojis(
+                    item.title || 'MotoTrack Update'
+                  );
+                  const cleanMsg = stripEmojis(item.message || '');
+                  const orderTag = item.orderId
+                    ? formatOrderCode(item.orderId)
+                    : '';
+
+                  return (
+                    <View
+                      key={id}
+                      style={[
+                        styles.notifCard,
                         {
                           backgroundColor: isUnread
-                            ? palette.orange
-                            : palette.bgMuted,
+                            ? theme.cardUnreadBg
+                            : theme.cardBg,
+                          borderColor: isUnread
+                            ? theme.cardUnreadBorder
+                            : theme.cardBorder,
                         },
                       ]}
                     >
-                      <BootstrapIcon
-                        name={item.icon || 'truck'}
-                        size={15}
-                        color={isUnread ? '#FFFFFF' : palette.textSecondary}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.notifRowTop}>
-                        <Text
+                      <TouchableOpacity
+                        onPress={() => toggleExpand(item)}
+                        style={styles.notifCardHeader}
+                        activeOpacity={0.75}
+                      >
+                        <View
                           style={[
-                            styles.notifRowTitle,
-                            { color: palette.textPrimary },
+                            styles.notifIconCircle,
+                            {
+                              backgroundColor: resolvedDark
+                                ? `${config.color}24`
+                                : config.bg,
+                            },
                           ]}
-                          numberOfLines={1}
                         >
-                          {item.title}
-                        </Text>
-                        {item.orderId ? (
+                          <BootstrapIcon
+                            name={config.icon}
+                            size={16}
+                            color={config.color}
+                          />
+                        </View>
+
+                        <View style={styles.notifCardTitleArea}>
+                          <View style={styles.notifTitleLine}>
+                            <Text
+                              style={[
+                                styles.notifCardTitle,
+                                isUnread
+                                  ? styles.notifCardTitleUnread
+                                  : styles.notifCardTitleRead,
+                                { color: theme.textPrimary },
+                              ]}
+                              numberOfLines={isExpanded ? undefined : 1}
+                            >
+                              {cleanTitle}
+                            </Text>
+                            {isUnread ? (
+                              <View
+                                style={[
+                                  styles.notifUnreadDot,
+                                  { backgroundColor: theme.unreadDot },
+                                ]}
+                              />
+                            ) : null}
+                          </View>
+
+                          {!isExpanded ? (
+                            <Text
+                              style={[
+                                styles.notifPreviewMsg,
+                                { color: theme.textMuted },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {cleanMsg ||
+                                (orderTag
+                                  ? `Order ${orderTag}`
+                                  : config.label)}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View style={styles.notifRightMeta}>
                           <Text
                             style={[
-                              styles.notifOrderTag,
-                              { color: palette.orangeText },
+                              styles.notifTimeText,
+                              { color: theme.textMuted },
                             ]}
                           >
-                            {formatOrderCode(item.orderId)}
+                            {formatRiderRelativeTime(item)}
                           </Text>
-                        ) : null}
-                      </View>
-                      <Text
-                        style={[
-                          styles.notifRowBody,
-                          { color: palette.textSecondary },
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {item.message}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.notifRowTime,
-                          { color: palette.textMuted },
-                        ]}
-                      >
-                        {item.timeLabel}
-                      </Text>
+                          <BootstrapIcon
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={13}
+                            color={theme.textMuted}
+                          />
+                        </View>
+                      </TouchableOpacity>
+
+                      {isExpanded ? (
+                        <View style={styles.notifExpandedBody}>
+                          {cleanMsg ? (
+                            <Text
+                              style={[
+                                styles.notifFullMessage,
+                                { color: theme.textSecondary },
+                              ]}
+                            >
+                              {cleanMsg}
+                            </Text>
+                          ) : null}
+
+                          <View
+                            style={[
+                              styles.notifCardDivider,
+                              { backgroundColor: theme.divider },
+                            ]}
+                          />
+
+                          <View style={styles.notifExpandedFooter}>
+                            <Text
+                              style={[
+                                styles.notifFullTimestamp,
+                                { color: theme.textMuted },
+                              ]}
+                              numberOfLines={2}
+                            >
+                              {`${formatRiderFullDate(item)} · ${config.label}${
+                                orderTag ? ` · ${orderTag}` : ''
+                              }`}
+                            </Text>
+
+                            <View style={styles.notifFooterActions}>
+                              {item.orderId ? (
+                                <TouchableOpacity
+                                  onPress={() => onSelectOrderFromNotif?.(item)}
+                                  style={[
+                                    styles.notifOrderBtn,
+                                    { backgroundColor: theme.actionBtnBg },
+                                  ]}
+                                  activeOpacity={0.75}
+                                >
+                                  <Text style={styles.notifOrderBtnText}>
+                                    View Order
+                                  </Text>
+                                  <BootstrapIcon
+                                    name="chevron-right"
+                                    size={11}
+                                    color="#EA580C"
+                                  />
+                                </TouchableOpacity>
+                              ) : null}
+
+                              <TouchableOpacity
+                                onPress={() => onDismiss?.(item)}
+                                style={styles.notifDeleteBtn}
+                                activeOpacity={0.75}
+                              >
+                                <BootstrapIcon
+                                  name="trash3"
+                                  size={12}
+                                  color={theme.textMuted}
+                                />
+                                <Text
+                                  style={[
+                                    styles.notifDeleteText,
+                                    { color: theme.textMuted },
+                                  ]}
+                                >
+                                  Dismiss
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      ) : null}
                     </View>
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      </View>
+                  );
+                })}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -904,8 +1429,7 @@ const styles = StyleSheet.create({
   shopGreetingSub: {
     fontSize: 11,
     color: '#94A3B8',
-    fontWeight: '400',
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
   },
   shopGreetingNameRow: {
     flexDirection: 'row',
@@ -914,11 +1438,11 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   shopUserName: {
-    fontSize: 14.5,
-    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 21,
     color: '#FFFFFF',
     letterSpacing: -0.2,
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
   },
   shopHeaderRight: {
     flexDirection: 'row',
@@ -950,9 +1474,8 @@ const styles = StyleSheet.create({
   },
   shopBadgeDotText: {
     color: '#FFFFFF',
-    fontSize: 8.5,
-    fontWeight: '700',
-    fontFamily: RIDER_FONT,
+    fontSize: 9,
+    ...riderFont('700'),
   },
   shopSearchSection: {
     marginTop: 6,
@@ -972,8 +1495,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13.5,
     color: '#FFFFFF',
-    fontWeight: '400',
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     paddingVertical: 0,
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
@@ -1006,18 +1528,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   headerEyebrow: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 10.5,
-    fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   headerPageTitle: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 26,
     lineHeight: 31,
-    fontWeight: '700',
     letterSpacing: -0.6,
   },
   headerActions: {
@@ -1067,8 +1587,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarInitials: {
-    fontFamily: RIDER_FONT,
-    fontWeight: '600',
+    ...riderFont('700'),
     letterSpacing: 0.2,
   },
   menuBackdrop: {
@@ -1100,15 +1619,13 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   menuRiderName: {
-    fontFamily: RIDER_FONT,
-    fontSize: 14.5,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 15,
     flexShrink: 1,
   },
   menuRiderId: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 11.5,
-    fontWeight: '500',
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
@@ -1132,14 +1649,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   menuDutyLabel: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 13,
   },
   menuDutyAction: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 12.5,
   },
   menuDivider: {
     height: 1,
@@ -1155,164 +1670,290 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 13.5,
-    fontWeight: '500',
   },
-  sheetOverlay: {
+  notifSafeArea: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
-  notifSheet: {
-    maxHeight: '82%',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 18,
-  },
-  dragHandle: {
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  notifSheetHeader: {
+  notifScreenHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    gap: 10,
   },
-  notifHeaderLeft: {
+  notifHeaderLeftRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
+    gap: 10,
+  },
+  notifBackBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifHeaderTitle: {
+    ...riderFont('700'),
+    fontSize: 18,
+    letterSpacing: -0.3,
+  },
+  notifReadAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  notifReadAllText: {
+    ...riderFont('700'),
+    fontSize: 12,
+    color: '#EA580C',
+  },
+  notifSearchWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  notifSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    borderWidth: 1,
+    gap: 8,
+  },
+  notifSearchInput: {
+    flex: 1,
+    ...riderFont('500'),
+    fontSize: 13.5,
+    paddingVertical: 0,
+  },
+  notifFilterRow: {
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  notifFilterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingTop: 4,
+  },
+  notifFilterChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  notifFilterChipText: {
+    ...riderFont('600'),
+    fontSize: 12.5,
+    fontVariant: ['tabular-nums'],
+  },
+  notifFilterChipTextActive: {
+    ...riderFont('700'),
+    color: '#FFFFFF',
+  },
+  notifScroll: {
     flex: 1,
   },
-  notifHeaderIcon: {
+  notifScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 20,
+  },
+  notifSectionGroup: {
+    gap: 10,
+  },
+  notifSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+    paddingHorizontal: 2,
+  },
+  notifSectionTitle: {
+    ...riderFont('700'),
+    fontSize: 12,
+    letterSpacing: 0.8,
+  },
+  notifSectionBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifSectionBadgeText: {
+    ...riderFont('700'),
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  notifCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  notifCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  notifIconCircle: {
     width: 38,
     height: 38,
-    borderRadius: 11,
-    borderWidth: 1,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notifTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 16,
-    fontWeight: '700',
+  notifCardTitleArea: {
+    flex: 1,
   },
-  notifSubtitle: {
-    fontFamily: RIDER_FONT,
+  notifTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  notifCardTitle: {
+    fontSize: 14.5,
+    lineHeight: 20,
+    flexShrink: 1,
+  },
+  notifCardTitleUnread: {
+    ...riderFont('700'),
+  },
+  notifCardTitleRead: {
+    ...riderFont('600'),
+  },
+  notifUnreadDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  notifPreviewMsg: {
+    ...riderFont('400'),
+    fontSize: 13,
+    marginTop: 2,
+  },
+  notifRightMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  notifTimeText: {
+    ...riderFont('500'),
     fontSize: 12,
-    fontWeight: '400',
-    marginTop: 1,
+    fontVariant: ['tabular-nums'],
   },
-  notifHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  markReadBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  markReadText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
-  sheetCloseBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notifList: {
+  notifExpandedBody: {
     paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 2,
   },
-  notifListContent: {
-    paddingVertical: 14,
-    gap: 10,
+  notifFullMessage: {
+    ...riderFont('400'),
+    fontSize: 13.5,
+    lineHeight: 21,
+    paddingLeft: 50,
+    marginBottom: 12,
   },
-  notifRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    padding: 13,
-    borderRadius: 14,
-    borderWidth: 1,
+  notifCardDivider: {
+    height: 1,
+    marginLeft: 50,
+    marginBottom: 12,
   },
-  notifRowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  notifRowTop: {
+  notifExpandedFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingLeft: 50,
     gap: 8,
+    flexWrap: 'wrap',
   },
-  notifRowTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    fontWeight: '600',
-    flex: 1,
-  },
-  notifOrderTag: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '600',
+  notifFullTimestamp: {
+    ...riderFont('500'),
+    fontSize: 11.5,
     fontVariant: ['tabular-nums'],
+    flexShrink: 1,
   },
-  notifRowBody: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontWeight: '400',
-    marginTop: 3,
-  },
-  notifRowTime: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 5,
-    fontVariant: ['tabular-nums'],
-  },
-  emptyNotifs: {
+  notifFooterActions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 38,
-    paddingHorizontal: 24,
+    gap: 10,
   },
-  emptyNotifIcon: {
+  notifOrderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  notifOrderBtnText: {
+    ...riderFont('700'),
+    fontSize: 12,
+    color: '#EA580C',
+  },
+  notifDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  notifDeleteText: {
+    ...riderFont('600'),
+    fontSize: 12,
+  },
+  notifEmptyContainer: {
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  notifEmptyIconWrap: {
     width: 52,
     height: 52,
-    borderRadius: 16,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  emptyNotifTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 15,
-    fontWeight: '600',
+  notifEmptyTitle: {
+    ...riderFont('700'),
+    fontSize: 16,
+    marginBottom: 6,
   },
-  emptyNotifSub: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 18,
+  notifEmptySubtitle: {
+    ...riderFont('400'),
+    fontSize: 13,
     textAlign: 'center',
-    marginTop: 4,
+    lineHeight: 19,
+    maxWidth: 270,
+    marginBottom: 18,
+  },
+  notifEmptyActionBtn: {
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 10,
+  },
+  notifEmptyActionText: {
+    ...riderFont('700'),
+    fontSize: 13,
+    color: '#FFFFFF',
   },
 });
 

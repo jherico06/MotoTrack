@@ -121,7 +121,7 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
         storeMarker.setLatLng([lat, lng]);
       }
       storeMarker.bindPopup(label || 'Store');
-      fitIfNeeded();
+      if (customerMarker) fitIfNeeded();
     }
 
     function setCustomer(lat, lng, label) {
@@ -132,6 +132,7 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
         customerMarker.setLatLng([lat, lng]);
       }
       if (label) customerMarker.bindPopup(label);
+      hasFitted = false;
       fitIfNeeded();
     }
 
@@ -255,6 +256,7 @@ export default function LiveDeliveryMap({
   customerLat,
   customerLng,
   customerAddress,
+  customerLandmark = '',
   storeLat = STORE_LOCATION.lat,
   storeLng = STORE_LOCATION.lng,
   storeLabel = STORE_LOCATION.name,
@@ -312,7 +314,7 @@ export default function LiveDeliveryMap({
       cancelled = true;
       try {
         controller?.abort();
-      } catch (_e) {}
+      } catch (_e) { }
     };
   }, [store?.lat, store?.lng, customer?.lat, customer?.lng]);
 
@@ -379,7 +381,7 @@ export default function LiveDeliveryMap({
             `Updated ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
           );
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
     postToMap({ type: 'status', text: parts.join(' · ') });
   }, [statusLabel, lastUpdatedAt, postToMap]);
@@ -395,11 +397,13 @@ export default function LiveDeliveryMap({
         label: store.name || 'Store',
       });
       if (customer) {
+        const destLabelParts = [customerAddress || 'Delivery destination'];
+        if (customerLandmark) destLabelParts.push(`Note: ${customerLandmark}`);
         postToMap({
           type: 'customer',
           lat: customer.lat,
           lng: customer.lng,
-          label: 'Delivery address',
+          label: destLabelParts.join(' — '),
         });
       }
       if (routePath?.length) {

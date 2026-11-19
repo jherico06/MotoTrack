@@ -20,7 +20,7 @@ import UserProfileButton from '../../../components/common/UserProfileButton.jsx'
 import NotificationDropdown from '../../../components/common/NotificationDropdown.jsx';
 import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
 import CartPage from './CartPage.jsx';
-import CheckoutModal from '../../../components/modals/CheckoutModal.jsx';
+import WebCheckoutModal from '../../../components/web/WebCheckoutModal.jsx';
 import GCashPaymentModal from '../../../components/modals/GCashPaymentModal.jsx';
 import ProductVariantPickerModal from '../../../components/modals/ProductVariantPickerModal.jsx';
 
@@ -391,6 +391,10 @@ export default function ProductDetailsPageWeb({
         customerEmail: currentUser?.email || null,
         customerAddress: orderFormData.customerAddress,
         deliveryNotes: orderFormData.deliveryNotes,
+        deliveryLat:
+          orderFormData.deliveryLat ?? currentUser?.latitude ?? currentUser?.delivery_lat ?? null,
+        deliveryLng:
+          orderFormData.deliveryLng ?? currentUser?.longitude ?? currentUser?.delivery_lng ?? null,
         paymentMethod: orderFormData.paymentMethod,
         gcashNumber: orderFormData.gcashNumber,
         gcashReference: orderFormData.gcashReference,
@@ -1376,7 +1380,7 @@ export default function ProductDetailsPageWeb({
         onNavigateToScreen={onNavigateToScreen}
       />
 
-      <CheckoutModal
+      <WebCheckoutModal
         visible={isCheckoutOpen}
         onClose={() => {
           setIsCheckoutOpen(false);

@@ -3,6 +3,23 @@ import { Platform } from 'react-native';
 import { supabase } from '../../lib/supabase.js';
 import { APP_CONFIG } from '../../config';
 
+function isLocalLoopbackUrl(url) {
+  return /^https?:\/\/(127\.0\.0\.1|10\.0\.2\.2|localhost)(:|\/|$)/i.test(String(url || '').trim());
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    return await fetch(url, {
+      ...options,
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function getNotifyApiBaseUrl() {
   const fromEnv = String(
     process.env.EXPO_PUBLIC_CUSTOMIZE_API_URL || APP_CONFIG.customizeApiUrl || ''
@@ -436,21 +453,17 @@ class EmailService {
     const ids = [...new Set([userId, customerId].map((v) => String(v || '').trim()).filter(Boolean))];
     if (ids.length && supabase) {
       try {
-        for (const id of ids) {
-          // 1. Check customers table by customer_id
-          const byCustomer = await supabase.from('customers').select('email').eq('customer_id', id).maybeSingle();
-          const foundCustomer = isValidEmail(byCustomer.data?.email);
-          if (foundCustomer) return foundCustomer;
-
-          // 2. Check users table by user_id
-          const byUserId = await supabase.from('users').select('email').eq('user_id', id).maybeSingle();
-          const foundUserId = isValidEmail(byUserId.data?.email);
-          if (foundUserId) return foundUserId;
-
-          // 3. Check users table by id
-          const byId = await supabase.from('users').select('email').eq('id', id).maybeSingle();
-          const foundId = isValidEmail(byId.data?.email);
-          if (foundId) return foundId;
+        const lookups = ids.flatMap((id) => [
+          supabase.from('customers').select('email').eq('customer_id', id).maybeSingle(),
+          supabase.from('users').select('email').eq('user_id', id).maybeSingle(),
+          supabase.from('users').select('email').eq('id', id).maybeSingle(),
+        ]);
+        const results = await Promise.allSettled(lookups);
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            const found = isValidEmail(r.value?.data?.email);
+            if (found) return found;
+          }
         }
       } catch (_e) {}
     }
@@ -482,11 +495,16 @@ class EmailService {
     // Method 1: Server transactional email (preferred — secrets stay on server)
     try {
       const base = getNotifyApiBaseUrl();
-      const res = await fetch(`${base}/api/notify/email`, {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: cleanEmail, subject, html }),
-      });
+      const timeoutMs = Platform.OS !== 'web' && isLocalLoopbackUrl(base) ? 1800 : 5000;
+      const res = await fetchWithTimeout(
+        `${base}/api/notify/email`,
+        {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: cleanEmail, subject, html }),
+        },
+        timeoutMs
+      );
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.success) {
         console.log('[EmailService] Sent via server to:', cleanEmail);
@@ -494,7 +512,10 @@ class EmailService {
       }
       if (data?.error) errors.push(data.error);
     } catch (e) {
-      const isFailedToFetch = e?.name === 'TypeError' || String(e?.message || '').includes('Failed to fetch');
+      const isFailedToFetch =
+        e?.name === 'TypeError' ||
+        e?.name === 'AbortError' ||
+        String(e?.message || '').includes('Failed to fetch');
       const errorMsg = isFailedToFetch
         ? `Failed to fetch: Backend server at ${getNotifyApiBaseUrl()} is unreachable. Run npm run server locally or check API deployment.`
         : e?.message || 'Server email unreachable';
@@ -505,19 +526,23 @@ class EmailService {
     const resendApiKey = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_RESEND_API_KEY;
     if (resendApiKey) {
       try {
-        const resendRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${resendApiKey}`,
+        const resendRes = await fetchWithTimeout(
+          'https://api.resend.com/emails',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${resendApiKey}`,
+            },
+            body: JSON.stringify({
+              from: 'MotoTrack <orders@resend.dev>',
+              to: [cleanEmail],
+              subject,
+              html,
+            }),
           },
-          body: JSON.stringify({
-            from: 'MotoTrack <orders@resend.dev>',
-            to: [cleanEmail],
-            subject,
-            html,
-          }),
-        });
+          5000
+        );
         if (resendRes.ok) {
           console.log('[EmailService] Sent via Resend to:', cleanEmail);
           dispatched = true;
@@ -542,20 +567,24 @@ class EmailService {
 
     if (emailJsServiceId && emailJsTemplateId && emailJsPublicKey) {
       try {
-        const emailJsRes = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            service_id: emailJsServiceId,
-            template_id: emailJsTemplateId,
-            user_id: emailJsPublicKey,
-            template_params: {
-              to_email: cleanEmail,
-              subject,
-              message: textMessage || subject,
-            },
-          }),
-        });
+        const emailJsRes = await fetchWithTimeout(
+          'https://api.emailjs.com/api/v1.0/email/send',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              service_id: emailJsServiceId,
+              template_id: emailJsTemplateId,
+              user_id: emailJsPublicKey,
+              template_params: {
+                to_email: cleanEmail,
+                subject,
+                message: textMessage || subject,
+              },
+            }),
+          },
+          5000
+        );
         if (emailJsRes.ok) {
           console.log('[EmailService] Sent via EmailJS to:', cleanEmail);
           return { success: true, dispatched: true, provider: 'emailjs' };

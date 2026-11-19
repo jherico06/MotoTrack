@@ -29,8 +29,8 @@ export function generateOrderId(channel = 'Online Store', existingOrders = []) {
   const prefix = (chanStr.includes('pos') || chanStr.includes('in-store') || chanStr.includes('counter') || chanStr.includes('walk-in'))
     ? 'POS'
     : (chanStr.includes('phone') || chanStr.includes('call') || chanStr.includes('tel'))
-    ? 'TEL'
-    : 'ON';
+      ? 'TEL'
+      : 'ON';
 
   let maxSeq = 0;
   const list = Array.isArray(existingOrders) ? existingOrders : [];
@@ -55,7 +55,7 @@ function readSharedOrdersJson() {
     if (typeof window !== 'undefined' && window.localStorage) {
       return window.localStorage.getItem(STORAGE_KEY_ORDERS);
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return null;
 }
 
@@ -64,7 +64,7 @@ function writeSharedOrdersJson(json) {
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(STORAGE_KEY_ORDERS, json);
     }
-  } catch (_e) {}
+  } catch (_e) { }
 }
 
 export const ORDER_STATUSES = {
@@ -132,7 +132,7 @@ export function assertStatusTransition(fromStatus, toStatus, options = {}) {
   // Delivered from Delivery Reported, Out for Delivery, or Accepted by Rider (with allowDelivered / riderConfirm)
   if (to === ORDER_STATUSES.DELIVERED) {
     if ((from === ORDER_STATUSES.REPORTED || from === ORDER_STATUSES.OUT || from === ORDER_STATUSES.ACCEPTED) &&
-        (options.allowDelivered || options.riderConfirm)) {
+      (options.allowDelivered || options.riderConfirm)) {
       return { ok: true, from, to };
     }
     if (!options.allowDelivered && !options.riderConfirm) {
@@ -270,7 +270,7 @@ function getOrdersBroadcast() {
     if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
       ordersBroadcast = new BroadcastChannel('mototrack_orders');
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return ordersBroadcast;
 }
 
@@ -343,7 +343,7 @@ class OrderService {
         appStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify([]));
         writeSharedOrdersJson('[]');
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // Auto-sync offline status updates when online (creates sync after fetch reconcile)
     setTimeout(() => this.syncPendingOrders({ skipCreates: true }), 2000);
@@ -359,14 +359,14 @@ class OrderService {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   }
 
   saveOfflineQueue(queue) {
     try {
       appStorage.setItem(STORAGE_KEY_OFFLINE_QUEUE, JSON.stringify(queue));
-    } catch (e) {}
+    } catch (e) { }
   }
 
   enqueueOfflineAction(action) {
@@ -536,7 +536,7 @@ class OrderService {
     this.listeners.forEach((fn) => {
       try {
         fn(orders);
-      } catch (e) {}
+      } catch (e) { }
     });
   }
 
@@ -549,14 +549,14 @@ class OrderService {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) sessionOrders = parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     try {
       const sharedRaw = readSharedOrdersJson();
       if (sharedRaw !== null && sharedRaw !== undefined) {
         const parsed = JSON.parse(sharedRaw);
         if (Array.isArray(parsed)) sharedOrders = parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // Explicit empty cache must stay empty (do not resurrect demo seed orders)
     if (sessionOrders !== null || sharedOrders !== null) {
@@ -583,13 +583,13 @@ class OrderService {
       if (typeof window !== 'undefined') {
         try {
           window.dispatchEvent(new CustomEvent('mototrack_orders_updated', { detail: orders }));
-        } catch (_e) {}
+        } catch (_e) { }
         try {
           const bc = getOrdersBroadcast();
           bc?.postMessage({ type: 'orders_updated', at: Date.now() });
-        } catch (_e) {}
+        } catch (_e) { }
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   clearLocalOrders() {
@@ -601,17 +601,17 @@ class OrderService {
       try {
         const queue = this.getOfflineQueue() || [];
         this.saveOfflineQueue(queue.filter((item) => item?.type !== 'create_order'));
-      } catch (_e) {}
+      } catch (_e) { }
       this.notifyListeners([]);
       if (typeof window !== 'undefined') {
         try {
           window.dispatchEvent(new CustomEvent('mototrack_orders_updated', { detail: [] }));
-        } catch (_e) {}
+        } catch (_e) { }
         try {
           getOrdersBroadcast()?.postMessage({ type: 'orders_cleared', at: Date.now() });
-        } catch (_e) {}
+        } catch (_e) { }
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   /** Order IDs waiting to sync creates to Supabase — must not be dropped on remote reconcile. */
@@ -754,7 +754,7 @@ class OrderService {
         let query = client
           .from('orders')
           .select(
-            'order_id,customer_id,customer_name,customer_phone,customer_email,customer_address,delivery_notes,payment_method,total_amount,discount_amount,shipping_fee,grand_total,items_summary,items_count,status,channel,created_at,updated_at,estimated_delivery,tracking_number,courier,cancel_reason,return_status,return_reason,return_notes,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,cod_approval_email_sent,cod_approval_email_at,cod_approval_email_status,cod_approval_email_error,cod_approval_email_recipient,customers(user_id,name,email,contact_number),order_items(order_item_id,product_id,quantity,cost,size,unit_cost,products(product_id,id,name,brand,price,categories(name))),order_deliveries(delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,expected_delivery_end_at,shipping_fee,rider_earning,rider_earning_credited,rider_earning_credited_at,rider_reported_delivered,rider_reported_at,rider_reported_by,rider_report_notes,admin_confirmed,admin_confirmed_at,confirmed_by_admin,admin_confirmed_reason,delivered_at,token_verified,confirmation_token_used_at,proof_uploaded_by,proof_uploaded_at,updated_at,created_at,customer_confirmed,customer_confirmed_at,riders(id,name,phone,vehicle_info,plate_number,status))'
+            'order_id,customer_id,customer_name,customer_phone,customer_email,customer_address,delivery_notes,delivery_landmark,payment_method,total_amount,discount_amount,shipping_fee,grand_total,items_summary,items_count,status,channel,created_at,updated_at,estimated_delivery,tracking_number,courier,cancel_reason,return_status,return_reason,return_notes,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,cod_approval_email_sent,cod_approval_email_at,cod_approval_email_status,cod_approval_email_error,cod_approval_email_recipient,customers(user_id,name,email,contact_number),order_items(order_item_id,product_id,quantity,cost,size,unit_cost,products(product_id,id,name,brand,price,categories(name))),order_deliveries(delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,expected_delivery_end_at,shipping_fee,rider_earning,rider_earning_credited,rider_earning_credited_at,rider_reported_delivered,rider_reported_at,rider_reported_by,rider_report_notes,admin_confirmed,admin_confirmed_at,confirmed_by_admin,admin_confirmed_reason,delivered_at,token_verified,confirmation_token_used_at,proof_uploaded_by,proof_uploaded_at,updated_at,created_at,customer_confirmed,customer_confirmed_at,riders(id,name,phone,vehicle_info,plate_number,status))'
           )
           .order('created_at', { ascending: false })
           .limit(150);
@@ -772,20 +772,20 @@ class OrderService {
               : null;
             const items = Array.isArray(o.order_items)
               ? o.order_items.map((oi) => ({
-                  product_id: oi.product_id,
-                  name: oi.products?.name || fallbackSummaryName || 'Motorcycle Part',
-                  brand: oi.products?.brand || 'MotoTrack',
-                  category: oi.products?.categories?.name || 'Gear',
-                  quantity: oi.quantity || 1,
-                  price: Number(oi.cost || oi.products?.price || 0),
-                  size: oi.size || null,
-                  unit_cost:
-                    oi.unit_cost != null && oi.unit_cost !== ''
-                      ? Number(oi.unit_cost)
-                      : null,
-                  image:
-                    'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=60',
-                }))
+                product_id: oi.product_id,
+                name: oi.products?.name || fallbackSummaryName || 'Motorcycle Part',
+                brand: oi.products?.brand || 'MotoTrack',
+                category: oi.products?.categories?.name || 'Gear',
+                quantity: oi.quantity || 1,
+                price: Number(oi.cost || oi.products?.price || 0),
+                size: oi.size || null,
+                unit_cost:
+                  oi.unit_cost != null && oi.unit_cost !== ''
+                    ? Number(oi.unit_cost)
+                    : null,
+                image:
+                  'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=60',
+              }))
               : [];
 
             const deliveryRow = Array.isArray(o.order_deliveries)
@@ -809,6 +809,7 @@ class OrderService {
               customer_email: o.customer_email || o.customers?.email || null,
               customer_address: o.customer_address,
               delivery_notes: o.delivery_notes,
+              delivery_landmark: o.delivery_landmark || o.delivery_notes || '',
               payment_method: o.payment_method || 'Cash on Delivery (COD)',
               total_amount: calcGrandTotal,
               discount_amount: Number(o.discount_amount || 0),
@@ -1041,6 +1042,9 @@ class OrderService {
     customerEmail = null,
     customerAddress,
     deliveryNotes = '',
+    deliveryLat: inputDeliveryLat = null,
+    deliveryLng: inputDeliveryLng = null,
+    deliveryLandmark = null,
     paymentMethod,
     gcashNumber = null,
     gcashReference = null,
@@ -1064,24 +1068,6 @@ class OrderService {
       (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
     const orderStatus = overrideStatus || (isCOD ? 'Pending Approval' : 'Processing');
     const nowIso = new Date().toISOString();
-
-    let deliveryLat = null;
-    let deliveryLng = null;
-    try {
-      const { geocodeAddress } = await import('../../utils/geo.js');
-      const geo = await geocodeAddress(customerAddress);
-      if (geo) {
-        deliveryLat = geo.lat;
-        deliveryLng = geo.lng;
-      }
-    } catch (_e) {}
-
-    const resolvedCustomerId = await this.resolveValidCustomerId(
-      customerId,
-      userId,
-      customerName,
-      customerPhone
-    );
 
     const normalizedItems = (items || []).map((i) => {
       const size = String(
@@ -1124,10 +1110,26 @@ class OrderService {
       return { success: false, error: 'Order items are missing product IDs', supabaseSynced: false };
     }
 
-    const stockResult = await productService.deductStock(normalizedItems, {
-      orderId,
-      referenceType: 'order',
-    });
+    const client = supabaseManager.getClient();
+    const { geocodeAddress, parseLatLng } = await import('../../utils/geo.js');
+
+    // Run customer ID resolution, email lookup, and atomic stock deduction concurrently
+    const [resolvedCustomerId, stockResult, directOrResolvedEmail] = await Promise.all([
+      this.resolveValidCustomerId(customerId, userId, customerName, customerPhone),
+      productService.deductStock(normalizedItems, {
+        orderId,
+        referenceType: 'order',
+      }),
+      customerEmail
+        ? Promise.resolve(customerEmail)
+        : emailService.resolveCustomerEmail({
+            customerEmail,
+            phone: customerPhone,
+            userId,
+            customerId,
+          }),
+    ]);
+
     if (!stockResult.success) {
       return {
         success: false,
@@ -1137,15 +1139,53 @@ class OrderService {
       };
     }
 
+    // Resolve delivery coordinates:
+    // 1) Explicit coordinates from Checkout / Profile
+    // 2) Saved coordinates from public.addresses for this customer
+    // 3) Geocoding fallback ONLY when no saved pin exists
+    let deliveryLat = null;
+    let deliveryLng = null;
+    let savedAddressLandmark = '';
+    const explicitCoords = parseLatLng(inputDeliveryLat, inputDeliveryLng);
+    if (explicitCoords) {
+      deliveryLat = explicitCoords.lat;
+      deliveryLng = explicitCoords.lng;
+    } else if (client && resolvedCustomerId) {
+      try {
+        const { data: savedAddr } = await client
+          .from('addresses')
+          .select('latitude, longitude, landmark')
+          .eq('customer_id', resolvedCustomerId)
+          .order('is_default', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const addrCoords = parseLatLng(savedAddr?.latitude, savedAddr?.longitude);
+        if (addrCoords) {
+          deliveryLat = addrCoords.lat;
+          deliveryLng = addrCoords.lng;
+        }
+        if (savedAddr?.landmark) savedAddressLandmark = String(savedAddr.landmark).trim();
+      } catch (_e) { }
+    }
+
+    if (deliveryLat == null || deliveryLng == null) {
+      try {
+        const geo = await geocodeAddress(customerAddress);
+        if (geo) {
+          deliveryLat = geo.lat;
+          deliveryLng = geo.lng;
+        }
+      } catch (_e) { }
+    }
+
+    const resolvedLandmark = String(
+      deliveryLandmark ?? (deliveryNotes || savedAddressLandmark) ?? ''
+    ).trim();
+
     const itemsSummary = normalizedItems.map((i) => `${i.name} (x${i.quantity})`).join(', ');
     const itemsCount = normalizedItems.reduce((sum, i) => sum + (i.quantity || 1), 0);
 
-    const resolvedCustomerEmail = await emailService.resolveCustomerEmail({
-      customerEmail,
-      phone: customerPhone,
-      userId,
-      customerId: resolvedCustomerId || customerId,
-    });
+    const resolvedCustomerEmail = directOrResolvedEmail || null;
 
     const newOrder = {
       order_id: orderId,
@@ -1157,7 +1197,7 @@ class OrderService {
       customer_email: resolvedCustomerEmail || null,
       customer_address: customerAddress,
       delivery_notes: deliveryNotes,
-      delivery_landmark: deliveryNotes || '',
+      delivery_landmark: resolvedLandmark || '',
       delivery_lat: deliveryLat,
       delivery_lng: deliveryLng,
       payment_method: paymentMethod,
@@ -1257,7 +1297,6 @@ class OrderService {
       }
     }
 
-    const client = supabaseManager.getClient();
     let supabaseSuccess = false;
 
     const orderPayload = {
@@ -1269,7 +1308,7 @@ class OrderService {
       customer_email: resolvedCustomerEmail || null,
       customer_address: customerAddress,
       delivery_notes: deliveryNotes,
-      delivery_landmark: deliveryNotes || null,
+      delivery_landmark: resolvedLandmark || null,
       delivery_lat: deliveryLat,
       delivery_lng: deliveryLng,
       payment_method: paymentMethod,
@@ -1346,33 +1385,34 @@ class OrderService {
 
         if (!ordErr) {
           supabaseSuccess = true;
-          const { error: payErr } = await client.from('payments').insert([paymentPayload]);
-          if (payErr) console.warn('[OrderService] Payment insert failed:', payErr);
-          const { error: saleErr } = await client.from('sales').insert([
-            { ...salePayload, customer_id: resolvedCustomerId },
-          ]);
-          if (saleErr) {
-            const saleRetry = await client.from('sales').insert([{ ...salePayload, customer_id: null }]);
-            if (saleRetry.error) console.warn('[OrderService] Sale insert failed:', saleRetry.error);
-          }
-          if (orderItemsPayload.length > 0) {
+          const insertPayments = async () => {
+            const { error: payErr } = await client.from('payments').insert([paymentPayload]);
+            if (payErr) console.warn('[OrderService] Payment insert failed:', payErr);
+          };
+          const insertSales = async () => {
+            const { error: saleErr } = await client.from('sales').insert([
+              { ...salePayload, customer_id: resolvedCustomerId },
+            ]);
+            if (saleErr) {
+              const saleRetry = await client.from('sales').insert([{ ...salePayload, customer_id: null }]);
+              if (saleRetry.error) console.warn('[OrderService] Sale insert failed:', saleRetry.error);
+            }
+          };
+          const insertOrderItems = async () => {
+            if (orderItemsPayload.length === 0) return;
             const { error: itemsErr } = await client.from('order_items').insert(orderItemsPayload);
             if (itemsErr) {
               const msg = String(itemsErr.message || '');
-              // Drop optional columns if not yet migrated, then drop invalid product_id FKs
               let retryPayload = orderItemsPayload;
               if (/unit_cost/i.test(msg)) {
                 retryPayload = retryPayload.map(({ unit_cost, ...rest }) => rest);
               }
               if (/size/i.test(msg) || /unit_cost/i.test(msg)) {
-                // also strip size if that column is missing
                 if (/size/i.test(msg)) {
                   retryPayload = retryPayload.map(({ size, ...rest }) => rest);
                 }
                 const retry = await client.from('order_items').insert(retryPayload);
-                if (!retry.error) {
-                  // ok
-                } else {
+                if (retry.error) {
                   const bareItems = retryPayload.map(({ product_id, ...rest }) => ({
                     ...rest,
                     product_id: null,
@@ -1389,7 +1429,9 @@ class OrderService {
                 if (itemsRetry.error) console.warn('[OrderService] Order items insert failed:', itemsRetry.error);
               }
             }
-          }
+          };
+
+          await Promise.all([insertPayments(), insertSales(), insertOrderItems()]);
         } else {
           console.warn('[OrderService] Supabase insert failed, enqueuing offline:', ordErr);
         }
@@ -1409,35 +1451,55 @@ class OrderService {
       });
     }
 
-    try {
-      await emailService.sendOrderConfirmationEmail({
+    // Non-blocking post-order side effects so mobile checkout never hangs on email/API timeouts
+    void emailService
+      .sendOrderConfirmationEmail({
         order: newOrder,
         customerEmail: resolvedCustomerEmail,
         customerName,
+      })
+      .catch((e) => {
+        console.warn('[OrderService] Order confirmation email failed:', e);
       });
-    } catch (e) {
-      console.warn('[OrderService] Order confirmation email failed:', e);
-    }
 
-    // Consume promo usage only after the order is successfully placed.
-    // Failed/cancelled flows never reach this point with a successful create.
     if (promoId) {
-      try {
-        await promoService.incrementUsage(promoId);
-      } catch (e) {
+      void promoService.incrementUsage(promoId).catch((e) => {
         console.warn('[OrderService] Promo usage increment failed:', e);
-      }
+      });
     }
 
     return { success: true, order: newOrder, supabaseSynced: supabaseSuccess };
   }
 
   /**
-   * Update Delivery Address for an existing order
+   * Update Delivery Address (and optional saved coordinates + landmark notes) for an existing order
    */
-  async updateAddress(orderId, newAddress) {
-    if (!orderId || !newAddress) return { success: false, error: 'Order ID and address are required' };
-    const cleanAddress = newAddress.trim();
+  async updateAddress(orderId, addressOrPayload, extra = {}) {
+    const cleanAddress =
+      typeof addressOrPayload === 'object' && addressOrPayload !== null
+        ? String(addressOrPayload.address || addressOrPayload.customer_address || '').trim()
+        : String(addressOrPayload || '').trim();
+    const opts =
+      typeof addressOrPayload === 'object' && addressOrPayload !== null
+        ? addressOrPayload
+        : extra || {};
+
+    if (!orderId || !cleanAddress) {
+      return { success: false, error: 'Order ID and address are required' };
+    }
+
+    const rawLat = Number(opts.latitude ?? opts.delivery_lat);
+    const rawLng = Number(opts.longitude ?? opts.delivery_lng);
+    const hasCoords =
+      Number.isFinite(rawLat) &&
+      Number.isFinite(rawLng) &&
+      Math.abs(rawLat) <= 90 &&
+      Math.abs(rawLng) <= 180 &&
+      (rawLat !== 0 || rawLng !== 0);
+    const cleanNotes =
+      opts.deliveryNotes !== undefined || opts.delivery_notes !== undefined
+        ? String(opts.deliveryNotes ?? opts.delivery_notes ?? '').trim()
+        : undefined;
 
     const orders = this.getLocalOrders();
     const existing = orders.find((o) => o.order_id === orderId || o.id === orderId);
@@ -1448,10 +1510,20 @@ class OrderService {
         error: 'Address cannot be changed after the order is out for delivery.',
       };
     }
+
+    const nowIso = new Date().toISOString();
     let targetOrder = null;
     const updated = orders.map((o) => {
       if (o.order_id === orderId || o.id === orderId) {
-        targetOrder = { ...o, customer_address: cleanAddress, updated_at: new Date().toISOString() };
+        targetOrder = {
+          ...o,
+          customer_address: cleanAddress,
+          ...(hasCoords ? { delivery_lat: rawLat, delivery_lng: rawLng } : {}),
+          ...(cleanNotes !== undefined
+            ? { delivery_notes: cleanNotes, delivery_landmark: cleanNotes }
+            : {}),
+          updated_at: nowIso,
+        };
         return targetOrder;
       }
       return o;
@@ -1462,12 +1534,26 @@ class OrderService {
     let synced = false;
     if (client) {
       try {
-        const { error } = await client
-          .from('orders')
-          .update({ customer_address: cleanAddress })
-          .eq('order_id', orderId);
+        const dbPayload = {
+          customer_address: cleanAddress,
+          ...(hasCoords ? { delivery_lat: rawLat, delivery_lng: rawLng } : {}),
+          ...(cleanNotes !== undefined
+            ? { delivery_notes: cleanNotes, delivery_landmark: cleanNotes || null }
+            : {}),
+        };
+        let { error } = await client.from('orders').update(dbPayload).eq('order_id', orderId);
+        if (error && /delivery_lat|delivery_lng|delivery_landmark/.test(String(error.message || ''))) {
+          const retry = await client
+            .from('orders')
+            .update({
+              customer_address: cleanAddress,
+              ...(cleanNotes !== undefined ? { delivery_notes: cleanNotes } : {}),
+            })
+            .eq('order_id', orderId);
+          error = retry.error;
+        }
         if (!error) synced = true;
-      } catch (e) {}
+      } catch (_e) { }
     }
 
     if (!synced) {
@@ -1475,6 +1561,8 @@ class OrderService {
         type: 'update_address',
         orderId,
         address: cleanAddress,
+        ...(hasCoords ? { delivery_lat: rawLat, delivery_lng: rawLng } : {}),
+        ...(cleanNotes !== undefined ? { delivery_notes: cleanNotes } : {}),
       });
     }
 
@@ -1586,7 +1674,7 @@ class OrderService {
             subtotal: Number(oi.cost || 0),
           }));
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     // Resolve customer email strictly from database records
@@ -1599,7 +1687,7 @@ class OrderService {
           .eq('customer_id', targetOrder.customer_id)
           .maybeSingle();
         if (custData?.email) customerEmail = custData.email;
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     const emailResult = await emailService.sendCodOrderApprovedEmail({
@@ -1639,13 +1727,13 @@ class OrderService {
         orders.map((o) =>
           o.order_id === orderId || o.id === orderId
             ? {
-                ...o,
-                cod_approval_email_sent: true,
-                cod_approval_email_at: nowIso,
-                cod_approval_email_status: 'sent',
-                cod_approval_email_recipient: emailResult.recipient,
-                cod_approval_email_error: null,
-              }
+              ...o,
+              cod_approval_email_sent: true,
+              cod_approval_email_at: nowIso,
+              cod_approval_email_status: 'sent',
+              cod_approval_email_recipient: emailResult.recipient,
+              cod_approval_email_error: null,
+            }
             : o
         )
       );
@@ -1689,11 +1777,11 @@ class OrderService {
         orders.map((o) =>
           o.order_id === orderId || o.id === orderId
             ? {
-                ...o,
-                cod_approval_email_sent: false,
-                cod_approval_email_status: 'failed',
-                cod_approval_email_error: errorMsg,
-              }
+              ...o,
+              cod_approval_email_sent: false,
+              cod_approval_email_status: 'failed',
+              cod_approval_email_error: errorMsg,
+            }
             : o
         )
       );
@@ -2252,7 +2340,7 @@ class OrderService {
           customerName: targetOrder.customer_name,
         });
       }
-    } catch (_err) {}
+    } catch (_err) { }
 
     const client = supabaseManager.getClient();
     let synced = false;
@@ -2279,9 +2367,9 @@ class OrderService {
                 author: 'Customer',
               },
             ]);
-          } catch (e) {}
+          } catch (e) { }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!synced) {
@@ -2305,7 +2393,7 @@ class OrderService {
           notes: `Reason: ${reason}`,
         });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return { success: true, order: targetOrder };
   }
@@ -2582,18 +2670,18 @@ class OrderService {
         date: isDelivered
           ? confirmedAt
             ? new Date(confirmedAt).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
             : 'Today'
           : order.estimated_delivery || 'Upcoming',
         time: isDelivered
           ? confirmedAt
             ? new Date(confirmedAt).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })
+              hour: 'numeric',
+              minute: '2-digit',
+            })
             : '05:30 PM'
           : '--',
         completed: isDelivered,

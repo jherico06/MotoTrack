@@ -35,23 +35,29 @@ export default function DeliveryTrackingPanel({
   const { riderLat, riderLng, lastUpdatedAt, loading } = useDeliveryLocation(orderId, { enabled });
 
   const storedCustomer = parseLatLng(order?.delivery_lat, order?.delivery_lng);
-  const [customerCoords, setCustomerCoords] = useState(storedCustomer);
+  const [fallbackGeoCoords, setFallbackGeoCoords] = useState(null);
   const address = order?.customer_address || order?.delivery_address || '';
+  const landmark = order?.delivery_landmark || order?.delivery_notes || '';
 
   useEffect(() => {
-    setCustomerCoords(parseLatLng(order?.delivery_lat, order?.delivery_lng));
-  }, [order?.delivery_lat, order?.delivery_lng]);
-
-  useEffect(() => {
-    if (customerCoords || !address) return undefined;
+    if (storedCustomer) {
+      setFallbackGeoCoords(null);
+      return undefined;
+    }
+    if (!address) {
+      setFallbackGeoCoords(null);
+      return undefined;
+    }
     let cancelled = false;
     geocodeAddress(address).then((geo) => {
-      if (!cancelled && geo) setCustomerCoords({ lat: geo.lat, lng: geo.lng });
+      if (!cancelled && geo) setFallbackGeoCoords({ lat: geo.lat, lng: geo.lng });
     });
     return () => {
       cancelled = true;
     };
-  }, [address, customerCoords]);
+  }, [address, storedCustomer]);
+
+  const customerCoords = storedCustomer || fallbackGeoCoords;
 
   if (!orderId) return null;
 
@@ -90,6 +96,7 @@ export default function DeliveryTrackingPanel({
         customerLat={customerCoords?.lat}
         customerLng={customerCoords?.lng}
         customerAddress={address}
+        customerLandmark={landmark}
         storeLat={STORE_LOCATION.lat}
         storeLng={STORE_LOCATION.lng}
         storeLabel={STORE_LOCATION.name}

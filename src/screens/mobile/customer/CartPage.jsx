@@ -833,21 +833,23 @@ export default function MobileCartPage({
         </ScrollView>
 
         {/* Product Specs Modal for inspecting & quick-adding suggested/cart items */}
-        <ProductSpecsModal
-          visible={isSpecsOpen}
-          product={selectedProductForSpecs}
-          onClose={() => setIsSpecsOpen(false)}
-          onAddToCart={(prod, qty = 1, opts = {}) => addToCart(prod, qty, opts)}
-          onBuyNow={
-            onBuyNow
-              ? (prod, qty = 1, opts = {}) => {
-                  setIsSpecsOpen(false);
-                  onClose?.();
-                  onBuyNow(prod, qty, opts);
-                }
-              : undefined
-          }
-        />
+        {isSpecsOpen && (
+          <ProductSpecsModal
+            visible={isSpecsOpen}
+            product={selectedProductForSpecs}
+            onClose={() => setIsSpecsOpen(false)}
+            onAddToCart={(prod, qty = 1, opts = {}) => addToCart(prod, qty, opts)}
+            onBuyNow={
+              onBuyNow
+                ? (prod, qty = 1, opts = {}) => {
+                    setIsSpecsOpen(false);
+                    onClose?.();
+                    onBuyNow(prod, qty, opts);
+                  }
+                : undefined
+            }
+          />
+        )}
       </SafeAreaView>
     </Modal>
   );

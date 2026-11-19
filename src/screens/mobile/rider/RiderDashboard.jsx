@@ -24,7 +24,7 @@ import { BootstrapIcon } from '../../../components/common/BootstrapIcon.jsx';
 import MobileBottomNavBar from '../../../components/mobile/customer/MobileBottomNavBar.jsx';
 import RiderQrScanSheet from '../../../components/modals/RiderQrScanSheet.jsx';
 import RiderDeliveryConfirmSheet from '../../../components/modals/RiderDeliveryConfirmSheet.jsx';
-import LiveOrderTrackingMapModal from '../../../components/modals/LiveOrderTrackingMapModal.jsx';
+import ConfirmModal from '../../../components/modals/ConfirmModal.jsx';
 import {
   RiderTopHeader,
   RiderProfileMenuModal,
@@ -33,19 +33,25 @@ import {
 import RiderOrderCard from '../../../components/mobile/rider/RiderOrderCard.jsx';
 import RiderOrderDetailsSheet from '../../../components/mobile/rider/RiderOrderDetailsSheet.jsx';
 import RiderHomeDeliveryMapCard from '../../../components/mobile/rider/RiderHomeDeliveryMapCard.jsx';
+import RiderCustomerTrackModal from '../../../components/mobile/rider/RiderCustomerTrackModal.jsx';
 import RiderEarningsView from '../../../components/mobile/rider/RiderEarningsView.jsx';
 import RiderAccountView from '../../../components/mobile/rider/RiderAccountView.jsx';
+import RiderSettingsView from '../../../components/mobile/rider/RiderSettingsView.jsx';
 import {
-  RIDER_FONT,
+  riderFont,
   cardShadowStyle,
   getRiderPalette,
   isDeliveredOrder,
+  isCancelledOrder,
   isNeedsPickupOrder,
+  reconcileDeliveryWithOrderStatus,
   formatOrderCode,
 } from '../../../components/mobile/rider/riderTheme.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
+import { supabaseManager } from '../../../lib/supabase.js';
+import { orderService } from '../../../services/orders/orderService.js';
 import { deliveryService } from '../../../services/delivery/deliveryService.js';
 import {
   riderService,
@@ -62,6 +68,8 @@ import { areaFromAddress } from '../../../utils/geo.js';
 
 const DEFAULT_PREFS = {
   pushNotifications: true,
+  soundNotification: true,
+  vibration: true,
   emailUpdates: true,
   twoFactorEnabled: false,
   homeAddress: '',
@@ -86,8 +94,20 @@ function groupByArea(deliveries) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
+function matchesOrderSearch(delivery, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return true;
+  return (
+    String(delivery?.orderId || '').toLowerCase().includes(q) ||
+    String(delivery?.customerName || '').toLowerCase().includes(q) ||
+    String(delivery?.customerAddress || '').toLowerCase().includes(q) ||
+    String(delivery?.customerPhone || '').toLowerCase().includes(q)
+  );
+}
+
 export default function RiderDashboard({ onLogout, initialConfirmToken }) {
-  const { currentUser, updateProfile, changeEmail, changePassword } = useAuth();
+  const { currentUser, updateProfile, changeEmail, changePassword, logout } =
+    useAuth();
   const { isDarkMode, setDarkMode } = useTheme();
   const palette = useMemo(() => getRiderPalette(isDarkMode), [isDarkMode]);
 
@@ -98,10 +118,12 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   const sessionRiderId = String(currentUser?.rider_id || '');
 
   // Navigation & Modal State
-  const [mainTab, setMainTab] = useState('home'); // 'home' | 'orders' | 'earnings' | 'account'
+  const [mainTab, setMainTab] = useState('home'); // 'home' | 'orders' | 'earnings' | 'account' | 'settings'
   const [accountTab, setAccountTab] = useState('profile'); // 'profile' | 'preferences' | 'security'
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [trackOrderId, setTrackOrderId] = useState(null);
 
   // Rider Data State
   const [riderId, setRiderId] = useState(sessionRiderId);
@@ -114,8 +136,9 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   const [prevWeekEarnings, setPrevWeekEarnings] = useState(0);
   const [error, setError] = useState('');
 
-  // Order Filter & Search State ('all' | 'to_confirm' | 'delivered')
-  const [orderFilter, setOrderFilter] = useState('all');
+  // Order Filter & Search State
+  const [homeFilter, setHomeFilter] = useState('all'); // 'all' | 'needs_pickup' | 'out'
+  const [orderFilter, setOrderFilter] = useState('all'); // 'all' | 'needs_pickup' | 'to_confirm' | 'delivered'
   const [ordersSubFilter, setOrdersSubFilter] = useState('all'); // 'all' | 'out' | 'assigned'
   const [groupByAreaMode, setGroupByAreaMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,9 +163,12 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   // Notifications & Local Rider Preferences
   const [rawNotifications, setRawNotifications] = useState([]);
   const [readNotifIds, setReadNotifIds] = useState(() => new Set());
+  const [dismissedNotifIds, setDismissedNotifIds] = useState(() => new Set());
   const [preferences, setPreferences] = useState(DEFAULT_PREFS);
 
+  const scrollViewRef = useRef(null);
   const scanOpenTimerRef = useRef(null);
+  const logoutModalTimerRef = useRef(null);
   const subscribeDebounceRef = useRef(null);
   const scanOrderRef = useRef(scanOrder);
   scanOrderRef.current = scanOrder;
@@ -158,7 +184,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     [userUid, sessionRiderId]
   );
 
-  // Hydrate persisted rider preferences & read notification IDs
+  const dismissedNotifsStorageKey = useMemo(
+    () =>
+      `mototrack_rider_dismissed_notifs_${userUid || sessionRiderId || 'default'}`,
+    [userUid, sessionRiderId]
+  );
+
+  // Hydrate persisted rider preferences, read IDs & dismissed notification IDs
   useEffect(() => {
     try {
       const savedPrefs = appStorage.getItem(prefsStorageKey);
@@ -173,8 +205,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         const arr = JSON.parse(savedRead);
         if (Array.isArray(arr)) setReadNotifIds(new Set(arr));
       }
-    } catch (_e) {}
-  }, [prefsStorageKey, readNotifsStorageKey]);
+      const savedDismissed = appStorage.getItem(dismissedNotifsStorageKey);
+      if (savedDismissed) {
+        const arr = JSON.parse(savedDismissed);
+        if (Array.isArray(arr)) setDismissedNotifIds(new Set(arr));
+      }
+    } catch (_e) { }
+  }, [prefsStorageKey, readNotifsStorageKey, dismissedNotifsStorageKey]);
 
   const showFeedback = useCallback((text, isError = false) => {
     if (!text) return;
@@ -189,6 +226,9 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   useEffect(() => {
     return () => {
       if (scanOpenTimerRef.current) clearTimeout(scanOpenTimerRef.current);
+      if (logoutModalTimerRef.current) {
+        clearTimeout(logoutModalTimerRef.current);
+      }
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (subscribeDebounceRef.current) {
         clearTimeout(subscribeDebounceRef.current);
@@ -200,12 +240,20 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   useEffect(() => {
     if (Platform.OS !== 'android') return undefined;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (logoutConfirmOpen) {
+        setLogoutConfirmOpen(false);
+        return true;
+      }
       if (profileMenuOpen) {
         setProfileMenuOpen(false);
         return true;
       }
       if (notificationsOpen) {
         setNotificationsOpen(false);
+        return true;
+      }
+      if (trackOrderId) {
+        setTrackOrderId(null);
         return true;
       }
       if (selectedOrder) {
@@ -219,7 +267,40 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       return false;
     });
     return () => sub.remove();
-  }, [profileMenuOpen, notificationsOpen, selectedOrder, mainTab]);
+  }, [
+    logoutConfirmOpen,
+    profileMenuOpen,
+    notificationsOpen,
+    trackOrderId,
+    selectedOrder,
+    mainTab,
+  ]);
+
+  const requestLogout = useCallback(() => {
+    if (logoutModalTimerRef.current) {
+      clearTimeout(logoutModalTimerRef.current);
+      logoutModalTimerRef.current = null;
+    }
+    if (profileMenuOpen) {
+      setProfileMenuOpen(false);
+      const settleMs = Platform.OS === 'ios' ? 280 : 120;
+      logoutModalTimerRef.current = setTimeout(() => {
+        logoutModalTimerRef.current = null;
+        setLogoutConfirmOpen(true);
+      }, settleMs);
+      return;
+    }
+    setLogoutConfirmOpen(true);
+  }, [profileMenuOpen]);
+
+  const handleConfirmLogout = useCallback(() => {
+    setLogoutConfirmOpen(false);
+    if (onLogout) {
+      onLogout();
+    } else {
+      logout?.();
+    }
+  }, [onLogout, logout]);
 
   const resolveRiderId = useCallback(async () => {
     if (sessionRiderId) return sessionRiderId;
@@ -251,8 +332,38 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       const profile = riderService.getRiderById(id);
       if (profile) setRiderProfile(profile);
 
-      const rows = await deliveryService.getMyDeliveries(id);
-      setDeliveries(rows || []);
+      const rawRows = (await deliveryService.getMyDeliveries(id)) || [];
+      const orderStatusMap = new Map();
+      (orderService.getLocalOrders?.() || []).forEach((o) => {
+        const oid = String(o?.order_id || o?.id || '').trim();
+        if (oid && o?.status) orderStatusMap.set(oid, o.status);
+      });
+      const orderIds = [
+        ...new Set(rawRows.map((r) => r?.orderId).filter(Boolean)),
+      ];
+      const sbClient = supabaseManager.getClient?.();
+      if (sbClient && orderIds.length > 0) {
+        try {
+          const { data: orderRows } = await sbClient
+            .from('orders')
+            .select('order_id,status')
+            .in('order_id', orderIds);
+          (orderRows || []).forEach((o) => {
+            if (o?.order_id && o?.status) {
+              orderStatusMap.set(String(o.order_id), o.status);
+            }
+          });
+        } catch (_e) { }
+      }
+      const rows = rawRows
+        .map((row) =>
+          reconcileDeliveryWithOrderStatus(
+            row,
+            orderStatusMap.get(String(row.orderId))
+          )
+        )
+        .filter((row) => !isCancelledOrder(row));
+      setDeliveries(rows);
 
       const weekStart = startOfWeek();
       const prevWeekStart = new Date(weekStart);
@@ -275,7 +386,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             earnedLastWeek += amt;
           }
         });
-      } catch (_e) {}
+      } catch (_e) { }
 
       if (earnedThisWeek <= 0) {
         (rows || []).forEach((d) => {
@@ -303,23 +414,26 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             userUsername
           ) || [];
         setRawNotifications(notifs);
-      } catch (_e) {}
+      } catch (_e) { }
 
       // Sync GPS watcher for active Out for Delivery jobs
-      const activeOut = (rows || []).find((d) =>
-        String(d.deliveryStatus || '')
-          .toLowerCase()
-          .includes('out for delivery')
+      const activeOut = (rows || []).find(
+        (d) =>
+          !isCancelledOrder(d) &&
+          !isNeedsPickupOrder(d) &&
+          String(d.deliveryStatus || '')
+            .toLowerCase()
+            .includes('out')
       );
       if (activeOut?.orderId && id) {
         const session = riderGpsTrackingService.getActiveSession();
         if (!session || session.orderId !== activeOut.orderId) {
           riderGpsTrackingService
             .start({ orderId: activeOut.orderId, riderId: id })
-            .catch(() => {});
+            .catch(() => { });
         }
       } else if (!activeOut && riderGpsTrackingService.isTracking()) {
-        riderGpsTrackingService.stop({ clearDb: true }).catch(() => {});
+        riderGpsTrackingService.stop({ clearDb: true }).catch(() => { });
       }
     } catch (e) {
       setError(e?.message || 'Unable to load your deliveries.');
@@ -356,7 +470,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             userUsername
           ) || [];
         setRawNotifications(notifs);
-      } catch (_e) {}
+      } catch (_e) { }
     });
 
     return () => {
@@ -366,13 +480,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       if (subscribeDebounceRef.current) {
         clearTimeout(subscribeDebounceRef.current);
       }
-      riderGpsTrackingService.stop({ clearDb: false }).catch(() => {});
+      riderGpsTrackingService.stop({ clearDb: false }).catch(() => { });
     };
   }, [load, userUid, userEmail, userUsername]);
 
   // Derived Order Collections
   const needConfirmationOrders = useMemo(
-    () => deliveries.filter((d) => !isDeliveredOrder(d)),
+    () => deliveries.filter((d) => !isDeliveredOrder(d) && !isCancelledOrder(d)),
     [deliveries]
   );
 
@@ -387,27 +501,36 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       });
   }, [deliveries]);
 
-  const outForDeliveryCount = useMemo(
-    () =>
-      needConfirmationOrders.filter((d) =>
-        String(d.deliveryStatus || '').toLowerCase().includes('out')
-      ).length,
-    [needConfirmationOrders]
-  );
-
-  const assignedCount = useMemo(
-    () =>
-      needConfirmationOrders.filter((d) => {
-        const s = String(d.deliveryStatus || '').toLowerCase();
-        return s.includes('assigned') || s.includes('ready');
-      }).length,
-    [needConfirmationOrders]
-  );
-
   const needsPickupOrders = useMemo(
     () => needConfirmationOrders.filter((d) => isNeedsPickupOrder(d)),
     [needConfirmationOrders]
   );
+
+  const outForDeliveryCount = useMemo(
+    () =>
+      needConfirmationOrders.filter(
+        (d) =>
+          !isNeedsPickupOrder(d) &&
+          String(d.deliveryStatus || '').toLowerCase().includes('out')
+      ).length,
+    [needConfirmationOrders]
+  );
+
+  const assignedCount = needsPickupOrders.length;
+
+  const homeOrders = useMemo(() => {
+    let list = needConfirmationOrders;
+    if (homeFilter === 'needs_pickup') {
+      list = needsPickupOrders;
+    } else if (homeFilter === 'out') {
+      list = needConfirmationOrders.filter(
+        (d) =>
+          !isNeedsPickupOrder(d) &&
+          String(d.deliveryStatus || '').toLowerCase().includes('out')
+      );
+    }
+    return list.filter((d) => matchesOrderSearch(d, searchQuery));
+  }, [homeFilter, searchQuery, needsPickupOrders, needConfirmationOrders]);
 
   const filteredOrders = useMemo(() => {
     let list = [];
@@ -416,14 +539,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     } else if (orderFilter === 'to_confirm') {
       list = needConfirmationOrders;
       if (mainTab === 'orders' && ordersSubFilter === 'out') {
-        list = list.filter((d) =>
-          String(d.deliveryStatus || '').toLowerCase().includes('out')
+        list = list.filter(
+          (d) =>
+            !isNeedsPickupOrder(d) &&
+            String(d.deliveryStatus || '').toLowerCase().includes('out')
         );
       } else if (mainTab === 'orders' && ordersSubFilter === 'assigned') {
-        list = list.filter((d) => {
-          const s = String(d.deliveryStatus || '').toLowerCase();
-          return s.includes('assigned') || s.includes('ready');
-        });
+        list = list.filter((d) => isNeedsPickupOrder(d));
       }
     } else if (orderFilter === 'delivered') {
       list = deliveredOrders;
@@ -431,17 +553,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       list = [...needConfirmationOrders, ...deliveredOrders];
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
-        (d) =>
-          String(d.orderId || '').toLowerCase().includes(q) ||
-          String(d.customerName || '').toLowerCase().includes(q) ||
-          String(d.customerAddress || '').toLowerCase().includes(q) ||
-          String(d.customerPhone || '').toLowerCase().includes(q)
-      );
-    }
-    return list;
+    return list.filter((d) => matchesOrderSearch(d, searchQuery));
   }, [
     orderFilter,
     ordersSubFilter,
@@ -454,49 +566,120 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
 
   const areaGroups = useMemo(() => {
     if (!groupByAreaMode) return [];
-    return groupByArea(filteredOrders);
-  }, [groupByAreaMode, filteredOrders]);
+    return groupByArea(mainTab === 'home' ? homeOrders : filteredOrders);
+  }, [groupByAreaMode, mainTab, homeOrders, filteredOrders]);
 
   // Unified Notifications Feed (merges service notifications + active dispatch alerts)
   const notificationFeed = useMemo(() => {
     const items = [];
     (rawNotifications || []).forEach((n, idx) => {
       const id = String(n.id || `svc-notif-${idx}`);
+      if (dismissedNotifIds.has(id)) return;
       const isUnread =
         (n.status === 'unread' || n.read === false) && !readNotifIds.has(id);
+      const rawType = String(n.type || n.category || 'order').toLowerCase();
       items.push({
         id,
         title: n.title || 'MotoTrack Update',
         message: n.message || '',
         orderId: n.meta?.orderId || '',
-        icon: 'bell',
+        type: rawType,
+        category: n.category || n.type || 'Order Update',
+        rawStatus: String(n.meta?.deliveryStatus || n.meta?.status || ''),
+        icon: rawType.includes('ear') || rawType.includes('pay')
+          ? 'wallet2'
+          : rawType.includes('sys') || rawType.includes('account')
+            ? 'shield-check'
+            : 'bell',
         unread: isUnread,
-        timeLabel: n.time || n.createdAt || 'Recent',
+        timestamp: n.created_at || n.timestamp || n.date || n.createdAt || null,
+        timeLabel: n.time || n.createdAt || n.created_at || 'Recent',
+        isDispatch: false,
       });
     });
 
     needConfirmationOrders.slice(0, 6).forEach((d) => {
       const id = `dispatch-${d.orderId}`;
-      if (items.some((x) => x.orderId && x.orderId === d.orderId)) return;
+      if (dismissedNotifIds.has(id)) return;
+      if (items.some((x) => x.orderId && String(x.orderId) === String(d.orderId)))
+        return;
+      const statusLower = String(d.deliveryStatus || '').toLowerCase();
+      const isOut = !isNeedsPickupOrder(d) && statusLower.includes('out');
       items.push({
         id,
-        title: String(d.deliveryStatus || '').toLowerCase().includes('out')
+        title: isOut
           ? 'Active drop-off awaiting QR scan'
-          : 'New delivery assigned to you',
+          : 'Order needs pickup at store hub',
         message: `${d.customerName || 'Customer'} · ${d.customerAddress || 'Tap to view route'}`,
         orderId: d.orderId,
-        icon: 'truck',
+        type: isOut ? 'out_for_delivery' : 'pickup',
+        category: isOut ? 'In Transit' : 'Need to pick up',
+        rawStatus: String(d.deliveryStatus || ''),
+        icon: isOut ? 'truck' : 'box-seam',
         unread: !readNotifIds.has(id),
-        timeLabel: 'Today',
+        timestamp: d.updatedAt || d.createdAt || d.expectedDeliveryAt || null,
+        timeLabel: d.expectedDeliveryTime || 'Today',
+        isDispatch: true,
       });
     });
 
     return items;
-  }, [rawNotifications, needConfirmationOrders, readNotifIds]);
+  }, [rawNotifications, needConfirmationOrders, readNotifIds, dismissedNotifIds]);
 
   const unreadNotifCount = useMemo(
     () => notificationFeed.filter((n) => n.unread).length,
     [notificationFeed]
+  );
+
+  const handleMarkNotifRead = useCallback(
+    (notif) => {
+      const id = String(notif?.id || '');
+      if (!id || readNotifIds.has(id)) return;
+      const next = new Set(readNotifIds);
+      next.add(id);
+      setReadNotifIds(next);
+      try {
+        appStorage.setItem(readNotifsStorageKey, JSON.stringify([...next]));
+        if (!id.startsWith('dispatch-')) {
+          notificationService.markAsRead?.(id);
+        }
+      } catch (_e) { }
+    },
+    [readNotifIds, readNotifsStorageKey]
+  );
+
+  const handleDismissNotif = useCallback(
+    (notif) => {
+      const id = String(notif?.id || '');
+      if (!id) return;
+      const nextDismissed = new Set(dismissedNotifIds);
+      nextDismissed.add(id);
+      setDismissedNotifIds(nextDismissed);
+
+      const nextRead = new Set(readNotifIds);
+      nextRead.add(id);
+      setReadNotifIds(nextRead);
+
+      try {
+        appStorage.setItem(
+          dismissedNotifsStorageKey,
+          JSON.stringify([...nextDismissed])
+        );
+        appStorage.setItem(readNotifsStorageKey, JSON.stringify([...nextRead]));
+        if (!id.startsWith('dispatch-')) {
+          setRawNotifications((prev) =>
+            (prev || []).filter((item) => String(item.id) !== id)
+          );
+          notificationService.deleteNotification?.(id);
+        }
+      } catch (_e) { }
+    },
+    [
+      dismissedNotifIds,
+      dismissedNotifsStorageKey,
+      readNotifIds,
+      readNotifsStorageKey,
+    ]
   );
 
   const handleMarkAllNotifsRead = useCallback(() => {
@@ -508,7 +691,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       if (userUid) {
         notificationService.markAllAsRead?.(userUid);
       }
-    } catch (_e) {}
+    } catch (_e) { }
     showFeedback('All notifications marked as read.');
   }, [
     readNotifIds,
@@ -684,7 +867,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
               orderId: res.delivery?.orderId || target.orderId,
               photoUri: podPhoto,
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       } else {
         res = await deliveryService.riderConfirmOrderDelivery({
@@ -787,7 +970,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     if (riderId) {
       try {
         await riderService.setRiderStatus(riderId, nextStatus);
-      } catch (_e) {}
+      } catch (_e) { }
     }
     showFeedback(`Availability updated to ${nextStatus}.`);
   };
@@ -806,7 +989,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       const next = { ...prev, [key]: value };
       try {
         appStorage.setItem(prefsStorageKey, JSON.stringify(next));
-      } catch (_e) {}
+      } catch (_e) { }
       return next;
     });
     if (feedbackMessage) showFeedback(feedbackMessage);
@@ -859,7 +1042,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
           avatar: avatar || riderProfile?.avatar,
         });
         if (rRes?.rider) setRiderProfile(rRes.rider);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     return { success: true };
@@ -868,53 +1051,62 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   const riderFullName =
     riderProfile?.name || currentUser?.name || 'Jherico Maurin';
   const riderAvatar = riderProfile?.avatar || currentUser?.avatar || '';
-  const [mapOrder, setMapOrder] = useState(null);
 
-  const openOrderMap = useCallback(
-    (delivery) => {
-      if (!delivery) return;
-      setSelectedOrder(null);
-      setMapOrder({
-        id: delivery.orderId,
-        order_id: delivery.orderId,
-        status: delivery.deliveryStatus || 'Assigned',
-        customer_name: delivery.customerName || 'Customer',
-        customer_address: delivery.customerAddress || '',
-        shipping_address: delivery.customerAddress || '',
-        customer_phone: delivery.customerPhone || '',
-        delivery_lat: delivery.lat,
-        delivery_lng: delivery.lng,
-        total: delivery.totalAmount,
-        grand_total: delivery.totalAmount,
-        payment_method: delivery.paymentMethod,
-        items: delivery.items,
-        items_summary: delivery.itemsSummary,
-        rider_name: riderFullName,
-        rider_phone: riderProfile?.phone || currentUser?.phone || '',
-        rider_vehicle: riderProfile?.vehicleInfo || '',
-        rider_plate: riderProfile?.plateNumber || '',
-        rider_avatar: riderAvatar || '',
-      });
-    },
-    [riderFullName, riderProfile, currentUser, riderAvatar]
-  );
+  const trackedDelivery = useMemo(() => {
+    if (!trackOrderId) return null;
+    return (
+      deliveries.find((d) => String(d.orderId) === String(trackOrderId)) || null
+    );
+  }, [trackOrderId, deliveries]);
+
+  const openOrderMap = useCallback((delivery) => {
+    if (!delivery?.orderId) return;
+    setSelectedOrder((prev) => {
+      const hadDetailSheet = Boolean(prev);
+      if (hadDetailSheet && Platform.OS === 'ios') {
+        setTimeout(() => setTrackOrderId(delivery.orderId), 260);
+      } else {
+        setTrackOrderId(delivery.orderId);
+      }
+      return null;
+    });
+  }, []);
 
   // Reusable Filter Tabs & Search Block (Customer Orders layout: Search bar above horizontal status pills)
-  const renderFiltersAndSearch = (showSearchInput = true, showAreaToggle = false) => {
-    const tabs = [
-      { id: 'all', label: 'All', count: deliveries.length },
-      {
-        id: 'needs_pickup',
-        label: 'Needs pickup',
-        count: needsPickupOrders.length,
-      },
-      {
-        id: 'to_confirm',
-        label: 'To confirm',
-        count: needConfirmationOrders.length,
-      },
-      { id: 'delivered', label: 'Delivered', count: deliveredOrders.length },
-    ];
+  const renderFiltersAndSearch = (
+    showSearchInput = true,
+    showAreaToggle = false,
+    homeOnly = false
+  ) => {
+    const tabs = homeOnly
+      ? [
+        { id: 'all', label: 'All', count: needConfirmationOrders.length },
+        {
+          id: 'needs_pickup',
+          label: 'Need to pick up',
+          count: needsPickupOrders.length,
+        },
+        {
+          id: 'out',
+          label: 'Out for delivery',
+          count: outForDeliveryCount,
+        },
+      ]
+      : [
+        { id: 'all', label: 'All', count: deliveries.length },
+        {
+          id: 'needs_pickup',
+          label: 'Need to pick up',
+          count: needsPickupOrders.length,
+        },
+        {
+          id: 'to_confirm',
+          label: 'To confirm',
+          count: needConfirmationOrders.length,
+        },
+        { id: 'delivered', label: 'Delivered', count: deliveredOrders.length },
+      ];
+    const currentFilter = homeOnly ? homeFilter : orderFilter;
 
     return (
       <View style={styles.filtersBlock}>
@@ -966,7 +1158,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
           contentContainerStyle={styles.filterTrack}
         >
           {tabs.map((t) => {
-            const active = orderFilter === t.id;
+            const active = currentFilter === t.id;
             return (
               <TouchableOpacity
                 key={t.id}
@@ -990,8 +1182,12 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                   },
                 ]}
                 onPress={() => {
-                  setOrderFilter(t.id);
-                  setOrdersSubFilter('all');
+                  if (homeOnly) {
+                    setHomeFilter(t.id);
+                  } else {
+                    setOrderFilter(t.id);
+                    setOrdersSubFilter('all');
+                  }
                 }}
                 activeOpacity={0.8}
                 accessibilityRole="tab"
@@ -1000,13 +1196,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                 <Text
                   style={[
                     styles.filterTabLabel,
+                    active && styles.filterTabLabelActive,
                     {
                       color: active
                         ? '#FFFFFF'
                         : palette.isDark
                           ? '#E5E7EB'
                           : '#52525B',
-                      fontWeight: active ? '600' : '500',
                     },
                   ]}
                 >
@@ -1044,13 +1240,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
               <Text
                 style={[
                   styles.filterTabLabel,
+                  styles.filterTabLabelSemi,
                   {
                     color: groupByAreaMode
                       ? palette.orangeText
                       : palette.isDark
                         ? '#E5E7EB'
                         : '#52525B',
-                    fontWeight: '600',
                   },
                 ]}
               >
@@ -1063,14 +1259,17 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     );
   };
 
-  const renderOrderCardsList = () => {
-    if (filteredOrders.length === 0) {
+  const renderOrderCardsList = (homeOnly = false) => {
+    const activeList = homeOnly ? homeOrders : filteredOrders;
+    const activeFilter = homeOnly ? homeFilter : orderFilter;
+
+    if (activeList.length === 0) {
       return (
         <View style={styles.emptyDarkBanner}>
           <View style={styles.emptyDarkIconOuter}>
             <View style={styles.emptyDarkIconInner}>
               <BootstrapIcon
-                name={orderFilter === 'delivered' ? 'check-circle' : 'bag-check-fill'}
+                name={activeFilter === 'delivered' ? 'check-circle' : 'bag-check-fill'}
                 size={18}
                 color="#38BDF8"
               />
@@ -1080,29 +1279,35 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             <Text style={styles.emptyDarkTitle}>
               {searchQuery.trim()
                 ? 'No matching orders'
-                : orderFilter === 'needs_pickup'
+                : activeFilter === 'needs_pickup'
                   ? 'No orders needing pickup'
-                  : orderFilter === 'delivered'
-                    ? 'No delivered orders'
-                    : orderFilter === 'to_confirm'
-                      ? 'All deliveries confirmed'
-                      : 'No related orders'}
+                  : activeFilter === 'out'
+                    ? 'No orders out for delivery'
+                    : activeFilter === 'delivered'
+                      ? 'No delivered orders'
+                      : activeFilter === 'to_confirm' || homeOnly
+                        ? 'All deliveries completed'
+                        : 'No related orders'}
             </Text>
             <Text style={styles.emptyDarkSub}>
               {searchQuery.trim()
                 ? 'Try searching a different order number, customer, or area'
-                : orderFilter === 'needs_pickup'
+                : activeFilter === 'needs_pickup'
                   ? 'Assigned orders waiting for rider pickup appear here'
-                  : orderFilter === 'delivered'
-                    ? 'Orders you scan and confirm at drop-off appear here'
-                    : 'New MotoTrack dispatches assigned to you will appear here'}
+                  : activeFilter === 'out'
+                    ? 'Orders marked Out for Delivery will appear here'
+                    : activeFilter === 'delivered'
+                      ? 'Orders you scan and confirm at drop-off appear here'
+                      : homeOnly
+                        ? 'Orders that still need to be delivered will appear here'
+                        : 'New MotoTrack dispatches assigned to you will appear here'}
             </Text>
           </View>
         </View>
       );
     }
 
-    if (mainTab === 'orders' && groupByAreaMode && areaGroups.length > 0) {
+    if (groupByAreaMode && areaGroups.length > 0) {
       return areaGroups.map(([area, stops]) => (
         <View key={area} style={styles.areaGroupSection}>
           <View style={styles.areaGroupHeader}>
@@ -1136,17 +1341,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                 setSelectedOrder(order);
                 setVerified(null);
               }}
-              onScanConfirm={(order) => {
-                setVerified(null);
-                setScanOrder(order);
-              }}
             />
           ))}
         </View>
       ));
     }
 
-    return filteredOrders.map((d) => (
+    return activeList.map((d) => (
       <RiderOrderCard
         key={d.orderId}
         delivery={d}
@@ -1156,10 +1357,6 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
           setPodPhoto(null);
           setSelectedOrder(order);
           setVerified(null);
-        }}
-        onScanConfirm={(order) => {
-          setVerified(null);
-          setScanOrder(order);
         }}
       />
     ));
@@ -1201,51 +1398,62 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bgCanvas }]}>
-      <SafeAreaView
-        style={[
-          styles.safeTop,
-          {
-            backgroundColor: palette.bgHeader,
-            paddingTop: ANDROID_TOP_INSET,
-          },
-        ]}
-      >
-        <StatusBar
-          style={palette.isDark ? 'light' : 'dark'}
-          translucent
-          backgroundColor="transparent"
-        />
-
-        {/* Customer-Styled MotoTrack Header */}
-        <RiderTopHeader
-          palette={palette}
-          activeTab={mainTab}
-          riderName={riderFullName}
-          riderAvatar={riderAvatar}
-          unreadCount={unreadNotifCount}
-          activeOrderCount={needConfirmationOrders.length}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onCycleFilter={() => {
-            setOrderFilter((prev) =>
-              prev === 'all'
-                ? 'to_confirm'
-                : prev === 'to_confirm'
-                  ? 'delivered'
-                  : 'all'
-            );
-            setOrdersSubFilter('all');
-          }}
-          onPressLogo={() => setMainTab('home')}
-          onPressNotifications={() => setNotificationsOpen(true)}
-          onPressOrders={() => setMainTab('orders')}
-          onPressScanQr={() => {
-            setVerified(null);
-            setScanOrder({ unbound: true });
-          }}
-          onPressProfile={() => setProfileMenuOpen(true)}
-        />
-      </SafeAreaView>
+      <StatusBar
+        style={mainTab === 'account' || palette.isDark ? 'light' : 'dark'}
+        translucent
+        backgroundColor="transparent"
+      />
+      {mainTab !== 'account' ? (
+        <SafeAreaView
+          style={[
+            styles.safeTop,
+            {
+              backgroundColor: palette.bgHeader,
+              paddingTop: ANDROID_TOP_INSET,
+            },
+          ]}
+        >
+          {/* Customer-Styled MotoTrack Header */}
+          <RiderTopHeader
+            palette={palette}
+            activeTab={mainTab}
+            riderName={riderFullName}
+            riderAvatar={riderAvatar}
+            unreadCount={unreadNotifCount}
+            activeOrderCount={needConfirmationOrders.length}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onCycleFilter={() => {
+              if (mainTab === 'home') {
+                setHomeFilter((prev) =>
+                  prev === 'all'
+                    ? 'needs_pickup'
+                    : prev === 'needs_pickup'
+                      ? 'out'
+                      : 'all'
+                );
+              } else {
+                setOrderFilter((prev) =>
+                  prev === 'all'
+                    ? 'to_confirm'
+                    : prev === 'to_confirm'
+                      ? 'delivered'
+                      : 'all'
+                );
+                setOrdersSubFilter('all');
+              }
+            }}
+            onPressLogo={() => setMainTab('home')}
+            onPressNotifications={() => setNotificationsOpen(true)}
+            onPressOrders={() => setMainTab('orders')}
+            onPressScanQr={() => {
+              setVerified(null);
+              setScanOrder({ unbound: true });
+            }}
+            onPressProfile={() => setProfileMenuOpen(true)}
+          />
+        </SafeAreaView>
+      ) : null}
 
       {/* Save Confirmation / Feedback Toast */}
       {feedbackToast ? (
@@ -1281,10 +1489,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={[styles.flexOne, { backgroundColor: palette.bgCanvas }]}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          bounces={mainTab !== 'account'}
           keyboardShouldPersistTaps="handled"
+          removeClippedSubviews={Platform.OS === 'android'}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1324,62 +1535,17 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             {/* ─── TAB 1: HOME DASHBOARD ─── */}
             {mainTab === 'home' ? (
               <>
-                {/* Interactive Map of Orders That Need to Be Delivered */}
+                {/* Interactive Map of Active Route */}
                 <RiderHomeDeliveryMapCard
                   deliveries={needConfirmationOrders}
                   palette={palette}
                   riderName={riderFullName}
-                  onOpenFullMap={openOrderMap}
-                  onScanConfirm={(order) => {
-                    setVerified(null);
-                    setScanOrder(order);
-                  }}
-                  onViewDetails={(order) => {
-                    setPodPhoto(null);
-                    setSelectedOrder(order);
-                    setVerified(null);
-                  }}
                 />
 
-                {/* Today's Orders Rounded Surface */}
-                <View
-                  style={[
-                    styles.ordersSheetContainer,
-                    {
-                      backgroundColor: palette.bgSheet,
-                      borderColor: palette.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.ordersSheetHead}>
-                    <Text
-                      style={[
-                        styles.ordersSheetTitle,
-                        { color: palette.textPrimary },
-                      ]}
-                    >
-                      Today&apos;s orders
-                    </Text>
-                    <View
-                      style={[
-                        styles.orderCountChip,
-                        { backgroundColor: palette.bgMuted },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.orderCountChipText,
-                          { color: palette.textPrimary },
-                        ]}
-                      >
-                        {filteredOrders.length}{' '}
-                        {filteredOrders.length === 1 ? 'order' : 'orders'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {renderFiltersAndSearch(false)}
-                  {renderOrderCardsList()}
+                {/* Active Orders To Deliver (Same Layout as Orders Page) */}
+                <View style={[styles.ordersPageWrap, styles.homeOrdersWrap]}>
+                  {renderFiltersAndSearch(false, true, true)}
+                  {renderOrderCardsList(true)}
                 </View>
               </>
             ) : null}
@@ -1390,7 +1556,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                 {renderFiltersAndSearch(true, true)}
 
                 {orderFilter === 'to_confirm' &&
-                needConfirmationOrders.length > 0 ? (
+                  needConfirmationOrders.length > 0 ? (
                   <View style={styles.subChipRow}>
                     {[
                       {
@@ -1399,19 +1565,19 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                       },
                       ...(outForDeliveryCount > 0
                         ? [
-                            {
-                              id: 'out',
-                              label: `Out for delivery (${outForDeliveryCount})`,
-                            },
-                          ]
+                          {
+                            id: 'out',
+                            label: `Out for delivery (${outForDeliveryCount})`,
+                          },
+                        ]
                         : []),
                       ...(assignedCount > 0
                         ? [
-                            {
-                              id: 'assigned',
-                              label: `Assigned (${assignedCount})`,
-                            },
-                          ]
+                          {
+                            id: 'assigned',
+                            label: `Need to pick up (${assignedCount})`,
+                          },
+                        ]
                         : []),
                     ].map((chip) => {
                       const active = ordersSubFilter === chip.id;
@@ -1435,6 +1601,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                           <Text
                             style={[
                               styles.subChipText,
+                              active && styles.subChipTextActive,
                               {
                                 color: active
                                   ? '#FFFFFF'
@@ -1480,13 +1647,48 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
                 riderId={riderId}
                 availabilityStatus={availabilityStatus}
                 onSelectAvailability={handleSelectAvailability}
+                onCycleAvailability={handleCycleAvailability}
+                unreadNotifCount={unreadNotifCount}
+                deliveredCount={deliveredOrders.length}
+                activeCount={needConfirmationOrders.length}
+                weekEarnings={weekEarnings}
+                onOpenNotifications={() => setNotificationsOpen(true)}
+                onOpenMenu={() => setProfileMenuOpen(true)}
+                onOpenSettings={() => {
+                  setMainTab('settings');
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                }}
+                onNavigateMainTab={(tab) => setMainTab(tab)}
+                onScrollToSection={(y) => scrollViewRef.current?.scrollTo({ y, animated: true })}
                 preferences={preferences}
                 onUpdatePreference={handleUpdatePreference}
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={setDarkMode}
                 onSavePersonalInfo={handleSavePersonalInfo}
                 onChangePassword={changePassword}
-                onLogout={onLogout}
+                onLogout={requestLogout}
+                onShowFeedback={showFeedback}
+              />
+            ) : null}
+
+            {/* ─── TAB 5: RIDER SETTINGS ─── */}
+            {mainTab === 'settings' ? (
+              <RiderSettingsView
+                palette={palette}
+                riderName={riderFullName}
+                riderEmail={userEmail}
+                riderId={riderId}
+                preferences={preferences}
+                onUpdatePreference={handleUpdatePreference}
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={setDarkMode}
+                onChangePassword={changePassword}
+                onOpenAccountProfile={() => {
+                  setAccountTab('profile');
+                  setMainTab('account');
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                }}
+                onLogout={requestLogout}
                 onShowFeedback={showFeedback}
               />
             ) : null}
@@ -1495,29 +1697,34 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       </KeyboardAvoidingView>
 
       {/* Floating QR Scan Button (Thumb-Accessible Above Floating Pill Nav) */}
-      <TouchableOpacity
-        style={[
-          styles.floatingQrFab,
-          {
-            backgroundColor: palette.orange,
-            borderColor: palette.bgCanvas,
-          },
-        ]}
-        onPress={() => {
-          setVerified(null);
-          setScanOrder({ unbound: true });
-        }}
-        activeOpacity={0.86}
-        accessibilityRole="button"
-        accessibilityLabel="Scan delivery QR code"
-      >
-        <BootstrapIcon name="qr-code-scan" size={21} color="#FFFFFF" />
-      </TouchableOpacity>
+      {mainTab !== 'settings' ? (
+        <TouchableOpacity
+          style={[
+            styles.floatingQrFab,
+            {
+              backgroundColor: palette.orange,
+              borderColor: palette.bgCanvas,
+            },
+          ]}
+          onPress={() => {
+            setVerified(null);
+            setScanOrder({ unbound: true });
+          }}
+          activeOpacity={0.86}
+          accessibilityRole="button"
+          accessibilityLabel="Scan delivery QR code"
+        >
+          <BootstrapIcon name="qr-code-scan" size={21} color="#FFFFFF" />
+        </TouchableOpacity>
+      ) : null}
 
       {/* Customer-Style Floating Charcoal Pill Bottom Navigation */}
       <MobileBottomNavBar
         activeTab={mainTab}
-        onTabChange={(nextId) => setMainTab(String(nextId).toLowerCase())}
+        onTabChange={(nextId) => {
+          setMainTab(String(nextId).toLowerCase());
+          scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+        }}
         tabs={[
           {
             id: 'home',
@@ -1528,10 +1735,8 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
           },
           {
             id: 'orders',
-            label:
-              needConfirmationOrders.length > 0
-                ? `Orders (${needConfirmationOrders.length})`
-                : 'Orders',
+            label: 'Orders',
+            badge: needConfirmationOrders.length,
             icon: 'box-seam',
             activeIcon: 'box-seam-fill',
             isActive: mainTab === 'orders',
@@ -1549,6 +1754,13 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
             icon: 'person',
             activeIcon: 'person-fill',
             isActive: mainTab === 'account',
+          },
+          {
+            id: 'settings',
+            label: 'Settings',
+            icon: 'gear',
+            activeIcon: 'gear-fill',
+            isActive: mainTab === 'settings',
           },
         ]}
       />
@@ -1568,18 +1780,26 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
           setMainTab('account');
         }}
         onNavigateMainTab={(tab) => setMainTab(tab)}
-        onLogout={onLogout}
+        onLogout={requestLogout}
       />
 
-      {/* Notifications Bottom Sheet */}
+      {/* Notifications Modal */}
       <RiderNotificationsModal
         visible={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
         palette={palette}
+        isDark={isDarkMode}
         notifications={notificationFeed}
         unreadCount={unreadNotifCount}
+        onMarkRead={handleMarkNotifRead}
         onMarkAllRead={handleMarkAllNotifsRead}
+        onDismiss={handleDismissNotif}
+        onViewOrders={() => {
+          setNotificationsOpen(false);
+          setMainTab('orders');
+        }}
         onSelectOrderFromNotif={(notif) => {
+          handleMarkNotifRead(notif);
           setNotificationsOpen(false);
           if (notif?.orderId) {
             const match = deliveries.find(
@@ -1665,14 +1885,36 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         onDone={handleConfirmFinished}
       />
 
-      {/* Customer-Style Live Route & Tracking Map Modal */}
-      <LiveOrderTrackingMapModal
-        visible={Boolean(mapOrder)}
-        order={mapOrder}
-        onClose={() => setMapOrder(null)}
-        showToast={showFeedback}
-        isDarkMode={isDarkMode}
+      {/* Rider Live Route Tracking to Customer Location */}
+      <RiderCustomerTrackModal
+        visible={Boolean(trackedDelivery)}
+        delivery={trackedDelivery}
+        palette={palette}
+        riderName={riderFullName}
+        busyId={busyId}
+        onClose={() => setTrackOrderId(null)}
+        onStartRoute={handleOutForDelivery}
+        onScanConfirm={(targetOrder) => {
+          setTrackOrderId(null);
+          openScannerFromDetail(targetOrder);
+        }}
       />
+
+      {/* Log Out Confirmation Modal (Matches Customer Flow) */}
+      {logoutConfirmOpen ? (
+        <ConfirmModal
+          visible={logoutConfirmOpen}
+          title="Log Out Confirmation"
+          message="Are you sure you want to log out of your MotoTrack rider account?"
+          confirmText="Log Out"
+          cancelText="Stay Logged In"
+          type="danger"
+          confirmIcon="box-arrow-right"
+          isDark={isDarkMode}
+          onConfirm={handleConfirmLogout}
+          onCancel={() => setLogoutConfirmOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1704,9 +1946,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingLabel: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 13.5,
-    fontWeight: '500',
     marginTop: 10,
   },
   toastBanner: {
@@ -1729,10 +1970,9 @@ const styles = StyleSheet.create({
   },
   toastText: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '500',
     color: '#FFFFFF',
   },
   scrollContent: {
@@ -1755,44 +1995,12 @@ const styles = StyleSheet.create({
   },
   errorAlertText: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 12.5,
     lineHeight: 18,
-    fontWeight: '500',
   },
-  ordersSheetContainer: {
-    marginHorizontal: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 14,
-    minHeight: 340,
-  },
-  ordersSheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 13,
-  },
-  ordersSheetTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  orderCountChip: {
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  orderCountChipText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    lineHeight: 15,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
+  homeOrdersWrap: {
+    paddingTop: 0,
   },
   filtersBlock: {
     gap: 14,
@@ -1815,9 +2023,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8.5,
   },
   filterTabLabel: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 12.5,
     lineHeight: 16,
+  },
+  filterTabLabelSemi: {
+    ...riderFont('600'),
+  },
+  filterTabLabelActive: {
+    ...riderFont('700'),
   },
   searchFieldWrap: {
     flexDirection: 'row',
@@ -1835,9 +2049,8 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 13.5,
-    fontWeight: '400',
     height: '100%',
   },
   clearSearchBtn: {
@@ -1879,15 +2092,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyDarkTitle: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 15.5,
-    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
     marginBottom: 3,
   },
   emptyDarkSub: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12,
     color: '#94A3B8',
     lineHeight: 16,
@@ -1909,10 +2121,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   subChipText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 12,
     fontVariant: ['tabular-nums'],
+  },
+  subChipTextActive: {
+    ...riderFont('700'),
   },
   areaGroupSection: {
     marginBottom: 10,
@@ -1925,9 +2139,8 @@ const styles = StyleSheet.create({
   },
   areaGroupTitle: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 12,
-    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -1937,9 +2150,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   areaCountText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 11,
-    fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
   floatingQrFab: {
@@ -1977,8 +2189,7 @@ const styles = StyleSheet.create({
     minWidth: 210,
   },
   checkingText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 14,
-    fontWeight: '600',
   },
 });

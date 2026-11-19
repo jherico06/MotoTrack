@@ -2,6 +2,7 @@
 import { supabase } from '../../lib/supabase.js';
 import { appStorage } from '../system/storageAdapter.js';
 import { hashPassword, isHashed, verifyPassword } from '../../utils/hash.js';
+import { parseLatLng } from '../../utils/geo.js';
 import { APP_CONFIG } from '../../config';
 // Re-exported from central config so the admin secret key is env-driven (.env)
 export { ADMIN_SECRET_KEY } from '../../config';
@@ -73,7 +74,7 @@ class UserService {
       if (!existing || cleaned.length !== (Array.isArray(users) ? users.length : 0)) {
         appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleaned));
       }
-    } catch (_e) {}
+    } catch (_e) { }
   }
 
   getLocalUsers() {
@@ -89,7 +90,7 @@ class UserService {
   saveLocalUsers(users) {
     try {
       appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // ─── GET ALL USERS (FROM SUPABASE PRIMARY) ───
@@ -104,6 +105,8 @@ class UserService {
         if (!error && data && data.length > 0) {
           const mapped = data.map((u) => {
             const custInfo = Array.isArray(u.customers) && u.customers[0] ? u.customers[0] : null;
+            const coords = parseLatLng(u.latitude ?? u.delivery_lat, u.longitude ?? u.delivery_lng);
+            const deliveryNotes = u.delivery_notes || '';
             return {
               id: u.user_id || u.id,
               user_id: u.user_id || u.id,
@@ -113,6 +116,12 @@ class UserService {
               password: u.password,
               phone: u.phone || (custInfo ? custInfo.contact_number : '') || '',
               address: u.address || '',
+              latitude: coords?.lat ?? null,
+              longitude: coords?.lng ?? null,
+              delivery_lat: coords?.lat ?? null,
+              delivery_lng: coords?.lng ?? null,
+              deliveryNotes,
+              delivery_notes: deliveryNotes,
               role: u.role || 'user',
               status: u.status || 'active',
               username: u.username || '',
@@ -149,8 +158,8 @@ class UserService {
     const normalizedStatus = String(status || 'active').trim().toLowerCase();
     const accountStatus =
       normalizedStatus === 'inactive' ||
-      normalizedStatus === 'disabled' ||
-      normalizedStatus === 'pending_verification'
+        normalizedStatus === 'disabled' ||
+        normalizedStatus === 'pending_verification'
         ? normalizedStatus
         : 'active';
     const safeRole =
@@ -199,7 +208,7 @@ class UserService {
         if (existingUsername) {
           return { success: false, error: 'That username is already in use.' };
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     const userId =
@@ -219,7 +228,7 @@ class UserService {
       username: normalizedUsername,
       password: hashPassword(password || '', normalizedEmail),
       phone: (phone || '').trim(),
-      address: (address || 'Metro Manila, Philippines').trim(),
+      address: (address || '').trim(),
       role: safeRole,
       status: accountStatus,
       avatar: avatar || null,
@@ -348,12 +357,39 @@ class UserService {
     return { success: true, user: next.find((u) => u.id === id || u.user_id === id) };
   }
 
-  // ─── UPDATE USER PROFILE (NAME, PHONE, ADDRESS, AVATAR) ───
-  async updateProfile(id, { name, phone, address, avatar, username }) {
+  // ─── UPDATE USER PROFILE (NAME, PHONE, ADDRESS, COORDINATES, NOTES, AVATAR) ───
+  async updateProfile(
+    id,
+    {
+      name,
+      fullName,
+      firstName,
+      lastName,
+      phone,
+      address,
+      city,
+      country,
+      bio,
+      avatar,
+      username,
+      latitude,
+      longitude,
+      delivery_lat,
+      delivery_lng,
+      deliveryNotes,
+      delivery_notes,
+    } = {}
+  ) {
     const userId = String(id).trim();
     const cleanName = name !== undefined ? name.trim() : undefined;
     const cleanPhone = phone !== undefined ? phone.trim() : undefined;
     const cleanAddress = address !== undefined ? address.trim() : undefined;
+    const rawLat = latitude !== undefined ? latitude : delivery_lat;
+    const rawLng = longitude !== undefined ? longitude : delivery_lng;
+    const hasCoordsArg = rawLat !== undefined || rawLng !== undefined;
+    const parsedCoords = hasCoordsArg ? parseLatLng(rawLat, rawLng) : null;
+    const rawNotes = deliveryNotes !== undefined ? deliveryNotes : delivery_notes;
+    const cleanNotes = rawNotes !== undefined ? String(rawNotes || '').trim() : undefined;
     const cleanUsername =
       username !== undefined ? String(username || '').trim().toLowerCase() : undefined;
 
@@ -372,21 +408,39 @@ class UserService {
           if (taken?.user_id) {
             return { success: false, error: 'That username is already in use.' };
           }
-        } catch (_e) {}
+        } catch (_e) { }
       }
     }
 
     // 1. Update in Supabase
     if (supabase) {
       try {
-        const updatePayload = {};
-        if (cleanName !== undefined) updatePayload.name = cleanName;
-        if (cleanPhone !== undefined) updatePayload.phone = cleanPhone;
-        if (cleanAddress !== undefined) updatePayload.address = cleanAddress;
-        if (avatar !== undefined) updatePayload.avatar = avatar;
-        if (cleanUsername !== undefined) updatePayload.username = cleanUsername;
+        const baseUserPayload = {};
+        if (cleanName !== undefined) baseUserPayload.name = cleanName;
+        if (cleanPhone !== undefined) baseUserPayload.phone = cleanPhone;
+        if (cleanAddress !== undefined) baseUserPayload.address = cleanAddress;
+        if (avatar !== undefined) baseUserPayload.avatar = avatar;
+        if (cleanUsername !== undefined) baseUserPayload.username = cleanUsername;
 
-        await supabase.from('users').update(updatePayload).eq('user_id', userId);
+        const extendedUserPayload = {
+          ...baseUserPayload,
+          ...(parsedCoords ? { latitude: parsedCoords.lat, longitude: parsedCoords.lng } : {}),
+          ...(cleanNotes !== undefined ? { delivery_notes: cleanNotes } : {}),
+        };
+
+        if (Object.keys(extendedUserPayload).length > 0) {
+          const { error: userErr } = await supabase
+            .from('users')
+            .update(extendedUserPayload)
+            .eq('user_id', userId);
+          if (
+            userErr &&
+            /latitude|longitude|delivery_notes/i.test(String(userErr.message || '')) &&
+            Object.keys(baseUserPayload).length > 0
+          ) {
+            await supabase.from('users').update(baseUserPayload).eq('user_id', userId);
+          }
+        }
 
         // Keep staff roster display names / usernames in sync
         const rosterPayload = {};
@@ -396,52 +450,105 @@ class UserService {
         if (Object.keys(rosterPayload).length > 0) {
           try {
             await supabase.from('riders').update(rosterPayload).eq('user_id', userId);
-          } catch (_e) {}
+          } catch (_e) { }
           try {
             const mechPayload = { ...rosterPayload };
             delete mechPayload.username; // mechanics table has no username column
             if (Object.keys(mechPayload).length > 0) {
               await supabase.from('mechanics').update(mechPayload).eq('user_id', userId);
             }
-          } catch (_e) {}
+          } catch (_e) { }
         }
 
         // Update customers table
-        const custPayload = {};
-        if (cleanName !== undefined) custPayload.name = cleanName;
-        if (cleanPhone !== undefined) custPayload.contact_number = cleanPhone;
-        if (Object.keys(custPayload).length > 0) {
-          await supabase.from('customers').update(custPayload).eq('user_id', userId);
+        const baseCustPayload = {};
+        if (cleanName !== undefined) baseCustPayload.name = cleanName;
+        if (cleanPhone !== undefined) baseCustPayload.contact_number = cleanPhone;
+        const extendedCustPayload = {
+          ...baseCustPayload,
+          ...(parsedCoords ? { latitude: parsedCoords.lat, longitude: parsedCoords.lng } : {}),
+          ...(cleanNotes !== undefined ? { delivery_notes: cleanNotes } : {}),
+        };
+        if (Object.keys(extendedCustPayload).length > 0) {
+          const { error: custErr } = await supabase
+            .from('customers')
+            .update(extendedCustPayload)
+            .eq('user_id', userId);
+          if (
+            custErr &&
+            /latitude|longitude|delivery_notes/i.test(String(custErr.message || '')) &&
+            Object.keys(baseCustPayload).length > 0
+          ) {
+            await supabase.from('customers').update(baseCustPayload).eq('user_id', userId);
+          }
         }
 
-        // Update addresses table
-        if (cleanAddress !== undefined) {
+        // Update addresses table (latitude, longitude, landmark already exist from migration 20260918045712)
+        if (cleanAddress !== undefined || parsedCoords || cleanNotes !== undefined) {
           const { data: cust } = await supabase
             .from('customers')
             .select('customer_id')
             .eq('user_id', userId)
             .maybeSingle();
           if (cust?.customer_id) {
+            const addrBaseFields = {
+              ...(cleanAddress !== undefined ? { full_address: cleanAddress } : {}),
+              ...(city !== undefined ? { city: String(city || '').trim() || null } : {}),
+              ...(parsedCoords ? { latitude: parsedCoords.lat, longitude: parsedCoords.lng } : {}),
+              ...(cleanNotes !== undefined ? { landmark: cleanNotes || null } : {}),
+            };
+            const addrFullFields = {
+              ...addrBaseFields,
+              ...(cleanNotes !== undefined ? { delivery_notes: cleanNotes || null } : {}),
+            };
             const { data: existingAddr } = await supabase
               .from('addresses')
               .select('address_id')
               .eq('customer_id', cust.customer_id)
               .limit(1);
             if (existingAddr && existingAddr.length > 0) {
-              await supabase
+              const { error: addrErr } = await supabase
                 .from('addresses')
-                .update({ full_address: cleanAddress })
+                .update(addrFullFields)
                 .eq('address_id', existingAddr[0].address_id);
-            } else {
-              await supabase.from('addresses').insert([
-                {
-                  address_id: 'addr-' + Date.now(),
-                  customer_id: cust.customer_id,
-                  label: 'Primary Delivery',
-                  full_address: cleanAddress,
-                  is_default: true,
-                },
-              ]);
+              if (addrErr && /delivery_notes/i.test(String(addrErr.message || ''))) {
+                await supabase
+                  .from('addresses')
+                  .update(addrBaseFields)
+                  .eq('address_id', existingAddr[0].address_id);
+              }
+            } else if (cleanAddress !== undefined || parsedCoords) {
+              const insertRow = {
+                address_id: 'addr-' + Date.now(),
+                customer_id: cust.customer_id,
+                label: 'Primary Delivery',
+                full_address: cleanAddress || 'Pinned House Location',
+                is_default: true,
+                ...addrFullFields,
+              };
+              const { error: addrInsErr } = await supabase.from('addresses').insert([insertRow]);
+              if (addrInsErr && /delivery_notes/i.test(String(addrInsErr.message || ''))) {
+                const { delivery_notes: _dn, ...fallbackInsertRow } = insertRow;
+                await supabase.from('addresses').insert([fallbackInsertRow]);
+              }
+            }
+
+            // Keep not-yet-dispatched customer orders aligned with the newly saved pin & landmark
+            if (parsedCoords) {
+              try {
+                const orderSyncPayload = {
+                  delivery_lat: parsedCoords.lat,
+                  delivery_lng: parsedCoords.lng,
+                  ...(cleanNotes !== undefined
+                    ? { delivery_notes: cleanNotes, delivery_landmark: cleanNotes || null }
+                    : {}),
+                };
+                await supabase
+                  .from('orders')
+                  .update(orderSyncPayload)
+                  .eq('customer_id', cust.customer_id)
+                  .in('status', ['Pending Approval', 'Processing', 'Ready for Delivery']);
+              } catch (_e) {}
             }
           }
         }
@@ -459,10 +566,26 @@ class UserService {
         updatedUser = {
           ...u,
           ...(cleanName !== undefined && { name: cleanName }),
+          ...(fullName !== undefined && { fullName }),
+          ...(firstName !== undefined && { firstName }),
+          ...(lastName !== undefined && { lastName }),
           ...(cleanPhone !== undefined && { phone: cleanPhone }),
           ...(cleanAddress !== undefined && { address: cleanAddress }),
+          ...(city !== undefined && { city }),
+          ...(country !== undefined && { country }),
+          ...(bio !== undefined && { bio }),
           ...(avatar !== undefined && { avatar }),
           ...(cleanUsername !== undefined && { username: cleanUsername }),
+          ...(parsedCoords && {
+            latitude: parsedCoords.lat,
+            longitude: parsedCoords.lng,
+            delivery_lat: parsedCoords.lat,
+            delivery_lng: parsedCoords.lng,
+          }),
+          ...(cleanNotes !== undefined && {
+            deliveryNotes: cleanNotes,
+            delivery_notes: cleanNotes,
+          }),
         };
         return updatedUser;
       }
@@ -474,9 +597,25 @@ class UserService {
         id: userId,
         user_id: userId,
         name: cleanName || 'Customer',
+        ...(fullName !== undefined && { fullName }),
+        ...(firstName !== undefined && { firstName }),
+        ...(lastName !== undefined && { lastName }),
         phone: cleanPhone || '',
         address: cleanAddress || '',
+        ...(city !== undefined && { city }),
+        ...(country !== undefined && { country }),
+        ...(bio !== undefined && { bio }),
         avatar: avatar || '',
+        ...(parsedCoords && {
+          latitude: parsedCoords.lat,
+          longitude: parsedCoords.lng,
+          delivery_lat: parsedCoords.lat,
+          delivery_lng: parsedCoords.lng,
+        }),
+        ...(cleanNotes !== undefined && {
+          deliveryNotes: cleanNotes,
+          delivery_notes: cleanNotes,
+        }),
       };
       localUsers.push(updatedUser);
     }
@@ -485,7 +624,7 @@ class UserService {
 
     try {
       this.logAccountActivity(userId, 'PROFILE_UPDATED', 'Updated profile information and delivery address');
-    } catch (_e) {}
+    } catch (_e) { }
 
     return { success: true, user: updatedUser };
   }
@@ -527,7 +666,7 @@ class UserService {
       list.unshift(logEntry);
       // Keep up to 50 logs
       appStorage.setItem(storageKey, JSON.stringify(list.slice(0, 50)));
-    } catch (_e) {}
+    } catch (_e) { }
 
     // 2. Write to Supabase if connected
     if (supabase) {
@@ -542,7 +681,7 @@ class UserService {
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'MotoTrack App',
           },
         ]);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     return logEntry;
@@ -567,7 +706,7 @@ class UserService {
         if (!error && Array.isArray(data) && data.length > 0) {
           logs = data;
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     // Merge / fallback to local storage
@@ -583,7 +722,7 @@ class UserService {
         });
         logs = Array.from(map.values());
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     // If still empty, supply initial default registration log
     if (logs.length === 0) {
@@ -630,7 +769,7 @@ class UserService {
           currentUser = data;
           storedPwd = data.password;
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!currentUser) {
@@ -670,7 +809,7 @@ class UserService {
         if (existing) {
           return { success: false, error: 'This email is already registered to another account.' };
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     const localConflict = this.getLocalUsers().find(
@@ -705,7 +844,7 @@ class UserService {
           .eq('user_id', uid);
 
         // Supabase Auth update if user has auth session
-        supabase.auth.updateUser({ email: cleanNewEmail }).catch(() => {});
+        supabase.auth.updateUser({ email: cleanNewEmail }).catch(() => { });
       } catch (e) {
         console.warn('Supabase changeEmail error:', e);
       }
@@ -783,7 +922,7 @@ class UserService {
           currentUser = data;
           storedPwd = data.password;
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!currentUser) {
@@ -827,7 +966,7 @@ class UserService {
         }
 
         // Update in Supabase Auth
-        supabase.auth.updateUser({ password: cleanNewPwd }).catch(() => {});
+        supabase.auth.updateUser({ password: cleanNewPwd }).catch(() => { });
       } catch (e) {
         console.warn('Supabase changePassword error:', e);
       }
@@ -893,7 +1032,7 @@ class UserService {
           .ilike('email', cleanEmail)
           .maybeSingle();
         if (data) targetUser = data;
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!targetUser) {
@@ -992,7 +1131,7 @@ class UserService {
             };
           }
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (supabase) {
@@ -1045,7 +1184,7 @@ class UserService {
             };
           }
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (supabase) {
@@ -1088,7 +1227,7 @@ class UserService {
           error: 'Administrator accounts cannot be deleted. Demote the account first if you must remove access.',
         };
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     if (supabase) {
       try {
@@ -1106,13 +1245,13 @@ class UserService {
 
         try {
           await supabase.from('notifications').delete().eq('user_id', userId);
-        } catch (e) {}
+        } catch (e) { }
         try {
           await supabase.from('carts').delete().eq('user_id', userId);
-        } catch (e) {}
+        } catch (e) { }
         try {
           await supabase.from('customers').delete().eq('user_id', userId);
-        } catch (e) {}
+        } catch (e) { }
         await supabase.from('users').delete().eq('user_id', userId);
       } catch (e) {
         console.warn('Supabase delete user error:', e);
@@ -1178,7 +1317,7 @@ class UserService {
               .maybeSingle();
             riderRow = data || null;
           }
-        } catch (_e) {}
+        } catch (_e) { }
         if (!riderRow) {
           try {
             const raw = appStorage.getItem('mototrack_riders_list');
@@ -1190,7 +1329,7 @@ class UserService {
                 String(r.username || '').toLowerCase() === String(user.username || normalizedEmail).toLowerCase() ||
                 String(r.email || '').toLowerCase() === String(user.email || '').toLowerCase()
             );
-          } catch (_e) {}
+          } catch (_e) { }
         }
         const accountStatus = String(riderRow?.account_status || riderRow?.accountStatus || 'Active');
         if (accountStatus.toLowerCase() === 'inactive') {
@@ -1239,7 +1378,7 @@ class UserService {
       safeUser.email_verified = user.email_verified !== false;
       try {
         this.logAccountActivity(user.id || user.user_id, 'LOGIN_SUCCESS', 'Logged in successfully');
-      } catch (_e) {}
+      } catch (_e) { }
       return { success: true, user: safeUser };
     };
 
@@ -1293,11 +1432,30 @@ class UserService {
                 .from('users')
                 .update({ password: hashPassword(cleanPassword, salt) })
                 .eq('user_id', dbUser.user_id || dbUser.id);
-            } catch (e) {}
+            } catch (e) { }
           }
 
           const custInfo =
             Array.isArray(dbUser.customers) && dbUser.customers[0] ? dbUser.customers[0] : null;
+          let addrRow = null;
+          if (custInfo?.customer_id) {
+            try {
+              const { data: aData } = await supabase
+                .from('addresses')
+                .select('latitude, longitude, landmark')
+                .eq('customer_id', custInfo.customer_id)
+                .order('is_default', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              if (aData) addrRow = aData;
+            } catch (_e) { }
+          }
+          const resolvedCoords = parseLatLng(
+            dbUser.latitude ?? addrRow?.latitude,
+            dbUser.longitude ?? addrRow?.longitude
+          );
+          const resolvedDeliveryNotes =
+            dbUser.delivery_notes || addrRow?.landmark || '';
           const user = {
             id: dbUser.user_id || dbUser.id,
             user_id: dbUser.user_id || dbUser.id,
@@ -1307,6 +1465,12 @@ class UserService {
             username: dbUser.username || '',
             phone: dbUser.phone || (custInfo ? custInfo.contact_number : '') || '',
             address: dbUser.address || '',
+            latitude: resolvedCoords?.lat ?? null,
+            longitude: resolvedCoords?.lng ?? null,
+            delivery_lat: resolvedCoords?.lat ?? null,
+            delivery_lng: resolvedCoords?.lng ?? null,
+            deliveryNotes: resolvedDeliveryNotes,
+            delivery_notes: resolvedDeliveryNotes,
             role: dbUser.role || 'user',
             status: dbUser.status || 'active',
             avatar: dbUser.avatar || null,
@@ -1340,7 +1504,7 @@ class UserService {
         if (rider?.userId || rider?.user_id) {
           user = users.find((u) => u.id === rider.userId || u.user_id === rider.userId || u.id === rider.user_id);
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!user && APP_CONFIG.demo.enableDemoLogins) {

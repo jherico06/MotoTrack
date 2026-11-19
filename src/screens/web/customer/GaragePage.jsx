@@ -33,10 +33,10 @@ import {
   CustomerRescheduleModal,
   AtelierAppointmentCard,
 } from '../../../components/web/booking';
+import { WebCheckoutModal } from '../../../components/web';
 import {
   LiveOrderTrackingMapModal,
   ConfirmModal,
-  CheckoutModal,
   RegisterMotorcycleModal,
 } from '../../../components/modals';
 import CartPage from './CartPage.jsx';
@@ -3211,7 +3211,7 @@ export default function GaragePageWeb({
         onLogout={onLogout}
       />
 
-      <CheckoutModal
+      <WebCheckoutModal
         visible={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         onCompleteOrder={() => {

@@ -12,7 +12,9 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import DeliveryLocationPicker from '../common/DeliveryLocationPicker.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
+import { parseLatLng } from '../../utils/geo.js';
 
 const ADDRESS_PRESETS = [
   { label: 'Inoburan, Naga', address: 'Purok Avocado 4, Inoburan, City of Naga, Cebu', city: 'City of Naga' },
@@ -44,6 +46,9 @@ export default function EditCustomerSettingsModal({
   const [country, setCountry] = useState('Philippines');
   const [bio, setBio] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+  const [coordError, setCoordError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -52,6 +57,10 @@ export default function EditCustomerSettingsModal({
     if (visible && currentUser) {
       const uName = currentUser.name || currentUser.fullName || '';
       const parts = uName.trim().split(' ');
+      const existingCoords = parseLatLng(
+        currentUser.latitude ?? currentUser.delivery_lat,
+        currentUser.longitude ?? currentUser.delivery_lng
+      );
       setFirstName(currentUser.firstName || parts[0] || '');
       setLastName(currentUser.lastName || (parts.length > 1 ? parts.slice(1).join(' ') : ''));
       setPhone(currentUser.phone || '');
@@ -59,7 +68,10 @@ export default function EditCustomerSettingsModal({
       setCity(currentUser.city || 'City of Naga');
       setCountry(currentUser.country || 'Philippines');
       setBio(currentUser.bio || 'Motorcycle Enthusiast & Customer');
-      setDeliveryNotes(currentUser.deliveryNotes || 'Leave at front gate / contact on delivery');
+      setDeliveryNotes(currentUser.deliveryNotes || currentUser.delivery_notes || '');
+      setLatitude(existingCoords?.lat ?? null);
+      setLongitude(existingCoords?.lng ?? null);
+      setCoordError('');
       setErrorMsg('');
       setIsSaving(false);
     }
@@ -80,7 +92,16 @@ export default function EditCustomerSettingsModal({
       setErrorMsg('Please enter a delivery address.');
       return;
     }
+    const validPin = parseLatLng(latitude, longitude);
+    if (!validPin) {
+      const pinMsg =
+        'Please set your exact house location on the map (tap "Use my current location" or drag the pin) before saving.';
+      setCoordError(pinMsg);
+      setErrorMsg(pinMsg);
+      return;
+    }
 
+    setCoordError('');
     setErrorMsg('');
     setIsSaving(true);
 
@@ -96,6 +117,11 @@ export default function EditCustomerSettingsModal({
         country: country.trim() || 'Philippines',
         bio: bio.trim() || 'Motorcycle Enthusiast & Customer',
         deliveryNotes: deliveryNotes.trim(),
+        delivery_notes: deliveryNotes.trim(),
+        latitude: validPin.lat,
+        longitude: validPin.lng,
+        delivery_lat: validPin.lat,
+        delivery_lng: validPin.lng,
       };
 
       if (typeof onSave === 'function') {
@@ -497,10 +523,34 @@ export default function EditCustomerSettingsModal({
               />
             </View>
 
-            {/* Delivery Notes */}
+            {/* Exact Delivery Pin Map Picker */}
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary, marginBottom: 4 }}>
+                Exact House Pin Location <Text style={{ color: '#DC2626' }}>*</Text>
+              </Text>
+              <Text style={{ fontSize: 11.5, color: textSecondary, marginBottom: 8 }}>
+                Your typed address acts as a label. Drag the pin directly onto your house so riders never land at the wrong place.
+              </Text>
+              <DeliveryLocationPicker
+                latitude={latitude}
+                longitude={longitude}
+                addressText={[address, city, country].filter(Boolean).join(', ')}
+                isDarkMode={isDarkMode}
+                height={230}
+                errorText={coordError}
+                onLocationChange={({ lat, lng }) => {
+                  setLatitude(lat);
+                  setLongitude(lng);
+                  setCoordError('');
+                  setErrorMsg('');
+                }}
+              />
+            </View>
+
+            {/* Landmark / Delivery Notes */}
             <View>
               <Text style={{ fontSize: 12, fontWeight: '700', color: textPrimary, marginBottom: 6 }}>
-                Delivery Instructions & Notes for Courier
+                Landmark / delivery notes
               </Text>
               <TextInput
                 style={{
@@ -512,13 +562,13 @@ export default function EditCustomerSettingsModal({
                   paddingVertical: 10,
                   color: textPrimary,
                   fontSize: 13,
-                  minHeight: 46,
+                  minHeight: 52,
                   textAlignVertical: 'top',
                   ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
                 }}
                 value={deliveryNotes}
                 onChangeText={setDeliveryNotes}
-                placeholder="e.g. Leave at front guardhouse / Call on arrival"
+                placeholder="e.g. blue gate, beside the sari-sari store"
                 placeholderTextColor={textSecondary}
                 multiline
               />

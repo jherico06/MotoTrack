@@ -4,12 +4,13 @@ import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import ExternalLink from '../../common/ExternalLink.jsx';
 import { googleMapsNavigateUrl } from '../../../utils/geo.js';
 import {
-  RIDER_FONT,
+  riderFont,
   cardShadowStyle,
   formatOrderCode,
   formatPhp,
   formatPhpExact,
   isDeliveredOrder,
+  isCancelledOrder,
   isCodOrder,
   formatActiveDeadlineLabel,
   formatCompletedTimeLabel,
@@ -20,11 +21,12 @@ export default function RiderOrderCard({
   delivery,
   palette,
   onViewDetails,
-  onScanConfirm,
   onViewMap,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const delivered = isDeliveredOrder(delivery);
+  const cancelled = isCancelledOrder(delivery);
+  const isClosed = delivered || cancelled;
   const badge = getOrderStatusBadge(delivery, palette);
   const cod = isCodOrder(delivery);
   const earningAmount =
@@ -209,33 +211,26 @@ export default function RiderOrderCard({
               size={12}
               color={palette.textMuted}
             />
-            <Text
-              style={[styles.addressLineText, { color: palette.textSecondary }]}
-              numberOfLines={1}
-            >
-              {delivery?.customerAddress || 'No delivery address provided'}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.addressLineText, { color: palette.textSecondary }]}
+                numberOfLines={1}
+              >
+                {delivery?.customerAddress || 'No delivery address provided'}
+              </Text>
+              {delivery?.landmark ? (
+                <Text
+                  style={[styles.landmarkLineText, { color: '#EA580C' }]}
+                  numberOfLines={1}
+                >
+                  Landmark: {delivery.landmark}
+                </Text>
+              ) : null}
+            </View>
           </View>
 
-          {!delivered ? (
+          {!isClosed ? (
             <View style={styles.mapActionsRow}>
-              <TouchableOpacity
-                onPress={() => onViewMap?.(delivery)}
-                activeOpacity={0.8}
-                style={[
-                  styles.inlineActionChip,
-                  {
-                    backgroundColor: palette.bgCard,
-                    borderColor: cardBorder,
-                  },
-                ]}
-              >
-                <BootstrapIcon name="map" size={12} color="#EA580C" />
-                <Text style={[styles.inlineActionChipText, { color: palette.textPrimary }]}>
-                  View map
-                </Text>
-              </TouchableOpacity>
-
               <ExternalLink href={navUrl}>
                 <View
                   style={[
@@ -270,9 +265,11 @@ export default function RiderOrderCard({
           <Text style={[styles.totalLabel, { color: palette.textMuted }]}>
             {delivered
               ? 'Earned fee'
-              : cod
-                ? 'COD to collect'
-                : 'Total amount (Paid)'}
+              : cancelled
+                ? 'Order total'
+                : cod
+                  ? 'COD to collect'
+                  : 'Total amount (Paid)'}
           </Text>
           <Text style={[styles.totalAmount, { color: '#EA580C' }]}>
             {delivered
@@ -287,18 +284,18 @@ export default function RiderOrderCard({
             { backgroundColor: primaryBtnBg },
           ]}
           onPress={() =>
-            delivered ? onViewDetails?.(delivery) : onScanConfirm?.(delivery)
+            isClosed ? onViewDetails?.(delivery) : onViewMap?.(delivery)
           }
           activeOpacity={0.82}
           accessibilityRole="button"
           accessibilityLabel={
-            delivered
+            isClosed
               ? `View order ${formatOrderCode(delivery?.orderId)}`
-              : `Scan and confirm order ${formatOrderCode(delivery?.orderId)}`
+              : `Track order ${formatOrderCode(delivery?.orderId)} to customer location`
           }
         >
           <Text style={styles.primaryFooterBtnText}>
-            {delivered ? 'View details' : 'Scan & confirm'}
+            {isClosed ? 'View details' : 'Track order'}
           </Text>
           <BootstrapIcon name="arrow-right" size={13} color="#FFFFFF" />
         </TouchableOpacity>
@@ -314,29 +311,31 @@ export default function RiderOrderCard({
             },
           ]}
         >
-          <TouchableOpacity
-            onPress={() => {
-              setMenuOpen(false);
-              onViewMap?.(delivery);
-            }}
-            activeOpacity={0.8}
-            style={[
-              styles.drawerChip,
-              {
-                backgroundColor: nestedBg,
-                borderColor: cardBorder,
-              },
-            ]}
-          >
-            <BootstrapIcon name="map" size={12} color="#EA580C" />
-            <Text
-              style={[styles.drawerChipText, { color: palette.textPrimary }]}
+          {!isClosed ? (
+            <TouchableOpacity
+              onPress={() => {
+                setMenuOpen(false);
+                onViewMap?.(delivery);
+              }}
+              activeOpacity={0.8}
+              style={[
+                styles.drawerChip,
+                {
+                  backgroundColor: nestedBg,
+                  borderColor: cardBorder,
+                },
+              ]}
             >
-              View map
-            </Text>
-          </TouchableOpacity>
+              <BootstrapIcon name="map" size={12} color="#EA580C" />
+              <Text
+                style={[styles.drawerChipText, { color: palette.textPrimary }]}
+              >
+                Track order
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
-          {!delivered ? (
+          {!isClosed ? (
             <ExternalLink href={navUrl}>
               <View
                 style={[
@@ -410,16 +409,14 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   dateSubText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
+    ...riderFont('500'),
+    fontSize: 12,
     lineHeight: 15,
-    fontWeight: '500',
   },
   orderCode: {
-    fontFamily: RIDER_FONT,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 15.5,
+    lineHeight: 21,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
@@ -434,10 +431,9 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   statusPillText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
+    ...riderFont('700'),
+    fontSize: 11.5,
     lineHeight: 14,
-    fontWeight: '600',
   },
   dotsMenuBtn: {
     width: 26,
@@ -466,28 +462,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemName: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    lineHeight: 18,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 14,
+    lineHeight: 19,
   },
   itemSub: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    lineHeight: 15,
+    ...riderFont('400'),
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
   },
   itemPrice: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    lineHeight: 18,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 14,
+    lineHeight: 19,
     fontVariant: ['tabular-nums'],
   },
   moreItemsText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '500',
+    ...riderFont('600'),
+    fontSize: 12,
     marginTop: 8,
   },
   addressStrip: {
@@ -500,10 +493,15 @@ const styles = StyleSheet.create({
   },
   addressLineText: {
     flex: 1,
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500',
+    ...riderFont('500'),
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
+  landmarkLineText: {
+    ...riderFont('600'),
+    fontSize: 11.5,
+    lineHeight: 15,
+    marginTop: 2,
   },
   mapActionsRow: {
     flexDirection: 'row',
@@ -521,9 +519,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   inlineActionChipText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 12,
   },
   footerRow: {
     flexDirection: 'row',
@@ -533,17 +530,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   totalLabel: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 11.5,
     lineHeight: 15,
-    fontWeight: '500',
     marginBottom: 2,
   },
   totalAmount: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 20,
     lineHeight: 24,
-    fontWeight: '700',
     letterSpacing: -0.4,
     fontVariant: ['tabular-nums'],
   },
@@ -556,10 +551,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   primaryFooterBtnText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 16,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 13,
+    lineHeight: 17,
     color: '#FFFFFF',
   },
   drawerRow: {
@@ -581,9 +575,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   drawerChipText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 12,
   },
 });
 

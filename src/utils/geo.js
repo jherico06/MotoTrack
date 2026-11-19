@@ -53,6 +53,23 @@ export function mapsEmbedUrl(lat, lng, address = '') {
   return `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=16&output=embed`;
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = 3500) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_e) {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function geocodeAddress(address) {
   const raw = String(address || '').trim();
   if (!raw) return null;
@@ -70,30 +87,20 @@ export async function geocodeAddress(address) {
   );
 
   for (const q of uniqueQueries) {
-    try {
-      const photon = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
-        { headers: { Accept: 'application/json' } }
-      );
-      if (photon.ok) {
-        const data = await photon.json();
-        const [lng, lat] = data?.features?.[0]?.geometry?.coordinates || [];
-        const parsed = parseLatLng(lat, lng);
-        if (parsed) return parsed;
-      }
-    } catch (_e) {}
+    const data = await fetchJsonWithTimeout(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
+      3500
+    );
+    const [lng, lat] = data?.features?.[0]?.geometry?.coordinates || [];
+    const parsedPhoton = parseLatLng(lat, lng);
+    if (parsedPhoton) return parsedPhoton;
 
-    try {
-      const nominatim = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-        { headers: { Accept: 'application/json' } }
-      );
-      if (nominatim.ok) {
-        const rows = await nominatim.json();
-        const parsed = parseLatLng(rows?.[0]?.lat, rows?.[0]?.lon);
-        if (parsed) return parsed;
-      }
-    } catch (_e) {}
+    const rows = await fetchJsonWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
+      3500
+    );
+    const parsedNom = parseLatLng(rows?.[0]?.lat, rows?.[0]?.lon);
+    if (parsedNom) return parsedNom;
   }
 
   return null;

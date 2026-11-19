@@ -158,6 +158,25 @@ export default function GaragePage({
   }, [initialSearchQuery]);
 
   const [packageCategoryFilter, setPackageCategoryFilter] = useState('all');
+  const [visiblePackageCount, setVisiblePackageCount] = useState(5);
+  const [isContentReady, setIsContentReady] = useState(Platform.OS === 'web');
+  useEffect(() => {
+    if (isContentReady) return undefined;
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame(() => setIsContentReady(true))
+        : setTimeout(() => setIsContentReady(true), 0);
+    return () => {
+      if (typeof cancelAnimationFrame === 'function' && typeof requestAnimationFrame === 'function') {
+        cancelAnimationFrame(raf);
+      } else {
+        clearTimeout(raf);
+      }
+    };
+  }, [isContentReady]);
+  useEffect(() => {
+    setVisiblePackageCount(5);
+  }, [packageCategoryFilter, bookingSearchQuery]);
   const [packagesCatalog, setPackagesCatalog] = useState(() =>
     buildMobilePackageCatalog(pmsPricingService.getCachedCatalog?.()?.services)
   );
@@ -949,17 +968,17 @@ export default function GaragePage({
   // Load & subscribe to live PMS/Repair packages catalog (matching Web Booking)
   useEffect(() => {
     let mounted = true;
-    const syncLivePackages = async () => {
+    const syncLivePackages = async (forceRefresh = false) => {
       try {
-        const res = await pmsPricingService.loadCatalog({ forceRefresh: true }).catch(() => null);
+        const res = await pmsPricingService.loadCatalog({ forceRefresh }).catch(() => null);
         if (!mounted) return;
         const formatted = buildMobilePackageCatalog(res?.services);
         if (formatted.length > 0) setPackagesCatalog(formatted);
       } catch (_e) { }
     };
-    syncLivePackages();
-    const unsubPms = pmsPricingService.subscribe?.(() => syncLivePackages());
-    const unsubGarageCatalog = garageService.subscribe?.(() => syncLivePackages());
+    syncLivePackages(false);
+    const unsubPms = pmsPricingService.subscribe?.(() => syncLivePackages(true));
+    const unsubGarageCatalog = garageService.subscribe?.(() => syncLivePackages(false));
     return () => {
       mounted = false;
       try { unsubPms?.(); } catch (_e) { }
@@ -1595,6 +1614,15 @@ export default function GaragePage({
         style={[styles.container, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}
         contentContainerStyle={[styles.scrollContent, { paddingTop: 10 }]}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={Platform.OS === 'android'}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          if (garageViewTab !== 'book' || visiblePackageCount >= filteredWebPackages.length) return;
+          const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 420) {
+            setVisiblePackageCount((prev) => Math.min(filteredWebPackages.length, prev + 6));
+          }
+        }}
       >
         <View style={styles.maxContainer}>
           {/* ─── TAB A: SERVICE BOOKING PACKAGES ─── */}
@@ -1881,7 +1909,23 @@ export default function GaragePage({
               )}
 
               {/* Live Service Packages List */}
-              {filteredWebPackages.length === 0 ? (
+              {!isContentReady ? (
+                <View style={{ gap: 14, marginBottom: 16 }}>
+                  {[0, 1].map((idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        height: 240,
+                        borderRadius: 16,
+                        backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#303236' : '#E4E4E7',
+                        opacity: 0.7,
+                      }}
+                    />
+                  ))}
+                </View>
+              ) : filteredWebPackages.length === 0 ? (
                 <View
                   style={[
                     styles.emptyBox,
@@ -1914,21 +1958,43 @@ export default function GaragePage({
                   </TouchableOpacity>
                 </View>
               ) : (
-                filteredWebPackages.map((pkg) => {
-                  const ccCalc = activeBikeCc > 0 ? calculatePackagePriceForCc(pkg, activeBikeCc) : null;
-                  return (
-                    <MobilePackageCard
-                      key={pkg.id}
-                      pkg={pkg}
-                      isSelected={selectedServiceIds.includes(pkg.id) && isBookingModalOpen}
-                      selectedMotorcycle={activeBike}
-                      matchedPrice={ccCalc ? ccCalc.price : null}
-                      isDarkMode={isDarkMode}
-                      onViewDetails={(p) => setDetailModalPackage(p)}
-                      onToggleSelect={(p) => handleSelectPackageForBooking(p)}
-                    />
-                  );
-                })
+                <>
+                  {filteredWebPackages.slice(0, visiblePackageCount).map((pkg) => {
+                    const ccCalc = activeBikeCc > 0 ? calculatePackagePriceForCc(pkg, activeBikeCc) : null;
+                    return (
+                      <MobilePackageCard
+                        key={pkg.id}
+                        pkg={pkg}
+                        isSelected={selectedServiceIds.includes(pkg.id) && isBookingModalOpen}
+                        selectedMotorcycle={activeBike}
+                        matchedPrice={ccCalc ? ccCalc.price : null}
+                        isDarkMode={isDarkMode}
+                        onViewDetails={(p) => setDetailModalPackage(p)}
+                        onToggleSelect={(p) => handleSelectPackageForBooking(p)}
+                      />
+                    );
+                  })}
+                  {filteredWebPackages.length > visiblePackageCount && (
+                    <TouchableOpacity
+                      onPress={() => setVisiblePackageCount((prev) => Math.min(filteredWebPackages.length, prev + 6))}
+                      activeOpacity={0.85}
+                      style={{
+                        alignSelf: 'center',
+                        marginBottom: 14,
+                        paddingHorizontal: 20,
+                        paddingVertical: 10,
+                        borderRadius: 9999,
+                        backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#2B3035' : '#EDE9E0',
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F9FAFB' : '#18181B' }}>
+                        Show more services ({filteredWebPackages.length - visiblePackageCount} remaining)
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
 
               {/* Custom Multi-Service Wizard Shortcut */}
@@ -2693,6 +2759,7 @@ export default function GaragePage({
       />
 
       {/* ─── STEP 1: CALENDAR DATE SELECTION MODAL ─── */}
+      {isCalendarModalOpen && (
       <Modal
         visible={isCalendarModalOpen}
         transparent={true}
@@ -2946,8 +3013,10 @@ export default function GaragePage({
           </View>
         </View>
       </Modal>
+      )}
 
       {/* ─── 5-STEP POPUP BOOKING FORM MODAL ─── */}
+      {isBookingModalOpen && (
       <Modal
         visible={isBookingModalOpen}
         transparent={true}
@@ -4536,27 +4605,27 @@ export default function GaragePage({
                     {/* Rider Information */}
                     <Text style={reviewSectionTitleStyle}>Rider Information</Text>
                     <View style={{ gap: 7, marginBottom: 14 }}>
-                      <ReviewRow label="👤 Rider" value={ownerName || '—'} />
-                      <ReviewRow label="📱 Phone" value={ownerPhone || '—'} />
-                      {ownerEmail ? <ReviewRow label="✉️ Email" value={ownerEmail} /> : null}
+                      <ReviewRow label="Rider" value={ownerName || '—'} />
+                      <ReviewRow label="Phone" value={ownerPhone || '—'} />
+                      {ownerEmail ? <ReviewRow label="Email" value={ownerEmail} /> : null}
                     </View>
 
                     {/* Motorcycle & Service Type */}
                     <Text style={reviewSectionTitleStyle}>Motorcycle & Service Type</Text>
                     <View style={{ gap: 7, marginBottom: 14 }}>
-                      <ReviewRow label="🛵 Motorcycle" value={selectedMotorcycleLabel || '—'} />
+                      <ReviewRow label="Motorcycle" value={selectedMotorcycleLabel || '—'} />
                       <ReviewRow
-                        label="🛠️ Service Type"
+                        label="Service Type"
                         value={
                           selectedServiceType === 'Repair'
                             ? 'Repair Services'
                             : 'Preventive Maintenance (PMS)'
                         }
                       />
-                      <ReviewRow label="⚙️ Engine CC" value={selectedEngineCcLabel} />
-                      <ReviewRow label="🏷️ CC Category" value={pmsCatalog.category?.name || '—'} />
+                      <ReviewRow label="Engine CC" value={selectedEngineCcLabel} />
+                      <ReviewRow label="CC Category" value={pmsCatalog.category?.name || '—'} />
                       {selectedMotorcycle?.plate_number ? (
-                        <ReviewRow label="🔖 Plate" value={selectedMotorcycle.plate_number} />
+                        <ReviewRow label="Plate" value={selectedMotorcycle.plate_number} />
                       ) : null}
                     </View>
 
@@ -4610,16 +4679,16 @@ export default function GaragePage({
                     {/* Details */}
                     <Text style={reviewSectionTitleStyle}>Request details</Text>
                     <View style={{ gap: 7, marginBottom: 14 }}>
-                      <ReviewRow label="📅 Preferred Date" value={`${bookingDate} • ${selectedTimeSlot}`} />
+                      <ReviewRow label="Preferred Date" value={`${bookingDate} • ${selectedTimeSlot}`} />
                       {serviceNotes.trim() ? (
-                        <ReviewRow label="📝 Problem" value={serviceNotes.trim()} multiline />
+                        <ReviewRow label="Problem" value={serviceNotes.trim()} multiline />
                       ) : null}
                       {additionalNotes.trim() ? (
-                        <ReviewRow label="🗒️ Notes" value={additionalNotes.trim()} multiline />
+                        <ReviewRow label="Notes" value={additionalNotes.trim()} multiline />
                       ) : null}
                       {motorcyclePhotos.length > 0 ? (
                         <ReviewRow
-                          label="📎 Photos"
+                          label="Photos"
                           value={`${motorcyclePhotos.length} file${motorcyclePhotos.length === 1 ? '' : 's'} attached`}
                         />
                       ) : null}
@@ -4887,6 +4956,7 @@ export default function GaragePage({
           </View>
         </View>
       </Modal>
+      )}
 
       {/* ─── 7. PERSISTENT MOBILE BOTTOM NAVIGATION ─── */}
       <MobileBottomNavBar
@@ -4897,6 +4967,7 @@ export default function GaragePage({
         currentUser={currentUser}
       />
       {/* Register Motorcycle Modal (opened from the booking sheet or garage header) */}
+      {isRegisterMotorcycleModalOpen && (
       <RegisterMotorcycleModal
         visible={isRegisterMotorcycleModalOpen}
         motorcycle={null}
@@ -4910,8 +4981,10 @@ export default function GaragePage({
         }}
         onSave={handleRegisterMotorcycle}
       />
+      )}
 
       {/* Cancellation Confirmation Modal (50% Downpayment Refund Policy) */}
+      {isCancelModalOpen && (
       <ConfirmModal
         visible={isCancelModalOpen}
         title={
@@ -4956,8 +5029,10 @@ export default function GaragePage({
           setBookingToCancel(null);
         }}
       />
+      )}
 
       {/* Customer Reschedule Appointment Modal */}
+      {Boolean(rescheduleBookingTarget) && (
       <MobileRescheduleModal
         visible={Boolean(rescheduleBookingTarget)}
         booking={rescheduleBookingTarget}
@@ -4966,8 +5041,10 @@ export default function GaragePage({
         showToast={showToast}
         isDarkMode={isDarkMode}
       />
+      )}
 
       {/* ─── CERTIFIED MECHANICS ROSTER MODAL ─── */}
+      {isRosterModalOpen && (
       <Modal
         visible={isRosterModalOpen}
         transparent={true}
@@ -5080,6 +5157,7 @@ export default function GaragePage({
           </View>
         </View>
       </Modal>
+      )}
     </SafeAreaView>
   );
 }

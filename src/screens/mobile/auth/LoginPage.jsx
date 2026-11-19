@@ -18,6 +18,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { appStorage } from '../../../services/system/storageAdapter.js';
 import BootstrapIcon from '../../../components/common/BootstrapIcon.jsx';
 import GoogleIcon from '../../../components/common/GoogleIcon.jsx';
+import { signInWithGoogleMobile } from './mobileGoogleAuth.js';
 
 const REMEMBER_EMAIL_KEY = 'mototrack_remember_login_email';
 
@@ -26,7 +27,7 @@ export default function LoginPage({
   onNavigateToSignUp,
   onNavigateToStore,
 }) {
-  const { login, loginWithGoogle, loginWithGoogleSimulated, requestPasswordResetOtp } = useAuth();
+  const { login, setCurrentUser, setRedirectReason, loginWithGoogleSimulated, requestPasswordResetOtp } = useAuth();
 
   const [email, setEmail] = useState(() => {
     try {
@@ -89,12 +90,15 @@ export default function LoginPage({
   };
 
   const handleGoogleLogin = async () => {
+    if (isGoogleLoading || isLoading) return;
     setErrorMessage('');
     setGoogleAdvisory(null);
     setIsGoogleLoading(true);
     try {
-      const res = await loginWithGoogle();
+      const res = await signInWithGoogleMobile();
       if (res?.success && res.user) {
+        setCurrentUser?.(res.user);
+        setRedirectReason?.('');
         onLoginSuccess?.(res.user);
       } else if (res?.notEnabled) {
         setGoogleAdvisory({
@@ -103,7 +107,7 @@ export default function LoginPage({
             'Google OAuth provider is not enabled in your Supabase project. You can enable it in Supabase Dashboard → Authentication → Providers, or use instant test sign in.',
           showInstantTest: true,
         });
-      } else if (res?.redirectConfigNeeded || res?.cancelled) {
+      } else if (res?.redirectConfigNeeded) {
         setGoogleAdvisory({
           title: 'Expo Go Redirect Blocked (Use Tunnel or Dev Build)',
           message:
@@ -113,6 +117,8 @@ export default function LoginPage({
         if (res?.error) {
           setErrorMessage(res.error);
         }
+      } else if (res?.cancelled) {
+        // User dismissed the Google sign-in sheet before completing login.
       } else if (res?.error) {
         setErrorMessage(res.error);
       }

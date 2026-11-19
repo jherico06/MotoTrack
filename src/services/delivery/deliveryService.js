@@ -214,14 +214,14 @@ function getTokenCache() {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') return parsed;
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return {};
 }
 
 function saveTokenCache(map) {
   try {
     appStorage.setItem(STORAGE_KEY_TOKEN_CACHE, JSON.stringify(map || {}));
-  } catch (_e) {}
+  } catch (_e) { }
 }
 
 function cachePlainToken(orderId, plainToken) {
@@ -424,7 +424,7 @@ async function findDeliveryByOrderIdentifier(rawId) {
   });
   try {
     await client.from('order_deliveries').upsert([toDeliveryDbRow(syntheticDelivery)], { onConflict: 'order_id' });
-  } catch (_e) {}
+  } catch (_e) { }
   upsertLocalDelivery(syntheticDelivery);
   return syntheticDelivery;
 }
@@ -500,14 +500,14 @@ function getLocalDeliveries() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return [];
 }
 
 function saveLocalDeliveries(list) {
   try {
     appStorage.setItem(STORAGE_KEY_DELIVERIES, JSON.stringify(list));
-  } catch (_e) {}
+  } catch (_e) { }
 }
 
 function getLocalHistory() {
@@ -517,14 +517,14 @@ function getLocalHistory() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return [];
 }
 
 function saveLocalHistory(list) {
   try {
     appStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(list));
-  } catch (_e) {}
+  } catch (_e) { }
 }
 
 function upsertLocalDelivery(record) {
@@ -687,13 +687,13 @@ async function enrichPreviewWithLocalOrder(preview) {
       const o = data[0];
       const items = Array.isArray(o.order_items)
         ? o.order_items.map((oi) => ({
-            name: oi.products?.name || 'Motorcycle Part',
-            brand: oi.products?.brand || '',
-            quantity: Number(oi.quantity || 1),
-            price: Number(oi.cost ?? oi.products?.price ?? 0),
-            size: oi.size || null,
-            image: oi.products?.image || null,
-          }))
+          name: oi.products?.name || 'Motorcycle Part',
+          brand: oi.products?.brand || '',
+          quantity: Number(oi.quantity || 1),
+          price: Number(oi.cost ?? oi.products?.price ?? 0),
+          size: oi.size || null,
+          image: oi.products?.image || null,
+        }))
         : [];
       const details = buildOrderDetailsFromOrder({
         ...o,
@@ -731,7 +731,7 @@ export const deliveryService = {
    * Rider + Admin screens subscribe so status updates appear without manual refresh.
    */
   subscribe(listener) {
-    if (typeof listener !== 'function') return () => {};
+    if (typeof listener !== 'function') return () => { };
     deliveryListeners.add(listener);
     setupDeliveryRealtime();
     return () => deliveryListeners.delete(listener);
@@ -1001,7 +1001,7 @@ export const deliveryService = {
         severity: 'INFO',
         metadata: { orderId, rider: record.rider_name, rider_id: record.rider_id },
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     try {
       if (!order.delivery_lat || !order.delivery_lng) {
@@ -1013,7 +1013,7 @@ export const deliveryService = {
             .eq('order_id', orderId);
         }
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     let riderAccess = null;
     try {
@@ -1089,7 +1089,7 @@ export const deliveryService = {
     if (delivery.rider_id) {
       try {
         await riderService.setRiderStatus(delivery.rider_id, RIDER_STATUSES.ON_DELIVERY);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     const client = supabaseManager.getClient();
@@ -1454,7 +1454,7 @@ export const deliveryService = {
     if (updated.rider_id) {
       try {
         await riderService.setRiderStatus(updated.rider_id, RIDER_STATUSES.AVAILABLE);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     await appendHistory({
@@ -1471,7 +1471,7 @@ export const deliveryService = {
       await deliveryLocationService.clearLocation(orderId, {
         riderId: updated.rider_id,
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     try {
       await notificationService.notifyCustomerDeliveryFailed({
@@ -1549,7 +1549,7 @@ export const deliveryService = {
     if (updated.rider_id) {
       try {
         await riderService.setRiderStatus(updated.rider_id, RIDER_STATUSES.AVAILABLE);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     await appendHistory({
@@ -1699,7 +1699,7 @@ export const deliveryService = {
         severity: 'INFO',
         metadata: { orderId, rider_id: updated.rider_id },
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     return { success: true, delivery: stripOtpSecrets(updated) };
   },
@@ -1865,7 +1865,7 @@ export const deliveryService = {
                 notes: noteText || 'Confirmed via secure QR/link',
                 reportedBy: delivery?.rider_name || 'Rider',
               });
-            } catch (_e) {}
+            } catch (_e) { }
 
             return {
               success: true,
@@ -1950,7 +1950,7 @@ export const deliveryService = {
         notes: noteText || 'Confirmed via secure QR/link',
         reportedBy: delivery.rider_name || 'Rider',
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     this.notifyChanged({ source: 'token_confirm', orderId });
     return {
@@ -2030,7 +2030,7 @@ export const deliveryService = {
         link: 'orders',
         icon: 'person-check',
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     return { success: true, delivery: stripOtpSecrets(updated) };
   },
@@ -2160,14 +2160,14 @@ export const deliveryService = {
     if (updatedDelivery.rider_id) {
       try {
         await riderService.setRiderStatus(updatedDelivery.rider_id, RIDER_STATUSES.AVAILABLE);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     try {
       await deliveryLocationService.clearLocation(orderId, {
         riderId: updatedDelivery.rider_id,
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     await appendHistory({
       orderId,
@@ -2261,7 +2261,7 @@ export const deliveryService = {
     if (Array.isArray(order?.items)) {
       items = order.items;
     } else if (typeof order?.items === 'string' && order.items.trim().startsWith('[')) {
-      try { items = JSON.parse(order.items); } catch (_e) {}
+      try { items = JSON.parse(order.items); } catch (_e) { }
     } else if (orderService.parseItemsSummary) {
       items = orderService.parseItemsSummary(order?.items_summary);
     }
@@ -2334,7 +2334,7 @@ export const deliveryService = {
           const { data: orows, error: oErr } = await client
             .from('orders')
             .select(
-              'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+              'order_id,customer_name,customer_phone,customer_address,delivery_notes,delivery_landmark,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
             )
             .in('order_id', ids)
             .limit(80);
@@ -2353,7 +2353,7 @@ export const deliveryService = {
         const { data: directOrders } = await client
           .from('orders')
           .select(
-            'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+            'order_id,customer_name,customer_phone,customer_address,delivery_notes,delivery_landmark,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
           )
           .eq('rider_id', riderId)
           .limit(80);
@@ -2376,7 +2376,7 @@ export const deliveryService = {
         const { data: completedOrders, error: cErr } = await client
           .from('orders')
           .select(
-            'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+            'order_id,customer_name,customer_phone,customer_address,delivery_notes,delivery_landmark,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
           )
           .eq('delivered_by_rider_id', riderId)
           .limit(40);
@@ -2530,7 +2530,7 @@ export const deliveryService = {
 
     try {
       notifyDeliveryListeners({ source: 'riderAcceptDelivery', orderId, at: Date.now() });
-    } catch (_e) {}
+    } catch (_e) { }
 
     return {
       success: true,
@@ -2578,7 +2578,7 @@ export const deliveryService = {
           fileName: `delivery-proofs/${orderId}-rider-${Date.now()}.jpg`,
         });
         if (uploadRes?.url) uploadedPhotoUrl = uploadRes.url;
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     let updatedDelivery = {
@@ -2650,7 +2650,7 @@ export const deliveryService = {
             })
             .eq('order_id', orderId)
             .eq('rider_id', riderId);
-        } catch (_e) {}
+        } catch (_e) { }
       }
     }
 
@@ -2678,11 +2678,11 @@ export const deliveryService = {
 
     try {
       await riderGpsTrackingService.stop({ clearDb: true, orderId, riderId });
-    } catch (_e) {}
+    } catch (_e) { }
 
     try {
       notifyDeliveryListeners({ source: 'riderConfirmOrderDelivery', orderId, at: Date.now() });
-    } catch (_e) {}
+    } catch (_e) { }
 
     return {
       success: true,
@@ -2733,7 +2733,7 @@ export const deliveryService = {
           p_notes: notes || 'Delivery issue reported by rider',
         });
         if (!rpcErr && rpcRes?.success) rpcWorked = true;
-      } catch (_e) {}
+      } catch (_e) { }
 
       if (!rpcWorked) {
         try {
@@ -2747,7 +2747,7 @@ export const deliveryService = {
               updated_at: nowIso,
             })
             .eq('order_id', orderId);
-        } catch (_e) {}
+        } catch (_e) { }
       }
     }
 
@@ -2770,11 +2770,11 @@ export const deliveryService = {
 
     try {
       await riderGpsTrackingService.stop({ clearDb: false, orderId, riderId });
-    } catch (_e) {}
+    } catch (_e) { }
 
     try {
       notifyDeliveryListeners({ source: 'riderReportDeliveryIssue', orderId, at: Date.now() });
-    } catch (_e) {}
+    } catch (_e) { }
 
     return {
       success: true,
@@ -2826,7 +2826,7 @@ export const deliveryService = {
 
     try {
       await riderService.setRiderStatus(riderId, RIDER_STATUSES.ON_DELIVERY);
-    } catch (_e) {}
+    } catch (_e) { }
 
     const client = supabaseManager.getClient();
     if (client) {
@@ -2870,7 +2870,7 @@ export const deliveryService = {
         riderName: delivery.rider_name,
         expectedDelivery: delivery.expected_delivery_at,
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     this.notifyChanged({ source: 'rider_out', orderId });
     return { success: true, delivery: stripOtpSecrets(delivery) };
@@ -3122,7 +3122,7 @@ export const deliveryService = {
             if (retryData?.length) {
               updatedRows = retryData;
             }
-          } catch (_re) {}
+          } catch (_re) { }
         }
         if (!updatedRows?.length) {
           try {
@@ -3139,7 +3139,7 @@ export const deliveryService = {
                 'Order Already Delivered'
               );
             }
-          } catch (_e) {}
+          } catch (_e) { }
           return riderQrFailure('unavailable', 'This order is not ready for delivery confirmation.');
         }
 
@@ -3217,7 +3217,7 @@ export const deliveryService = {
 
       try {
         await riderService.setRiderStatus(riderId, RIDER_STATUSES.AVAILABLE);
-      } catch (_e) {}
+      } catch (_e) { }
 
       try {
         await orderService.updateOrderStatus(targetOrderId, DELIVERY_STATUSES.DELIVERED, 'Rider confirmed delivery via QR', {
@@ -3255,11 +3255,11 @@ export const deliveryService = {
           orderId: targetOrderId,
           riderName: updatedDelivery.rider_name,
         });
-      } catch (_e) {}
+      } catch (_e) { }
 
       try {
         await deliveryLocationService.clearLocation(targetOrderId, { riderId });
-      } catch (_e) {}
+      } catch (_e) { }
 
       logQrValidation({
         step: 'confirmed',

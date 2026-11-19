@@ -4,14 +4,14 @@
   "main": "index.js",
   "scripts": {
     "build": "expo export -p web",
-    "start": "expo start",
+    "start": "expo start --go",
     "start:dev": "expo start --dev-client",
-    "tunnel": "expo start --tunnel",
-    "clear": "expo start -c",
+    "tunnel": "expo start --go --tunnel",
+    "clear": "expo start --go -c",
     "web": "expo start --web",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "mobile": "expo start --tunnel",
+    "android": "expo start --go --android",
+    "ios": "expo start --go --ios",
+    "mobile": "expo start --go --tunnel",
     "build:dev:android": "eas build --profile development --platform android",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:preview:android": "eas build --profile preview --platform android",
@@ -22,6 +22,7 @@
     "postinstall": "node scripts/patch-css-interop.js"
   },
   "dependencies": {
+    "@expo-google-fonts/google-sans-flex": "^0.4.7",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/manrope": "^0.4.2",
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",

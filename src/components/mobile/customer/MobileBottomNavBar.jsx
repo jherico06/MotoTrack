@@ -32,118 +32,113 @@ function notifyTabActivated(tabId) {
   });
 }
 
-function AnimatedNavTab({ tab, active, animateOnMount, activationSeq, isCompact, onPress }) {
+function AnimatedNavTab({
+  tab,
+  tabIndex,
+  prevTabIndex,
+  slotWidth,
+  active,
+  animateOnMount,
+  activationSeq,
+  isCompact,
+  onPress,
+}) {
   const animateMountRef = useRef(animateOnMount);
   const didMountRef = useRef(false);
   const enterAnim = useRef(new Animated.Value(active && animateMountRef.current ? 0 : 1)).current;
-  const pressScale = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const prevTabIndexRef = useRef(prevTabIndex);
+  prevTabIndexRef.current = prevTabIndex;
 
   useEffect(() => {
     const isMount = !didMountRef.current;
     didMountRef.current = true;
     if (!active) {
       enterAnim.setValue(0);
+      slideAnim.setValue(0);
       return;
     }
     if (!isMount || animateMountRef.current) {
+      const fromIdx = prevTabIndexRef.current;
+      const rawOffset =
+        fromIdx >= 0 && fromIdx !== tabIndex ? (fromIdx - tabIndex) * slotWidth : 0;
+      const clampedOffset = Math.max(-slotWidth * 2.2, Math.min(slotWidth * 2.2, rawOffset));
+
       enterAnim.setValue(0);
-      Animated.timing(enterAnim, {
-        toValue: 1,
-        duration: 165,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }).start();
+      slideAnim.setValue(clampedOffset);
+
+      Animated.parallel([
+        Animated.timing(enterAnim, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 210,
+          friction: 22,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]).start();
     } else {
       enterAnim.setValue(1);
+      slideAnim.setValue(0);
     }
-  }, [active, activationSeq, enterAnim]);
+  }, [active, activationSeq, tabIndex, slotWidth, enterAnim, slideAnim]);
 
-  const handlePressIn = () => {
-    Animated.timing(pressScale, {
-      toValue: 0.95,
-      duration: 60,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.timing(pressScale, {
-      toValue: 1,
-      duration: 110,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  };
-
-  const pillOpacity = enterAnim;
-  const pillScale = enterAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
-  });
-  const labelTranslateX = enterAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-6, 0],
-  });
+  const iconSize = isCompact ? 18 : 20;
+  const labelFontSize = isCompact ? 9.5 : 10;
+  const badgeCount = Number(tab.badge) || 0;
 
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       hitSlop={4}
+      style={styles.tabPressable}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={tab.label}
+      accessibilityLabel={badgeCount > 0 ? `${tab.label}, ${badgeCount}` : tab.label}
     >
-      <Animated.View
-        style={[
-          styles.tabButton,
-          active
-            ? { paddingHorizontal: isCompact ? 11 : 14 }
-            : { paddingHorizontal: isCompact ? 6 : 9 },
-          { transform: [{ scale: pressScale }] },
-        ]}
-      >
+      <View style={styles.tabButton}>
         {active ? (
           <Animated.View
             pointerEvents="none"
             style={[
-              styles.activePillBg,
+              styles.activeTopBar,
               {
-                opacity: pillOpacity,
-                transform: [{ scale: pillScale }],
+                opacity: enterAnim,
+                transform: [{ translateX: slideAnim }],
               },
             ]}
           />
         ) : null}
-        <BootstrapIcon
-          name={active ? tab.activeIcon || tab.icon : tab.icon}
-          size={active ? (isCompact ? 16 : 18) : (isCompact ? 18 : 19)}
-          color={active ? '#FFFFFF' : '#E2E8F0'}
-        />
-        {active ? (
-          <Animated.View
-            style={[
-              styles.labelWrap,
-              {
-                opacity: enterAnim,
-                transform: [{ translateX: labelTranslateX }],
-              },
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.activeLabel,
-                { fontSize: isCompact ? 11.5 : 12.5 },
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </Animated.View>
-        ) : null}
-      </Animated.View>
+        <View style={styles.iconBox}>
+          <BootstrapIcon
+            name={active ? tab.activeIcon || tab.icon : tab.icon}
+            size={iconSize}
+            color={active ? '#F97316' : '#94A3B8'}
+          />
+          {badgeCount > 0 ? (
+            <View style={styles.iconBadge}>
+              <Text allowFontScaling={false} style={styles.iconBadgeText}>
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <Text
+          numberOfLines={1}
+          allowFontScaling={false}
+          style={[
+            styles.tabLabel,
+            { fontSize: labelFontSize, lineHeight: 13 },
+            active ? styles.activeLabel : styles.inactiveLabel,
+          ]}
+        >
+          {tab.label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -151,9 +146,9 @@ function AnimatedNavTab({ tab, active, animateOnMount, activationSeq, isCompact,
 /**
  * MobileBottomNavBar
  *
- * Floating charcoal pill bottom navigation bar.
- * - Active tab expands into a raised charcoal-slate inner pill with filled white icon + label.
- * - Inactive tabs show clean outline white/silver icons with no cluttered badges or numbers.
+ * Docked charcoal bottom navigation bar with subtle top-left and top-right corner radius.
+ * - Static page titles sit below every icon across equal-width columns.
+ * - Active tab highlights both the filled icon and title in Racing Orange with a sliding top bar.
  */
 export default function MobileBottomNavBar({
   activeTab = 'Home',
@@ -180,12 +175,13 @@ export default function MobileBottomNavBar({
     activeTab === 'garage' ||
     activeTab === 'MyGarage' ||
     activeTab === 'Fleet';
-  const isOrdersActive = activeTab === 'Orders' || activeTab === 'orders';
   const isMoreActive =
     activeTab === 'More' ||
     activeTab === 'more' ||
     activeTab === 'menu' ||
     activeTab === 'Menu' ||
+    activeTab === 'Orders' ||
+    activeTab === 'orders' ||
     activeTab === 'Dashboard' ||
     activeTab === 'dashboard' ||
     activeTab === 'Profile' ||
@@ -209,7 +205,7 @@ export default function MobileBottomNavBar({
         id: 'Services',
         label: 'Services',
         icon: 'tools',
-        activeIcon: 'wrench-adjustable',
+        activeIcon: 'tools',
         isActive: isServicesActive,
       },
       {
@@ -227,13 +223,6 @@ export default function MobileBottomNavBar({
         isActive: isGarageActive,
       },
       {
-        id: 'Orders',
-        label: 'Orders',
-        icon: 'box-seam',
-        activeIcon: 'box-seam-fill',
-        isActive: isOrdersActive,
-      },
-      {
         id: 'More',
         label: 'More',
         icon: 'list',
@@ -247,7 +236,6 @@ export default function MobileBottomNavBar({
     isServicesActive,
     isCustomizeActive,
     isGarageActive,
-    isOrdersActive,
     isMoreActive,
   ]);
 
@@ -255,7 +243,9 @@ export default function MobileBottomNavBar({
   const propActiveId = customerTabs.find((tab) => tab.isActive)?.id || activeTab;
   const [optimisticTabId, setOptimisticTabId] = useState(null);
   const [activationSeq, setActivationSeq] = useState(0);
+  const [barWidth, setBarWidth] = useState(() => Math.min(Math.max(width - 20, 280), 540));
   const optimisticTimerRef = useRef(null);
+  const navSwitchRafRef = useRef(null);
 
   useEffect(() => {
     setOptimisticTabId(null);
@@ -302,6 +292,9 @@ export default function MobileBottomNavBar({
       if (optimisticTimerRef.current) {
         clearTimeout(optimisticTimerRef.current);
       }
+      if (navSwitchRafRef.current != null && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(navSwitchRafRef.current);
+      }
     };
   }, []);
 
@@ -310,36 +303,68 @@ export default function MobileBottomNavBar({
     Boolean(initialPrevTabRef.current) && initialPrevTabRef.current !== propActiveId;
 
   const handleTabPress = (tabId) => {
-    if (tabId !== displayActiveId) {
-      setOptimisticTabId(tabId);
-      if (optimisticTimerRef.current) {
-        clearTimeout(optimisticTimerRef.current);
-      }
-      optimisticTimerRef.current = setTimeout(() => {
-        setOptimisticTabId(null);
-      }, 380);
-      notifyTabActivated(tabId);
+    if (tabId === displayActiveId) {
+      onTabChange(tabId);
+      return;
     }
-    onTabChange(tabId);
+
+    setOptimisticTabId(tabId);
+    if (optimisticTimerRef.current) {
+      clearTimeout(optimisticTimerRef.current);
+    }
+    optimisticTimerRef.current = setTimeout(() => {
+      setOptimisticTabId(null);
+    }, 220);
+    notifyTabActivated(tabId);
+
+    // Yield one frame on native so press/pill visual feedback commits before mounting heavy screens.
+    if (Platform.OS !== 'web' && typeof requestAnimationFrame === 'function') {
+      if (navSwitchRafRef.current != null && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(navSwitchRafRef.current);
+      }
+      navSwitchRafRef.current = requestAnimationFrame(() => {
+        navSwitchRafRef.current = null;
+        onTabChange(tabId);
+      });
+    } else {
+      onTabChange(tabId);
+    }
   };
+
+  const prevId = previousGlobalNavTabId || initialPrevTabRef.current;
+  const prevTabIndex = prevId ? customerTabs.findIndex((t) => t.id === prevId) : -1;
+  const slotWidth = barWidth / Math.max(1, customerTabs.length);
 
   return (
     <View pointerEvents="box-none" style={styles.outerWrap}>
-      <View style={styles.pillContainer}>
-        {customerTabs.map((tab) => {
-          const active = tab.id === displayActiveId || (!optimisticTabId && Boolean(tab.isActive));
-          return (
-            <AnimatedNavTab
-              key={tab.id}
-              tab={tab}
-              active={active}
-              animateOnMount={animateOnMount}
-              activationSeq={activationSeq}
-              isCompact={isCompact}
-              onPress={() => handleTabPress(tab.id)}
-            />
-          );
-        })}
+      <View style={styles.dockedBar}>
+        <View
+          style={styles.pillContainer}
+          onLayout={(e) => {
+            const measured = e?.nativeEvent?.layout?.width;
+            if (measured && Math.abs(measured - barWidth) > 2) {
+              setBarWidth(measured);
+            }
+          }}
+        >
+          {customerTabs.map((tab, idx) => {
+            const active = tab.id === displayActiveId || (!optimisticTabId && Boolean(tab.isActive));
+            return (
+              <AnimatedNavTab
+                key={tab.id}
+                tab={tab}
+                tabIndex={idx}
+                prevTabIndex={prevTabIndex}
+                slotWidth={slotWidth}
+                active={active}
+                animateOnMount={animateOnMount}
+                activationSeq={activationSeq}
+                isCompact={isCompact}
+                onPress={() => handleTabPress(tab.id)}
+              />
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -348,59 +373,119 @@ export default function MobileBottomNavBar({
 const styles = StyleSheet.create({
   outerWrap: {
     position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: Platform.OS === 'ios' ? 18 : Math.max(12, ANDROID_BOTTOM_INSET + 6),
-    alignItems: 'center',
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 100,
+  },
+  dockedBar: {
+    width: '100%',
+    backgroundColor: '#24272B',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: '#32373E',
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : Math.max(12, ANDROID_BOTTOM_INSET + 4),
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 -6px 20px rgba(15, 23, 42, 0.22)' }
+      : {
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 12,
+          elevation: 14,
+        }),
   },
   pillContainer: {
     width: '100%',
-    maxWidth: 520,
-    backgroundColor: '#1C1F24',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#2D3139',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
+    maxWidth: 540,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    ...(Platform.OS === 'web'
-      ? { boxShadow: '0 10px 26px rgba(15, 23, 42, 0.24)' }
-      : {
-          shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.24,
-          shadowRadius: 16,
-          elevation: 12,
-        }),
+  },
+  tabPressable: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabButton: {
+    width: '100%',
     position: 'relative',
-    minHeight: 40,
-    paddingVertical: 9,
-    borderRadius: 999,
-    flexDirection: 'row',
+    minHeight: 46,
+    paddingVertical: 4,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activePillBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#31353E',
-    borderRadius: 999,
+  iconBox: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  labelWrap: {
-    marginLeft: 6,
+  iconBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3.5,
+    backgroundColor: '#EA580C',
+    borderWidth: 1.5,
+    borderColor: '#24272B',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  activeLabel: {
+  iconBadgeText: {
+    ...(Platform.OS === 'web'
+      ? {
+          fontFamily:
+            'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+          fontWeight: '700',
+        }
+      : { fontFamily: 'GoogleSansFlex-Bold' }),
+    fontSize: 9.5,
+    lineHeight: 11,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    includeFontPadding: false,
+    fontVariant: ['tabular-nums'],
+  },
+  activeTopBar: {
+    position: 'absolute',
+    top: -10,
+    alignSelf: 'center',
+    width: 30,
+    height: 2.5,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    backgroundColor: '#F97316',
+  },
+  tabLabel: {
     fontFamily:
       Platform.OS === 'web'
         ? 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
         : undefined,
-    color: '#FFFFFF',
+    marginTop: 3,
+    textAlign: 'center',
     fontWeight: '600',
     letterSpacing: -0.1,
+    includeFontPadding: false,
+  },
+  activeLabel: {
+    color: '#F97316',
+  },
+  inactiveLabel: {
+    color: '#94A3B8',
   },
 });

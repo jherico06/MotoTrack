@@ -34,13 +34,11 @@ import {
   BootstrapIcon,
   ToastNotification,
   ProductSpecsModal,
-  CheckoutModal,
-  ProfileModal,
   AccessDeniedModal,
   LiveOrderTrackingMapModal,
   GCashPaymentModal,
 } from '../../../components';
-import { CompanyInfoModal } from '../../../components/web';
+import { CompanyInfoModal, WebCheckoutModal, WebProfileModal } from '../../../components/web';
 import CartPage from './CartPage.jsx';
 import {
   UserProfileDropdown,
@@ -734,6 +732,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       customerPhone,
       customerAddress,
       deliveryNotes,
+      deliveryLat,
+      deliveryLng,
       paymentMethod,
       gcashNumber,
       gcashReference,
@@ -753,6 +753,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         customerEmail: currentUser?.email || null,
         customerAddress,
         deliveryNotes,
+        deliveryLat: deliveryLat ?? currentUser?.latitude ?? currentUser?.delivery_lat ?? null,
+        deliveryLng: deliveryLng ?? currentUser?.longitude ?? currentUser?.delivery_lng ?? null,
         paymentMethod,
         gcashNumber,
         gcashReference,
@@ -2507,7 +2509,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         }}
       />
 
-      <CheckoutModal
+      <WebCheckoutModal
         visible={isCheckoutOpen}
         onClose={() => {
           if (isPlacingOrder) return;
@@ -2526,7 +2528,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         }}
       />
 
-      <ProfileModal
+      <WebProfileModal
         visible={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         onNavigateToOrders={() => onNavigateToScreen?.('profile', { tab: 'orders' })}

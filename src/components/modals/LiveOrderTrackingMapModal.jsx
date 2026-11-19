@@ -16,10 +16,11 @@ import {
 import { WebView } from 'react-native-webview';
 import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import DeliveryTrackingPanel from '../common/DeliveryTrackingPanel.jsx';
+import DeliveryLocationPicker from '../common/DeliveryLocationPicker.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, canCustomerEditAddressStatus } from '../../services/orders/orderService.js';
-import { geocodeAddress, STORE_LOCATION } from '../../utils/geo.js';
+import { geocodeAddress, parseLatLng, STORE_LOCATION } from '../../utils/geo.js';
 
 // Route Waypoints focused across City of Naga, Cebu, Philippines
 const ROUTE_WAYPOINTS = [
@@ -141,6 +142,10 @@ export default function LiveOrderTrackingMapModal({
   const [isCallingRider, setIsCallingRider] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [customAddress, setCustomAddress] = useState('');
+  const [customLat, setCustomLat] = useState(null);
+  const [customLng, setCustomLng] = useState(null);
+  const [customDeliveryNotes, setCustomDeliveryNotes] = useState('');
+  const [addressModalError, setAddressModalError] = useState('');
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('Found a better price / changed mind');
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -153,21 +158,37 @@ export default function LiveOrderTrackingMapModal({
 
   const handleSaveAddress = async () => {
     if (!customAddress.trim()) {
+      setAddressModalError('Please enter a delivery address.');
       showToast('Please enter an address');
       return;
     }
+    const validPin = parseLatLng(customLat, customLng);
+    if (!validPin) {
+      const msg = 'Please set your exact house pin on the map before saving.';
+      setAddressModalError(msg);
+      showToast(msg);
+      return;
+    }
+    setAddressModalError('');
     const orderId = activeOrder?.order_id || activeOrder?.id;
     if (orderId) {
       setIsSubmittingAction(true);
       try {
-      const res = await orderService.updateAddress(orderId, customAddress.trim());
+        const res = await orderService.updateAddress(orderId, {
+          address: customAddress.trim(),
+          latitude: validPin.lat,
+          longitude: validPin.lng,
+          deliveryNotes: customDeliveryNotes.trim(),
+        });
         if (!res.success) {
+          setAddressModalError(res.error || 'Failed to update address');
           showToast(res.error || 'Failed to update address');
           return;
         }
-        showToast('Delivery address updated successfully');
+        setCustomerCoords({ lat: validPin.lat, lng: validPin.lng });
+        showToast('Delivery address and map pin updated');
         setIsAddressModalOpen(false);
-      } catch (e) {
+      } catch (_e) {
         showToast('Failed to update address');
       } finally {
         setIsSubmittingAction(false);
@@ -309,18 +330,33 @@ export default function LiveOrderTrackingMapModal({
   const distanceKm = ((1 - progress) * 5.6).toFixed(1);
   const currentSpeed = isPlaying && progress < 1 ? Math.floor(32 + Math.random() * 12) : 0;
 
-  // Dynamically resolve customer delivery coordinates (geocoding or order lat/lng)
-  const [customerCoords, setCustomerCoords] = useState(null);
+  // Dynamically resolve customer delivery coordinates (order saved pin -> profile pin -> legacy geocode)
+  const [customerCoords, setCustomerCoords] = useState(() =>
+    parseLatLng(order?.delivery_lat, order?.delivery_lng)
+  );
 
   useEffect(() => {
     let isMounted = true;
-    const oLat = Number(activeOrder?.delivery_lat);
-    const oLng = Number(activeOrder?.delivery_lng);
-    if (Number.isFinite(oLat) && Number.isFinite(oLng) && oLat !== 0 && oLng !== 0) {
-      setCustomerCoords({ lat: oLat, lng: oLng });
-      return;
+    const savedCoords = parseLatLng(activeOrder?.delivery_lat, activeOrder?.delivery_lng);
+    if (savedCoords) {
+      setCustomerCoords(savedCoords);
+      return () => {
+        isMounted = false;
+      };
     }
 
+    const profilePin = parseLatLng(
+      currentUser?.latitude ?? currentUser?.delivery_lat,
+      currentUser?.longitude ?? currentUser?.delivery_lng
+    );
+    if (profilePin && (!activeOrder?.customer_address || activeOrder.customer_address === currentUser?.address)) {
+      setCustomerCoords(profilePin);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Legacy fallback only when an older order record has no saved coordinates
     if (deliveryAddressStr) {
       geocodeAddress(deliveryAddressStr)
         .then((coords) => {
@@ -340,7 +376,17 @@ export default function LiveOrderTrackingMapModal({
     return () => {
       isMounted = false;
     };
-  }, [deliveryAddressStr, activeOrder?.delivery_lat, activeOrder?.delivery_lng]);
+  }, [
+    deliveryAddressStr,
+    activeOrder?.delivery_lat,
+    activeOrder?.delivery_lng,
+    activeOrder?.customer_address,
+    currentUser?.latitude,
+    currentUser?.longitude,
+    currentUser?.delivery_lat,
+    currentUser?.delivery_lng,
+    currentUser?.address,
+  ]);
 
   // Self-contained, robust interactive Leaflet HTML map that works 100% on Mobile WebViews without blinking
   const leafletMapHtml = useMemo(() => {
@@ -547,7 +593,12 @@ export default function LiveOrderTrackingMapModal({
     if (order?.customer_address) {
       setCustomAddress(order.customer_address);
     }
-  }, [order?.customer_address]);
+    const orderPin = parseLatLng(order?.delivery_lat, order?.delivery_lng);
+    setCustomLat(orderPin?.lat ?? null);
+    setCustomLng(orderPin?.lng ?? null);
+    setCustomDeliveryNotes(order?.delivery_landmark || order?.delivery_notes || '');
+    setAddressModalError('');
+  }, [order?.order_id, order?.id, order?.customer_address, order?.delivery_lat, order?.delivery_lng, order?.delivery_landmark, order?.delivery_notes]);
 
   // Dynamic arrival estimate (Unconditionally called before any return)
   const arrivalRangeText = useMemo(() => {
@@ -586,23 +637,41 @@ export default function LiveOrderTrackingMapModal({
 
   const stepIndex = getStepIndex();
   const statusLower = (activeOrder.status || '').toLowerCase();
+  const deliveryStatusLower = String(activeOrder?.delivery_status || '').toLowerCase();
+  const isOutForDeliveryStatus =
+    statusLower.includes('out for delivery') ||
+    deliveryStatusLower.includes('out for delivery') ||
+    statusLower.includes('delivery reported') ||
+    deliveryStatusLower.includes('delivery reported');
+  const isRiderView = String(currentUser?.role || '').toLowerCase() === 'rider';
+  const canShowLiveMap = isOutForDeliveryStatus || isRiderView;
   const step2Label =
-    statusLower === 'delivery failed' ? 'Delivery Failed' : 'Out for Delivery';
+    statusLower === 'delivery failed' ? 'Delivery Failed' : 'On the way';
   const step1Label =
     statusLower === 'rescheduled'
       ? 'Rescheduled'
-      : statusLower === 'ready for delivery'
-        ? 'Ready for Delivery'
-        : isCOD
-          ? 'Approval / Packing'
-          : 'Ready for Delivery';
+      : 'Packing';
 
   const STEPS = [
-    { label: 'Order placed', key: 'step-0' },
+    { label: 'Placed', key: 'step-0' },
     { label: step1Label, key: 'step-1' },
     { label: step2Label, key: 'step-2' },
-    { label: 'Order delivered', key: 'step-3' },
+    { label: 'Delivered', key: 'step-3' },
   ];
+
+  const headerStatusBadge = (() => {
+    if (statusLower.includes('cancel')) return { label: 'CANCELLED', bg: '#FEE2E2', color: '#B91C1C' };
+    if (statusLower.includes('deliver') && !statusLower.includes('out for delivery') && !statusLower.includes('ready')) {
+      return { label: 'DELIVERED', bg: '#DCFCE7', color: '#15803D' };
+    }
+    if (isOutForDeliveryStatus) return { label: 'ON THE WAY', bg: '#FFEDD5', color: '#C2410C' };
+    if (isCOD && (statusLower.includes('pending') || statusLower.includes('approval'))) {
+      return { label: 'COD CHECK', bg: '#FEF3C7', color: '#92400E' };
+    }
+    if (statusLower === 'ready for delivery') return { label: 'READY', bg: '#DCFCE7', color: '#15803D' };
+    if (statusLower === 'processing') return { label: 'PACKING', bg: '#DBEAFE', color: '#1D4ED8' };
+    return { label: isCOD ? 'COD CHECK' : 'CONFIRMED', bg: '#FEF3C7', color: '#92400E' };
+  })();
 
   const handleCopyOrderNumber = () => {
     const num = activeOrder.order_id || activeOrder.id || '';
@@ -684,26 +753,49 @@ export default function LiveOrderTrackingMapModal({
         />
         <View style={[styles.modalContainer, isDesktop && styles.modalContainerDesktop]}>
           {/* ─── 1. TOP HEADER ─── */}
-          <View style={[styles.headerRow, windowWidth < 400 && { paddingHorizontal: 12, paddingVertical: 12 }]}>
-            <TouchableOpacity style={[styles.closeBtn, windowWidth < 400 && { marginRight: 8 }]} onPress={onClose} activeOpacity={0.8}>
-              <BootstrapIcon name="x-lg" size={15} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
+          <View style={[styles.headerRow, windowWidth < 400 && { paddingHorizontal: 14, paddingVertical: 14 }]}>
+            <TouchableOpacity style={[styles.closeBtn, windowWidth < 400 && { marginRight: 10 }]} onPress={onClose} activeOpacity={0.8}>
+              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#A1A1AA' : '#475569'} />
             </TouchableOpacity>
 
             <View style={styles.headerTextWrap}>
-              <Text style={[styles.headerMainTitle, windowWidth < 380 && { fontSize: 15 }]} numberOfLines={1}>
-                {stepIndex === 0
-                  ? 'Order placed'
-                  : stepIndex === 1
-                    ? step1Label
-                    : stepIndex === 2
-                      ? step2Label
-                      : 'Order delivered'}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Text style={[styles.headerMainTitle, windowWidth < 380 && { fontSize: 17 }]} numberOfLines={1}>
+                  {stepIndex === 0
+                    ? 'Order placed'
+                    : stepIndex === 1
+                      ? step1Label
+                      : stepIndex === 2
+                        ? 'Out for delivery'
+                        : 'Order delivered'}
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.18)' : headerStatusBadge.bg,
+                    paddingHorizontal: 9,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: '800',
+                      letterSpacing: 0.4,
+                      color: isDarkMode ? '#FCD34D' : headerStatusBadge.color,
+                    }}
+                  >
+                    {headerStatusBadge.label}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.headerSubtitleText}>
+                {/awaiting|not set/i.test(arrivalRangeText) ? 'Arrives today' : arrivalRangeText}
               </Text>
-              <Text style={styles.headerSubtitleText}>{arrivalRangeText}</Text>
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, windowWidth < 400 && { paddingHorizontal: 12 }]}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, windowWidth < 400 && { paddingHorizontal: 14 }]}>
             {/* ─── 2. FOUR-STAGE TIMELINE PROGRESS STEPPER ─── */}
             <View style={styles.stepperCard}>
               <View style={styles.stepperTrackRow}>
@@ -729,7 +821,7 @@ export default function LiveOrderTrackingMapModal({
                     <View key={s.key} style={styles.stepNodeContainer}>
                       {isCurrent ? (
                         <View style={styles.activeStepCircle}>
-                          <BootstrapIcon name="box-seam-fill" size={13} color="#FFFFFF" />
+                          <BootstrapIcon name="box-seam" size={13} color="#FFFFFF" />
                         </View>
                       ) : isPassedOrCurrent ? (
                         <View style={styles.completedStepDot}>
@@ -756,9 +848,9 @@ export default function LiveOrderTrackingMapModal({
                         styles.stepLabelText,
                         isCurrent && styles.stepLabelTextActive,
                         isPassed && styles.stepLabelTextCompleted,
-                        windowWidth < 360 && { fontSize: 9.5 },
+                        windowWidth < 360 && { fontSize: 10 },
                       ]}
-                      numberOfLines={2}
+                      numberOfLines={1}
                     >
                       {s.label}
                     </Text>
@@ -769,134 +861,232 @@ export default function LiveOrderTrackingMapModal({
 
             {/* ─── 3. GUARANTEED ON-TIME DELIVERY BANNER ─── */}
             <View style={styles.guaranteeBanner}>
-              <View style={styles.guaranteeIconWrap}>
-                <BootstrapIcon name="clock-history" size={17} color="#EA580C" />
+              <View
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.22)' : '#FDE68A',
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: '800',
+                    letterSpacing: 0.5,
+                    color: isDarkMode ? '#FDE68A' : '#92400E',
+                  }}
+                >
+                  TODAY
+                </Text>
               </View>
-              <Text style={styles.guaranteeText}>
-                <Text style={{ fontWeight: '600', color: '#EA580C' }}>Guaranteed On-Time Delivery</Text>{' '}
-                assures that a delivery will be attempted by {arrivalRangeText.replace('Arriving ', '')}. Get
-                a coupon if your order arrives late.
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: isDarkMode ? '#FDE68A' : '#78350F',
+                  }}
+                >
+                  On-time delivery guaranteed
+                </Text>
+                <Text style={styles.guaranteeText}>
+                  Get a coupon if your order arrives late.
+                </Text>
+              </View>
             </View>
 
-            {/* ─── 4. REAL GOOGLE MAP / GPS TRACKING DRAWER ─── */}
+            {/* ─── 4. LIVE GPS TRACKING SECTION (VISIBLE WHEN OUT FOR DELIVERY) ─── */}
             {showLiveMapDrawer && (
-              <View style={styles.mapCard}>
-                {/* Map Header Toolbar */}
-                <View style={styles.mapToolbarRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={styles.mapHudLiveDot} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
-                      Live GPS Tracking
-                    </Text>
-                    <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', fontWeight: '600' }}>
-                      • City of Naga
-                    </Text>
-                  </View>
+              <View style={{ gap: 8 }}>
+                {canShowLiveMap ? (
+                  <>
+                    <View style={styles.mapToolbarRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 7,
+                            backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.22)' : '#DCFCE7',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <View style={styles.mapHudLiveDot} />
+                        </View>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F2F2F3' : '#0F172A' }}>
+                          Live tracking
+                        </Text>
+                        <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#64748B', fontWeight: '500' }}>
+                          {destCity || 'City of Naga'}
+                        </Text>
+                      </View>
 
-                  <TouchableOpacity
-                    style={styles.openGoogleMapsBtn}
-                    onPress={handleOpenGoogleMapsApp}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon name="box-arrow-up-right" size={11} color={isDarkMode ? '#FB923C' : '#EA580C'} />
-                    <Text style={styles.openGoogleMapsBtnText}>Open in Google Maps</Text>
-                  </TouchableOpacity>
-                </View>
+                      <TouchableOpacity
+                        onPress={handleOpenGoogleMapsApp}
+                        activeOpacity={0.8}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      >
+                        <Text style={styles.openGoogleMapsBtnText}>Open map</Text>
+                        <BootstrapIcon name="box-arrow-up-right" size={11} color={isDarkMode ? '#FB923C' : '#EA580C'} />
+                      </TouchableOpacity>
+                    </View>
 
-                {/* Live GPS map — rider location from delivery_locations (Realtime) */}
-                <View style={styles.mapCanvasWrapper}>
-                  <DeliveryTrackingPanel
-                    order={{
-                      ...activeOrder,
-                      order_id: activeOrder?.order_id || activeOrder?.id,
-                      delivery_lat: customerCoords?.lat ?? activeOrder?.delivery_lat,
-                      delivery_lng: customerCoords?.lng ?? activeOrder?.delivery_lng,
-                      customer_address: deliveryAddressStr,
-                      status: activeOrder?.status,
+                    <View style={styles.mapCanvasWrapper}>
+                      <DeliveryTrackingPanel
+                        order={{
+                          ...activeOrder,
+                          order_id: activeOrder?.order_id || activeOrder?.id,
+                          delivery_lat: customerCoords?.lat ?? activeOrder?.delivery_lat,
+                          delivery_lng: customerCoords?.lng ?? activeOrder?.delivery_lng,
+                          delivery_landmark: activeOrder?.delivery_landmark || activeOrder?.delivery_notes || '',
+                          customer_address: deliveryAddressStr,
+                          status: activeOrder?.status,
+                        }}
+                        statusOverride={activeOrder?.status}
+                        height={240}
+                        title="Live delivery map"
+                        showWhenInactive={isRiderView}
+                        hideHeader={true}
+                        hideLegend={true}
+                        hideFooter={true}
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <View
+                    style={{
+                      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
+                      borderRadius: 12,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
                     }}
-                    statusOverride={activeOrder?.status}
-                    height={260}
-                    title="Live delivery map"
-                    showWhenInactive
-                    hideHeader={true}
-                    hideLegend={true}
-                    hideFooter={true}
-                  />
-                </View>
-
-                {/* Rider Contact Card */}
-                <View style={styles.riderInfoBar}>
-                  {riderInfo.unassigned ? (
+                  >
                     <View
-                      style={[
-                        styles.riderAvatarSmall,
-                        {
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
-                        },
-                      ]}
-                    >
-                      <BootstrapIcon name="person" size={16} color="#94A3B8" />
-                    </View>
-                  ) : riderInfo.avatar ? (
-                    <Image source={{ uri: riderInfo.avatar }} style={styles.riderAvatarSmall} />
-                  ) : (
-                    <View
-                      style={[
-                        styles.riderAvatarSmall,
-                        {
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: isDarkMode ? '#202124' : '#E2E8F0',
-                        },
-                      ]}
-                    >
-                      <BootstrapIcon name="person" size={16} color="#94A3B8" />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    {riderInfo.unassigned ? (
-                      <>
-                        <Text style={styles.riderNameSmall}>Awaiting rider assignment</Text>
-                        <Text style={styles.riderPlateText}>
-                          Admin will assign a registered delivery rider
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.riderNameSmall}>
-                          {riderInfo.name}
-                          {riderInfo.vehicle ? ` • ${riderInfo.vehicle}` : ''}
-                        </Text>
-                        <Text style={styles.riderPlateText}>
-                          {riderInfo.plateNumber && riderInfo.plateNumber !== '—'
-                            ? `Plate: ${riderInfo.plateNumber}`
-                            : 'Registered delivery rider'}
-                          {riderInfo.rating != null ? ` • ⭐️ ${riderInfo.rating}` : ''}
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                  {!riderInfo.unassigned && riderInfo.phone && riderInfo.phone !== '—' ? (
-                    <TouchableOpacity
-                      style={styles.riderCallSmallBtn}
-                      onPress={() => {
-                        if (Platform.OS === 'web' && typeof Linking !== 'undefined') {
-                          Linking.openURL(`tel:${String(riderInfo.phone).replace(/[^\d+]/g, '')}`);
-                        }
-                        setIsCallingRider(true);
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#FED7AA',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
-                      activeOpacity={0.8}
                     >
-                      <BootstrapIcon name="telephone-fill" size={13} color="#FFFFFF" />
-                      <Text style={styles.riderCallSmallText}>Call</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
+                      <BootstrapIcon name="truck" size={17} color="#EA580C" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          color: isDarkMode ? '#F2F2F3' : '#0F172A',
+                        }}
+                      >
+                        Live map unlocks when Out for Delivery
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          color: isDarkMode ? '#A1A1AA' : '#64748B',
+                          marginTop: 2,
+                          lineHeight: 16,
+                        }}
+                      >
+                        Current status: {activeOrder?.status || 'Processing'}. Once the rider is on the way, live GPS tracking will appear here.
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
+
+            {/* ─── 4B. RIDER STATUS / CONTACT CARD ─── */}
+            <View style={styles.riderInfoBar}>
+              {riderInfo.unassigned ? (
+                <View
+                  style={[
+                    styles.riderAvatarSmall,
+                    {
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="person" size={17} color="#94A3B8" />
+                </View>
+              ) : riderInfo.avatar ? (
+                <Image source={{ uri: riderInfo.avatar }} style={styles.riderAvatarSmall} />
+              ) : (
+                <View
+                  style={[
+                    styles.riderAvatarSmall,
+                    {
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isDarkMode ? '#202124' : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="person" size={17} color="#94A3B8" />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                {riderInfo.unassigned ? (
+                  <>
+                    <Text style={styles.riderNameSmall}>Finding your rider</Text>
+                    <Text style={styles.riderPlateText}>
+                      We&apos;ll update you when a rider is assigned.
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.riderNameSmall}>
+                      {riderInfo.name}
+                      {riderInfo.vehicle ? ` • ${riderInfo.vehicle}` : ''}
+                    </Text>
+                    <Text style={styles.riderPlateText}>
+                      {riderInfo.plateNumber && riderInfo.plateNumber !== '—'
+                        ? `Plate: ${riderInfo.plateNumber}`
+                        : 'Registered delivery rider'}
+                      {riderInfo.rating != null ? ` • ⭐️ ${riderInfo.rating}` : ''}
+                    </Text>
+                  </>
+                )}
+              </View>
+              {riderInfo.unassigned ? (
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: '#F59E0B',
+                    marginRight: 4,
+                  }}
+                />
+              ) : riderInfo.phone && riderInfo.phone !== '—' ? (
+                <TouchableOpacity
+                  style={styles.riderCallSmallBtn}
+                  onPress={() => {
+                    if (Platform.OS === 'web' && typeof Linking !== 'undefined') {
+                      Linking.openURL(`tel:${String(riderInfo.phone).replace(/[^\d+]/g, '')}`);
+                    }
+                    setIsCallingRider(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <BootstrapIcon name="telephone-fill" size={13} color="#FFFFFF" />
+                  <Text style={styles.riderCallSmallText}>Call</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
             {/* ─── 5. CUSTOMER SHIPPING ADDRESS CARD ─── */}
             <View style={styles.addressCard}>
@@ -905,23 +1095,62 @@ export default function LiveOrderTrackingMapModal({
                   <BootstrapIcon name="geo-alt-fill" size={16} color="#EA580C" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.addressRecipientName}>
-                    {activeOrder?.customer_name || currentUser?.name || currentUser?.fullName || 'Customer'}{' '}
-                    <Text style={styles.addressPhone}>
-                      {formatPHPhone(activeOrder?.customer_phone || currentUser?.phone, true)}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <Text style={[styles.addressRecipientName, { flex: 1 }]} numberOfLines={1}>
+                      {activeOrder?.customer_name || currentUser?.name || currentUser?.fullName || 'Customer'}{' '}
+                      <Text style={styles.addressPhone}>
+                        {formatPHPhone(activeOrder?.customer_phone || currentUser?.phone, true)}
+                      </Text>
                     </Text>
-                  </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (!canEditAddress) {
+                          showToast('Address cannot be changed after the order is out for delivery.');
+                          return;
+                        }
+                        const pin = parseLatLng(activeOrder?.delivery_lat, activeOrder?.delivery_lng);
+                        setCustomAddress(deliveryAddressStr);
+                        setCustomLat(pin?.lat ?? customerCoords?.lat ?? null);
+                        setCustomLng(pin?.lng ?? customerCoords?.lng ?? null);
+                        setCustomDeliveryNotes(activeOrder?.delivery_landmark || activeOrder?.delivery_notes || '');
+                        setAddressModalError('');
+                        setIsAddressModalOpen(true);
+                      }}
+                      activeOpacity={0.8}
+                      hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+                    >
+                      <Text style={[styles.changeAddressLinkText, !canEditAddress && { opacity: 0.45 }]}>
+                        Edit
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                   <Text style={styles.addressDetailText}>{deliveryAddressStr}</Text>
+                  {(activeOrder?.delivery_landmark || activeOrder?.delivery_notes) ? (
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: isDarkMode ? '#FB923C' : '#C2410C',
+                        fontWeight: '600',
+                        marginTop: 4,
+                      }}
+                    >
+                      {activeOrder?.delivery_landmark || activeOrder?.delivery_notes}
+                    </Text>
+                  ) : null}
+                  {parseLatLng(customerCoords?.lat ?? activeOrder?.delivery_lat, customerCoords?.lng ?? activeOrder?.delivery_lng) ? (
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        color: isDarkMode ? '#86EFAC' : '#15803D',
+                        fontWeight: '700',
+                        marginTop: 5,
+                      }}
+                    >
+                      ✓ Exact pin added
+                    </Text>
+                  ) : null}
                 </View>
               </View>
-
-              <TouchableOpacity
-                style={styles.changeAddressLink}
-                onPress={() => setIsAddressModalOpen(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.changeAddressLinkText}>Change address</Text>
-              </TouchableOpacity>
             </View>
 
             {/* ─── 6. STORE & ORDER ITEMS CARD ─── */}
@@ -932,7 +1161,12 @@ export default function LiveOrderTrackingMapModal({
                   <View style={styles.storeAvatarCircle}>
                     <BootstrapIcon name="shield-check" size={14} color="#EA580C" />
                   </View>
-                  <Text style={styles.storeNameText}>MotoTrack Motorparts and Accessories</Text>
+                  <View>
+                    <Text style={styles.storeNameText}>MotoTrack Motorparts</Text>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 1 }}>
+                      Motorparts &amp; accessories
+                    </Text>
+                  </View>
                 </View>
 
                 <TouchableOpacity
@@ -942,8 +1176,8 @@ export default function LiveOrderTrackingMapModal({
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.browseShopText}>Browse shop</Text>
-                  <BootstrapIcon name="chevron-right" size={12} color={isDarkMode ? '#A1A1AA' : '#64748B'} />
+                  <Text style={[styles.browseShopText, { color: isDarkMode ? '#FB923C' : '#EA580C' }]}>Shop</Text>
+                  <BootstrapIcon name="chevron-right" size={11} color={isDarkMode ? '#FB923C' : '#EA580C'} />
                 </TouchableOpacity>
               </View>
 
@@ -1010,7 +1244,7 @@ export default function LiveOrderTrackingMapModal({
 
               {/* Order Number & Copy Row */}
               <View style={styles.orderNumberRow}>
-                <Text style={styles.orderNumberLabel}>Order number</Text>
+                <Text style={styles.orderNumberLabel}>Order</Text>
                 <TouchableOpacity
                   style={styles.orderNumberValueWrap}
                   onPress={handleCopyOrderNumber}
@@ -1139,59 +1373,95 @@ export default function LiveOrderTrackingMapModal({
           {/* ─── ADDRESS EDIT DIALOG ─── */}
           {isAddressModalOpen && (
             <View style={styles.editAddressOverlay}>
-              <View style={styles.editAddressCard}>
-                <Text style={styles.editAddressTitle}>Update Delivery Address</Text>
-                {currentUser?.address ? (
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: '#FEF3C7',
-                      padding: 8,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: '#FDE68A',
+              <View style={[styles.editAddressCard, { maxWidth: 460, maxHeight: '90%' }]}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                  <Text style={styles.editAddressTitle}>Update Delivery Address & Pin</Text>
+                  {currentUser?.address ? (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: '#FEF3C7',
+                        padding: 8,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: '#FDE68A',
+                      }}
+                      onPress={() => {
+                        const savedProfilePin = parseLatLng(
+                          currentUser.latitude ?? currentUser.delivery_lat,
+                          currentUser.longitude ?? currentUser.delivery_lng
+                        );
+                        setCustomAddress(currentUser.address);
+                        if (savedProfilePin) {
+                          setCustomLat(savedProfilePin.lat);
+                          setCustomLng(savedProfilePin.lng);
+                        }
+                        if (currentUser.deliveryNotes || currentUser.delivery_notes) {
+                          setCustomDeliveryNotes(
+                            currentUser.deliveryNotes || currentUser.delivery_notes
+                          );
+                        }
+                        setAddressModalError('');
+                        showToast('Loaded address & pin from user profile');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="geo-alt-fill" size={13} color="#EA580C" />
+                      <Text style={{ fontSize: 11.5, color: '#EA580C', fontWeight: '600', flex: 1 }}>
+                        Use Profile Address: {currentUser.address.slice(0, 35)}...
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TextInput
+                    style={styles.editAddressInput}
+                    value={customAddress}
+                    onChangeText={setCustomAddress}
+                    placeholder="Enter updated complete address"
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                  />
+                  <TextInput
+                    style={[styles.editAddressInput, { minHeight: 42 }]}
+                    value={customDeliveryNotes}
+                    onChangeText={setCustomDeliveryNotes}
+                    placeholder="Landmark / delivery notes (e.g. blue gate, beside sari-sari store)"
+                    placeholderTextColor="#94A3B8"
+                  />
+                  <DeliveryLocationPicker
+                    latitude={customLat}
+                    longitude={customLng}
+                    addressText={customAddress}
+                    isDarkMode={isDarkMode}
+                    height={190}
+                    errorText={addressModalError}
+                    onLocationChange={({ lat, lng }) => {
+                      setCustomLat(lat);
+                      setCustomLng(lng);
+                      setAddressModalError('');
                     }}
-                    onPress={() => {
-                      setCustomAddress(currentUser.address);
-                      showToast('Loaded address from user profile');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon name="geo-alt-fill" size={13} color="#EA580C" />
-                    <Text style={{ fontSize: 11.5, color: '#EA580C', fontWeight: '600', flex: 1 }}>
-                      Use Profile Address: {currentUser.address.slice(0, 35)}...
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TextInput
-                  style={styles.editAddressInput}
-                  value={customAddress}
-                  onChangeText={setCustomAddress}
-                  placeholder="Enter updated complete address"
-                  placeholderTextColor="#94A3B8"
-                  multiline
-                />
-                <View style={styles.editAddressBtnRow}>
-                  <TouchableOpacity
-                    style={styles.editAddressCancelBtn}
-                    onPress={() => setIsAddressModalOpen(false)}
-                  >
-                    <Text style={styles.editAddressCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.editAddressSaveBtn}
-                    disabled={isSubmittingAction}
-                    onPress={handleSaveAddress}
-                  >
-                    {isSubmittingAction ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.editAddressSaveText}>Save Address</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                  />
+                  <View style={styles.editAddressBtnRow}>
+                    <TouchableOpacity
+                      style={styles.editAddressCancelBtn}
+                      onPress={() => setIsAddressModalOpen(false)}
+                    >
+                      <Text style={styles.editAddressCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.editAddressSaveBtn}
+                      disabled={isSubmittingAction}
+                      onPress={handleSaveAddress}
+                    >
+                      {isSubmittingAction ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.editAddressSaveText}>Save Address & Pin</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             </View>
           )}
@@ -1448,8 +1718,8 @@ const createStyles = (isDarkMode) =>
       backgroundColor: isDarkMode ? '#191A1D' : '#FFFFFF',
       borderWidth: isDarkMode ? 1 : 0,
       borderColor: isDarkMode ? '#303236' : 'transparent',
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
       maxHeight: '94%',
       overflow: 'hidden',
       shadowColor: '#0F172A',
@@ -1461,7 +1731,7 @@ const createStyles = (isDarkMode) =>
     modalContainerDesktop: {
       maxWidth: 560,
       marginHorizontal: 'auto',
-      borderRadius: 28,
+      borderRadius: 16,
       maxHeight: '90%',
       marginBottom: 24,
       borderWidth: 1,
@@ -1532,11 +1802,11 @@ const createStyles = (isDarkMode) =>
 
     // 2. Timeline Stepper
     stepperCard: {
-      backgroundColor: isDarkMode ? '#18181B' : '#F8FAFC',
-      borderRadius: 20,
-      paddingHorizontal: 16,
-      paddingTop: 20,
-      paddingBottom: 16,
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingTop: 18,
+      paddingBottom: 14,
       borderWidth: 1,
       borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
@@ -1623,22 +1893,22 @@ const createStyles = (isDarkMode) =>
     // 3. Guarantee Banner
     guaranteeBanner: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7',
-      borderRadius: 16,
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#FFFBEB',
+      borderRadius: 12,
       padding: 13,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.3)' : '#FDE68A',
-      gap: 10,
+      gap: 12,
     },
     guaranteeIconWrap: {
       marginTop: 1,
     },
     guaranteeText: {
-      flex: 1,
       fontSize: 12,
-      color: isDarkMode ? '#FDE68A' : '#334155',
-      lineHeight: 18,
+      color: isDarkMode ? '#FDE68A' : '#92400E',
+      marginTop: 2,
+      lineHeight: 17,
     },
 
     // 4. Google Maps Section
@@ -1710,14 +1980,14 @@ const createStyles = (isDarkMode) =>
     },
 
     mapCanvasWrapper: {
-      height: 260,
-      minHeight: 260,
+      height: 240,
+      minHeight: 240,
       backgroundColor: isDarkMode ? '#14181D' : '#EDF1F5',
-      borderRadius: 16,
+      borderRadius: 12,
       position: 'relative',
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: isDarkMode ? '#303236' : '#CBD5E1',
+      borderColor: isDarkMode ? '#303236' : '#E2E8F0',
     },
     iframeMapContainer: {
       width: '100%',
@@ -2079,28 +2349,27 @@ const createStyles = (isDarkMode) =>
     riderInfoBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
-      borderRadius: 14,
-      padding: 10,
+      gap: 12,
+      backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+      borderRadius: 12,
+      padding: 13,
       borderWidth: 1,
       borderColor: isDarkMode ? '#303236' : '#E2E8F0',
-      marginTop: 10,
     },
     riderAvatarSmall: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
     },
     riderNameSmall: {
-      fontSize: 12.5,
-      fontWeight: '600',
+      fontSize: 13.5,
+      fontWeight: '700',
       color: isDarkMode ? '#F2F2F3' : '#0F172A',
     },
     riderPlateText: {
-      fontSize: 10.5,
-      color: '#94A3B8',
-      marginTop: 1,
+      fontSize: 11.5,
+      color: isDarkMode ? '#94A3B8' : '#64748B',
+      marginTop: 2,
     },
     riderCallSmallBtn: {
       flexDirection: 'row',
@@ -2120,11 +2389,11 @@ const createStyles = (isDarkMode) =>
     // 6. Address Card
     addressCard: {
       backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
-      borderRadius: 18,
+      borderRadius: 12,
       padding: 14,
       borderWidth: 1,
       borderColor: isDarkMode ? '#303236' : '#E2E8F0',
-      gap: 8,
+      gap: 6,
     },
     addressHeaderRow: {
       flexDirection: 'row',
@@ -2164,7 +2433,7 @@ const createStyles = (isDarkMode) =>
     // 7. Order Items Card
     orderItemsCard: {
       backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
-      borderRadius: 18,
+      borderRadius: 12,
       padding: 14,
       borderWidth: 1,
       borderColor: isDarkMode ? '#303236' : '#E2E8F0',
@@ -2181,12 +2450,12 @@ const createStyles = (isDarkMode) =>
     storeHeaderLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 10,
     },
     storeAvatarCircle: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
       alignItems: 'center',
       justifyContent: 'center',
@@ -2378,7 +2647,7 @@ const createStyles = (isDarkMode) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7',
-      borderRadius: 16,
+      borderRadius: 12,
       padding: 13,
       borderWidth: 1,
       borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.3)' : '#FDE68A',
@@ -2408,7 +2677,7 @@ const createStyles = (isDarkMode) =>
       flex: 1,
       backgroundColor: isDarkMode ? '#202124' : '#F8FAFC',
       paddingVertical: 13,
-      borderRadius: 14,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
@@ -2423,7 +2692,7 @@ const createStyles = (isDarkMode) =>
       flex: 1,
       backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
       paddingVertical: 13,
-      borderRadius: 14,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,

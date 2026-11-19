@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
+import React, { memo, useState, useMemo } from 'react';
+import { View, Text, TouchableOpacity, Image, Platform, useWindowDimensions } from 'react-native';
 import BootstrapIcon from '../../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../../styles/shop.styles.js';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
@@ -50,7 +50,7 @@ function resolveProductImage(url) {
   return raw;
 }
 
-export default function ProductCard({ product, bike, onPress, containerPadding }) {
+function ProductCard({ product, bike, onPress, containerPadding }) {
   const { width } = useWindowDimensions();
   const { isDarkMode = false } = useTheme?.() || {};
   const isTablet = width >= 700 && width < 1024;
@@ -75,13 +75,10 @@ export default function ProductCard({ product, bike, onPress, containerPadding }
 
   const rawImage = product?.image || product?.imageUrl || '';
   const resolvedImageUri = useMemo(() => resolveProductImage(rawImage), [rawImage]);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-
-  useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
-  }, [resolvedImageUri]);
+  const [failedUri, setFailedUri] = useState(null);
+  const [loadedUri, setLoadedUri] = useState(null);
+  const imageError = Boolean(resolvedImageUri && failedUri === resolvedImageUri);
+  const imageLoaded = Boolean(resolvedImageUri && loadedUri === resolvedImageUri);
 
   const compatMessage = product?.compatMessage;
   const compatStatus = product?.compatStatus;
@@ -111,8 +108,9 @@ export default function ProductCard({ product, bike, onPress, containerPadding }
                 height: '100%',
               }}
               resizeMode="cover"
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageError(true)}
+              fadeDuration={Platform.OS === 'android' ? 0 : 200}
+              onLoad={() => setLoadedUri(resolvedImageUri)}
+              onError={() => setFailedUri(resolvedImageUri)}
             />
             {!imageLoaded && (
               <View
@@ -244,4 +242,17 @@ export default function ProductCard({ product, bike, onPress, containerPadding }
     </TouchableOpacity>
   );
 }
+
+export default memo(ProductCard, (prev, next) => (
+  prev.product?.id === next.product?.id &&
+  prev.product?.price === next.product?.price &&
+  prev.product?.stock === next.product?.stock &&
+  prev.product?.image === next.product?.image &&
+  prev.product?.imageUrl === next.product?.imageUrl &&
+  prev.product?.compatStatus === next.product?.compatStatus &&
+  prev.product?.rating === next.product?.rating &&
+  prev.product?.reviews === next.product?.reviews &&
+  prev.bike?.motorcycle_id === next.bike?.motorcycle_id &&
+  prev.containerPadding === next.containerPadding
+));
 

@@ -223,7 +223,7 @@ export const authService = {
           expiresAt,
         })
       );
-    } catch (_e) {}
+    } catch (_e) { }
 
     return {
       success: true,
@@ -306,7 +306,7 @@ export const authService = {
               isOtpValid = true;
             }
           }
-        } catch (_authErr) {}
+        } catch (_authErr) { }
       }
     }
 
@@ -320,7 +320,7 @@ export const authService = {
             isOtpValid = true;
           }
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!isOtpValid) {
@@ -365,7 +365,7 @@ export const authService = {
               data: { name, phone, address, role: isAdmin ? 'admin' : 'user' },
             },
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       const { password: _, ...safeUser } = res.user;
@@ -378,7 +378,7 @@ export const authService = {
             email: safeUser.email,
             phone: safeUser.phone,
           });
-        } catch (_e) {}
+        } catch (_e) { }
       }
 
       return { success: true, user: safeUser };
@@ -416,15 +416,16 @@ export const authService = {
       } else {
         appStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       }
-    } catch (_e) {}
+    } catch (_e) { }
   },
 
   async updateProfile(userId, updates) {
     const res = await userService.updateProfile(userId, updates);
     if (res.success && res.user) {
       const { password: _, ...safeUser } = res.user;
-      this.setCurrentUser(safeUser);
-      return { success: true, user: safeUser };
+      const mergedUser = { ...(this.getCurrentUser() || {}), ...safeUser };
+      this.setCurrentUser(mergedUser);
+      return { success: true, user: mergedUser };
     }
     return res;
   },
@@ -440,7 +441,7 @@ export const authService = {
           type: 'security',
           userId: userId,
         });
-      } catch (_e) {}
+      } catch (_e) { }
     }
     return res;
   },
@@ -457,7 +458,7 @@ export const authService = {
             must_change_password: false,
           });
         }
-      } catch (_e) {}
+      } catch (_e) { }
       try {
         emailService.sendNotification({
           title: 'MotoTrack Security Alert: Password Updated',
@@ -466,7 +467,7 @@ export const authService = {
           type: 'security',
           userId: userId,
         });
-      } catch (_e) {}
+      } catch (_e) { }
     }
     return res;
   },
@@ -489,14 +490,14 @@ export const authService = {
           .ilike('email', cleanEmail)
           .maybeSingle();
         if (data) targetUser = data;
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!targetUser) {
       try {
         const all = await userService.getAllUsers();
         targetUser = (all || []).find((u) => String(u.email || '').toLowerCase() === cleanEmail);
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!targetUser && cleanEmail === ADMIN_USER.email.toLowerCase()) {
@@ -557,7 +558,7 @@ export const authService = {
           expiresAt,
         })
       );
-    } catch (_e) {}
+    } catch (_e) { }
 
     return {
       success: true,
@@ -632,7 +633,7 @@ export const authService = {
             isOtpValid = true;
           }
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     if (!isOtpValid) {
@@ -656,7 +657,7 @@ export const authService = {
         type: 'security',
         userId: resetRes.user?.user_id || resetRes.user?.id,
       });
-    } catch (_e) {}
+    } catch (_e) { }
 
     return resetRes;
   },
@@ -683,7 +684,7 @@ export const authService = {
           email: cleanEmail,
           password: cleanPassword,
         });
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     // 2. Validate user in Supabase public.users
@@ -692,7 +693,7 @@ export const authService = {
       // Mechanic is a retired role: legacy accounts can no longer sign in.
       try {
         if (supabase) await supabase.auth.signOut();
-      } catch (_e) {}
+      } catch (_e) { }
       return { success: false, error: LEGACY_MECHANIC_BLOCKED_MESSAGE };
     }
     if (res.success) {
@@ -806,7 +807,7 @@ export const authService = {
             capturedUrl = url;
             try {
               WebBrowser.dismissBrowser();
-            } catch (_e) {}
+            } catch (_e) { }
           }
         });
 
@@ -885,7 +886,7 @@ export const authService = {
         try {
           const res = await oauthCallbackInFlight;
           if (res?.success) return res;
-        } catch (_e) {}
+        } catch (_e) { }
       }
       const existing = this.getCurrentUser();
       if (existing?.auth_provider === 'google') {
@@ -967,7 +968,7 @@ export const authService = {
 
       try {
         await this.logAccountActivity(safeUser.id, 'oauth_google_login', 'User signed in via Google account');
-      } catch (_e) {}
+      } catch (_e) { }
 
       return {
         success: true,
@@ -995,17 +996,38 @@ export const authService = {
       try {
         const { data } = await supabase
           .from('users')
-          .select('*')
+          .select('*, customers(customer_id, contact_number)')
           .ilike('email', googleEmail)
           .maybeSingle();
         if (data) {
+          const custInfo =
+            Array.isArray(data.customers) && data.customers[0] ? data.customers[0] : null;
+          let addrRow = null;
+          if (custInfo?.customer_id) {
+            try {
+              const { data: aData } = await supabase
+                .from('addresses')
+                .select('full_address, latitude, longitude, landmark')
+                .eq('customer_id', custInfo.customer_id)
+                .order('is_default', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              if (aData) addrRow = aData;
+            } catch (_e) { }
+          }
           existingRecord = {
             ...data,
             id: data.user_id || data.id,
             user_id: data.user_id || data.id,
+            customer_id: custInfo?.customer_id || data.customer_id || null,
+            phone: data.phone || custInfo?.contact_number || '',
+            address: data.address || addrRow?.full_address || '',
+            latitude: data.latitude ?? addrRow?.latitude ?? null,
+            longitude: data.longitude ?? addrRow?.longitude ?? null,
+            delivery_notes: data.delivery_notes || addrRow?.landmark || '',
           };
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
     if (!existingRecord) {
       try {
@@ -1013,20 +1035,56 @@ export const authService = {
         existingRecord = (allUsers || []).find(
           (user) => (user.email || '').toLowerCase() === googleEmail
         );
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     let safeUser;
     if (existingRecord) {
       const { password: _pwd, ...restExisting } = existingRecord;
+      const cachedCurrent = this.getCurrentUser();
+      const sameCached =
+        cachedCurrent &&
+        (String(cachedCurrent.email || '').toLowerCase() === googleEmail ||
+          cachedCurrent.id === existingRecord.id ||
+          cachedCurrent.user_id === existingRecord.user_id);
+      const rawLat =
+        existingRecord.latitude ??
+        existingRecord.delivery_lat ??
+        (sameCached ? cachedCurrent.latitude ?? cachedCurrent.delivery_lat : null);
+      const rawLng =
+        existingRecord.longitude ??
+        existingRecord.delivery_lng ??
+        (sameCached ? cachedCurrent.longitude ?? cachedCurrent.delivery_lng : null);
+      const existingCoords =
+        rawLat != null &&
+        rawLng != null &&
+        Number.isFinite(Number(rawLat)) &&
+        Number.isFinite(Number(rawLng)) &&
+        (Number(rawLat) !== 0 || Number(rawLng) !== 0)
+          ? { lat: Number(rawLat), lng: Number(rawLng) }
+          : null;
+      const existingNotes =
+        existingRecord.deliveryNotes ||
+        existingRecord.delivery_notes ||
+        (sameCached ? cachedCurrent.deliveryNotes || cachedCurrent.delivery_notes : '') ||
+        '';
       safeUser = {
         ...restExisting,
         id: existingRecord.id || existingRecord.user_id || u.id,
         user_id: existingRecord.user_id || existingRecord.id || u.id,
+        customer_id:
+          existingRecord.customer_id || (sameCached ? cachedCurrent.customer_id : null) || null,
         name: existingRecord.name || fullName,
         email: googleEmail,
         role: existingRecord.role || 'user',
         avatar: existingRecord.avatar || avatarUrl,
+        address: existingRecord.address || (sameCached ? cachedCurrent.address : '') || '',
+        latitude: existingCoords?.lat ?? null,
+        longitude: existingCoords?.lng ?? null,
+        delivery_lat: existingCoords?.lat ?? null,
+        delivery_lng: existingCoords?.lng ?? null,
+        deliveryNotes: existingNotes,
+        delivery_notes: existingNotes,
         auth_provider: 'google',
       };
       try {
@@ -1034,7 +1092,7 @@ export const authService = {
           name: safeUser.name,
           avatar: safeUser.avatar,
         });
-      } catch (_e) {}
+      } catch (_e) { }
       if (safeUser.role === 'admin') {
         adminSecurityService.lockSession(safeUser);
       }
@@ -1149,7 +1207,7 @@ export const authService = {
             email: safeUser.email,
             phone: safeUser.phone,
           });
-        } catch (_e) {}
+        } catch (_e) { }
       }
 
       return { success: true, user: safeUser };
@@ -1160,7 +1218,7 @@ export const authService = {
 
   logout() {
     if (supabase) {
-      supabase.auth.signOut().catch(() => {});
+      supabase.auth.signOut().catch(() => { });
     }
     try {
       adminSecurityService.lockSession();
@@ -1169,7 +1227,7 @@ export const authService = {
         window.localStorage.removeItem('@mototrack_user_notifications');
         window.localStorage.removeItem('@mototrack_garage_bookings');
       }
-    } catch (_e) {}
+    } catch (_e) { }
     this.setCurrentUser(null);
     return { success: true };
   },

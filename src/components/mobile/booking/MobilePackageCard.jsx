@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import React, { useState, useEffect, memo } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
 import { BootstrapIcon } from '../../common';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 import {
@@ -8,7 +8,7 @@ import {
   getPackageStartingPrice,
 } from './mobilePackageCatalog.js';
 
-export default function MobilePackageCard({
+function MobilePackageCard({
   pkg,
   isSelected = false,
   selectedMotorcycle = null,
@@ -75,6 +75,7 @@ export default function MobilePackageCard({
             source={{ uri: imageUri }}
             style={styles.cardImage}
             resizeMode="cover"
+            fadeDuration={Platform.OS === 'android' ? 0 : 200}
             onError={() => setImgError(true)}
           />
         )}
@@ -203,6 +204,8 @@ export default function MobilePackageCard({
     </View>
   );
 }
+
+export default memo(MobilePackageCard);
 
 const styles = StyleSheet.create({
   cardWrapper: {

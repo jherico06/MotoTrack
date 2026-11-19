@@ -22,6 +22,7 @@ export { default as OrderDeliveryCalendar } from './OrderDeliveryCalendar.jsx';
 export { default as DateRangeCalendarPicker } from './DateRangeCalendarPicker.jsx';
 export { default as LiveDeliveryMap } from './LiveDeliveryMap.jsx';
 export { default as DeliveryTrackingPanel } from './DeliveryTrackingPanel.jsx';
+export { default as DeliveryLocationPicker } from './DeliveryLocationPicker.jsx';
 export { default as ServiceCategoryIcon } from './ServiceCategoryIcon.jsx';
 export { default as ToggleSwitch } from './ToggleSwitch.jsx';
 export { default as HeaderSearchWidget } from './HeaderSearchWidget.jsx';

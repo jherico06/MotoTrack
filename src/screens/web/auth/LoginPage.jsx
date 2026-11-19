@@ -14,9 +14,12 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon, BrandLogo, GoogleIcon } from '../../../components';
+import WebLocationPicker from '../../../components/web/WebLocationPicker.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { authService } from '../../../services/auth/authService.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { appStorage } from '../../../services/system/storageAdapter.js';
+import { parseLatLng } from '../../../utils/geo.js';
 import { isRider } from '../../../utils/permissions.js';
 import { fontFamily } from '../../../styles/typography.js';
 import { botanicalStyles, authWebStyles as authStyles } from '../../../styles/web/loginPage.web.styles.js';
@@ -36,6 +39,7 @@ export default function LoginPageWeb({
   const {
     login,
     logout,
+    setCurrentUser,
     loginWithGoogle,
     loginWithGoogleSimulated,
     validatePasswordStrength,
@@ -118,6 +122,10 @@ export default function LoginPageWeb({
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPhone, setSignUpPhone] = useState('');
   const [signUpAddress, setSignUpAddress] = useState('');
+  const [signUpLat, setSignUpLat] = useState(null);
+  const [signUpLng, setSignUpLng] = useState(null);
+  const [signUpPinError, setSignUpPinError] = useState('');
+  const [showSignUpPinMap, setShowSignUpPinMap] = useState(true);
   const [signUpPassword, setSignUpPassword] = useState('');
   const [signUpConfirmPassword, setSignUpConfirmPassword] = useState('');
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
@@ -410,6 +418,14 @@ export default function LoginPageWeb({
       setSignUpError('Please enter your delivery address.');
       return;
     }
+    const signUpCoords = parseLatLng(signUpLat, signUpLng);
+    if (!signUpCoords) {
+      const msg = 'Please pin your exact house location on the map before continuing.';
+      setSignUpPinError(msg);
+      setSignUpError(msg);
+      setShowSignUpPinMap(true);
+      return;
+    }
     if (!passwordAnalysis.isStrong) {
       setSignUpError(
         passwordAnalysis.feedback || 'Please choose a strong password fulfilling all security requirements.'
@@ -524,18 +540,50 @@ export default function LoginPageWeb({
         isAdmin: false,
       },
     });
-    setIsSignUpLoading(false);
 
     if (!res.success) {
+      setIsSignUpLoading(false);
       setSignUpError(res.error || 'Verification failed. Please check the code and try again.');
       return;
     }
 
+    let finalUser = res.user;
+    const signUpCoords = parseLatLng(signUpLat, signUpLng);
+    if (signUpCoords && finalUser) {
+      const uid = finalUser.id || finalUser.user_id;
+      if (uid) {
+        try {
+          const coordRes = await authService.updateProfile(uid, {
+            address: signUpAddress.trim(),
+            latitude: signUpCoords.lat,
+            longitude: signUpCoords.lng,
+            delivery_lat: signUpCoords.lat,
+            delivery_lng: signUpCoords.lng,
+          });
+          if (coordRes?.success && coordRes?.user) {
+            finalUser = coordRes.user;
+            setCurrentUser?.(coordRes.user);
+          } else {
+            finalUser = {
+              ...finalUser,
+              latitude: signUpCoords.lat,
+              longitude: signUpCoords.lng,
+              delivery_lat: signUpCoords.lat,
+              delivery_lng: signUpCoords.lng,
+            };
+            authService.setCurrentUser?.(finalUser);
+            setCurrentUser?.(finalUser);
+          }
+        } catch (_pinSaveErr) {}
+      }
+    }
+    setIsSignUpLoading(false);
+
     // Direct navigation straight to the storefront
     if (onLoginSuccess) {
-      onLoginSuccess(res.user);
+      onLoginSuccess(finalUser);
     } else if (onSignUpSuccess) {
-      onSignUpSuccess(res.user);
+      onSignUpSuccess(finalUser);
     } else {
       onNavigateToStore?.();
     }
@@ -552,6 +600,108 @@ export default function LoginPageWeb({
   });
 
   const isSignUp = activeMode === 'signup';
+  const signUpPinCoords = parseLatLng(signUpLat, signUpLng);
+
+  const renderSignUpMapPinCard = (compact = false) => {
+    if (activeMode !== 'signup' || signUpStep !== 1) return null;
+    return (
+      <View
+        style={{
+          width: '100%',
+          marginTop: compact ? 2 : 6,
+          marginBottom: compact ? 14 : 10,
+          borderRadius: compact ? 14 : 12,
+          borderWidth: 1,
+          borderColor: signUpPinCoords ? '#86EFAC' : '#E2E8F0',
+          backgroundColor: '#F8FAFC',
+          padding: 12,
+          gap: 8,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+            <BootstrapIcon
+              name={signUpPinCoords ? 'geo-alt-fill' : 'pin-map-fill'}
+              size={14}
+              color={signUpPinCoords ? '#16A34A' : '#EA580C'}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: '600',
+                  color: '#0F172A',
+                  fontFamily: fontFamily.sans,
+                }}
+              >
+                Pin Exact House Location *
+              </Text>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '500',
+                  color: signUpPinCoords ? '#166534' : '#64748B',
+                  fontFamily: fontFamily.sans,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {signUpPinCoords
+                  ? `Pinned: ${signUpPinCoords.lat.toFixed(5)}, ${signUpPinCoords.lng.toFixed(5)}`
+                  : 'Used by riders for accurate doorstep delivery'}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => setShowSignUpPinMap((prev) => !prev)}
+            activeOpacity={0.8}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              backgroundColor: '#FFFFFF',
+              borderWidth: 1,
+              borderColor: '#CBD5E1',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: '600',
+                color: '#334155',
+                fontFamily: fontFamily.sans,
+              }}
+            >
+              {showSignUpPinMap ? 'Hide Map' : 'Open Map'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {showSignUpPinMap && (
+          <WebLocationPicker
+            latitude={signUpLat}
+            longitude={signUpLng}
+            addressText={signUpAddress}
+            height={compact ? 210 : 195}
+            compact
+            errorText={signUpPinError}
+            onLocationChange={({ lat, lng }) => {
+              setSignUpLat(lat);
+              setSignUpLng(lng);
+              setSignUpPinError('');
+              if (signUpError) setSignUpError('');
+            }}
+          />
+        )}
+      </View>
+    );
+  };
 
   const signInFormContent = (
     <>
@@ -950,6 +1100,8 @@ export default function LoginPageWeb({
               onSubmitEditing={() => signUpPasswordRef.current?.focus()}
             />
           </View>
+
+          {renderSignUpMapPinCard(false)}
 
           {/* Password */}
           <View
@@ -2095,6 +2247,8 @@ export default function LoginPageWeb({
                     />
                   </View>
                 </View>
+
+                {renderSignUpMapPinCard(true)}
 
                 {/* 5. Password */}
                 <View style={authStyles.mobileInputGroup}>

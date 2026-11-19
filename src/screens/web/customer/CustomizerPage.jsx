@@ -34,9 +34,9 @@ import {
 import {
   LiveOrderTrackingMapModal,
   RegisterMotorcycleModal,
-  CheckoutModal,
   BookInstallationModal,
 } from '../../../components/modals';
+import { WebCheckoutModal } from '../../../components/web';
 import CartPage from './CartPage.jsx';
 import CustomizationWorkspace from '../../../components/customizer/CustomizationWorkspace.jsx';
 import AiMotorcycleInstallStudio from '../../../components/customizer/AiMotorcycleInstallStudio.jsx';
@@ -937,7 +937,7 @@ export default function CustomizerPageWeb({
       </Modal>
 
       {/* ─── 3. CHECKOUT MODAL ─── */}
-      <CheckoutModal
+      <WebCheckoutModal
         visible={isCheckoutModalOpen}
         onClose={() => setIsCheckoutModalOpen(false)}
         onCompleteOrder={() => {

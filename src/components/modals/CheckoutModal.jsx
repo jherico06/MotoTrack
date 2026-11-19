@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
+import DeliveryLocationPicker from '../common/DeliveryLocationPicker.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { formatPHPhone } from './LiveOrderTrackingMapModal.jsx';
+import { parseLatLng } from '../../utils/geo.js';
 
 export default function CheckoutModal({
   visible,
@@ -108,7 +110,9 @@ export default function CheckoutModal({
       : isFreeShipping;
 
   // Delivery Notes & Payment State
-  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState(
+    currentUser?.deliveryNotes || currentUser?.delivery_notes || ''
+  );
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery (COD)');
   const [gcashNumber, setGcashNumber] = useState(currentUser?.phone || '');
   const [gcashReference, setGcashReference] = useState(
@@ -118,14 +122,46 @@ export default function CheckoutModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Inline Quick Address Editor (if user has missing address or wants quick edit)
+  const savedUserCoords = parseLatLng(
+    currentUser?.latitude ?? currentUser?.delivery_lat,
+    currentUser?.longitude ?? currentUser?.delivery_lng
+  );
   const [isEditingAddress, setIsEditingAddress] = useState(!currentUser?.address);
   const [inlineAddress, setInlineAddress] = useState(currentUser?.address || '');
   const [inlinePhone, setInlinePhone] = useState(currentUser?.phone || '');
+  const [inlineLat, setInlineLat] = useState(savedUserCoords?.lat ?? null);
+  const [inlineLng, setInlineLng] = useState(savedUserCoords?.lng ?? null);
+  const [inlineCoordError, setInlineCoordError] = useState('');
   const [isSavingInline, setIsSavingInline] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    const coords = parseLatLng(
+      currentUser?.latitude ?? currentUser?.delivery_lat,
+      currentUser?.longitude ?? currentUser?.delivery_lng
+    );
+    setInlineAddress(currentUser?.address || '');
+    setInlinePhone(currentUser?.phone || '');
+    setInlineLat(coords?.lat ?? null);
+    setInlineLng(coords?.lng ?? null);
+    setInlineCoordError('');
+    setDeliveryNotes((prev) => prev || currentUser?.deliveryNotes || currentUser?.delivery_notes || '');
+  }, [
+    visible,
+    currentUser?.address,
+    currentUser?.phone,
+    currentUser?.latitude,
+    currentUser?.longitude,
+    currentUser?.delivery_lat,
+    currentUser?.delivery_lng,
+    currentUser?.deliveryNotes,
+    currentUser?.delivery_notes,
+  ]);
 
   const customerName = currentUser?.name || currentUser?.fullName || currentUser?.email?.split('@')[0] || '';
   const customerPhone = currentUser?.phone || inlinePhone || '';
   const customerAddress = currentUser?.address || inlineAddress || '';
+  const activeDeliveryCoords = parseLatLng(inlineLat, inlineLng) || savedUserCoords;
   const busy = isSubmitting || isPlacingOrder;
 
   const handleSaveInlineAddress = async () => {
@@ -133,15 +169,29 @@ export default function CheckoutModal({
       showToast('Please enter a delivery address');
       return;
     }
+    const validPin = parseLatLng(inlineLat, inlineLng);
+    if (!validPin) {
+      const msg = 'Please drop a pin on your house on the map before saving.';
+      setInlineCoordError(msg);
+      showToast(msg);
+      return;
+    }
+    setInlineCoordError('');
     setIsSavingInline(true);
     try {
       const res = await updateProfile({
         address: inlineAddress.trim(),
         phone: inlinePhone.trim() || customerPhone,
+        latitude: validPin.lat,
+        longitude: validPin.lng,
+        delivery_lat: validPin.lat,
+        delivery_lng: validPin.lng,
+        deliveryNotes: deliveryNotes.trim(),
+        delivery_notes: deliveryNotes.trim(),
       });
       if (res.success) {
         setIsEditingAddress(false);
-        showToast('Delivery address updated in your Supabase profile');
+        showToast('Delivery address and map pin saved to your profile');
       } else {
         showToast(res.error || 'Failed to update address in Supabase');
       }
@@ -173,6 +223,8 @@ export default function CheckoutModal({
         customerPhone,
         customerAddress,
         deliveryNotes,
+        deliveryLat: activeDeliveryCoords?.lat ?? null,
+        deliveryLng: activeDeliveryCoords?.lng ?? null,
         paymentMethod,
         gcashNumber,
         gcashReference,
@@ -288,9 +340,15 @@ export default function CheckoutModal({
                   <Text style={checkoutStyles.addressFullText}>{customerAddress}</Text>
 
                   <View style={checkoutStyles.profileSyncBadge}>
-                    <BootstrapIcon name="shield-check" size={12} color={brandAccent} />
+                    <BootstrapIcon
+                      name={activeDeliveryCoords ? 'check-circle-fill' : 'exclamation-triangle-fill'}
+                      size={12}
+                      color={activeDeliveryCoords ? '#16A34A' : '#D97706'}
+                    />
                     <Text style={checkoutStyles.profileSyncBadgeText}>
-                      Linked directly to your user profile & live GPS map
+                      {activeDeliveryCoords
+                        ? `Pinned on map (${activeDeliveryCoords.lat.toFixed(5)}, ${activeDeliveryCoords.lng.toFixed(5)})`
+                        : 'No house pin saved yet — tap "Edit in Profile" to drop your exact pin'}
                     </Text>
                   </View>
                 </View>
@@ -316,6 +374,23 @@ export default function CheckoutModal({
                     keyboardType="phone-pad"
                   />
 
+                  <Text style={[checkoutStyles.inlineFormLabel, { marginTop: 8 }]}>
+                    Pin Exact House Location on Map *:
+                  </Text>
+                  <DeliveryLocationPicker
+                    latitude={inlineLat}
+                    longitude={inlineLng}
+                    addressText={inlineAddress}
+                    isDarkMode={isDarkMode}
+                    height={210}
+                    errorText={inlineCoordError}
+                    onLocationChange={({ lat, lng }) => {
+                      setInlineLat(lat);
+                      setInlineLng(lng);
+                      setInlineCoordError('');
+                    }}
+                  />
+
                   <TouchableOpacity
                     style={checkoutStyles.inlineSaveBtn}
                     onPress={handleSaveInlineAddress}
@@ -324,7 +399,7 @@ export default function CheckoutModal({
                     {isSavingInline ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={checkoutStyles.inlineSaveBtnText}>Save Address to Profile</Text>
+                      <Text style={checkoutStyles.inlineSaveBtnText}>Save Address & Pin to Profile</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -445,9 +520,9 @@ export default function CheckoutModal({
               </View>
             )}
 
-            {/* ─── 3. DELIVERY INSTRUCTIONS (OPTIONAL) ─── */}
+            {/* ─── 3. LANDMARK / DELIVERY NOTES ─── */}
             <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: textPrimary }]}>Delivery Instructions (Optional)</Text>
+              <Text style={[styles.formLabel, { color: textPrimary }]}>Landmark / delivery notes</Text>
               <TextInput
                 style={[
                   styles.formInput,
@@ -459,7 +534,7 @@ export default function CheckoutModal({
                 ]}
                 value={deliveryNotes}
                 onChangeText={setDeliveryNotes}
-                placeholder="e.g. Leave at front porch, ring doorbell upon arrival..."
+                placeholder="e.g. blue gate, beside the sari-sari store"
                 placeholderTextColor="#94A3B8"
               />
             </View>

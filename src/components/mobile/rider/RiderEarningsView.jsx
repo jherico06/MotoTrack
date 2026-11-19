@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import {
-  RIDER_FONT,
+  riderFont,
   cardShadowStyle,
   formatOrderCode,
   formatPhp,
@@ -192,10 +192,8 @@ export default function RiderEarningsView({
               <Text
                 style={[
                   styles.segmentText,
-                  {
-                    color: active ? '#FFFFFF' : palette.textMuted,
-                    fontWeight: active ? '600' : '500',
-                  },
+                  active && styles.segmentTextActive,
+                  { color: active ? '#FFFFFF' : palette.textMuted },
                 ]}
               >
                 {tab.label}
@@ -353,18 +351,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   heroOverline: {
-    fontFamily: RIDER_FONT,
-    fontSize: 10.5,
+    ...riderFont('700'),
+    fontSize: 11,
     lineHeight: 14,
-    fontWeight: '700',
     letterSpacing: 1.1,
     color: '#EA580C',
   },
   heroAmount: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 30,
     lineHeight: 36,
-    fontWeight: '700',
     letterSpacing: -0.6,
     color: '#FFFFFF',
     marginTop: 4,
@@ -381,10 +377,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroSub: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '400',
     color: '#94A3B8',
     marginTop: 4,
   },
@@ -409,15 +404,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   heroStatLabel: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '500',
+    ...riderFont('500'),
+    fontSize: 11.5,
     color: '#94A3B8',
   },
   heroStatValue: {
-    fontFamily: RIDER_FONT,
-    fontSize: 14.5,
-    fontWeight: '700',
+    ...riderFont('700'),
+    fontSize: 15,
     color: '#FFFFFF',
     marginTop: 2,
     fontVariant: ['tabular-nums'],
@@ -443,8 +436,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   segmentText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 13,
+  },
+  segmentTextActive: {
+    ...riderFont('700'),
   },
   ledgerSheet: {
     borderRadius: 22,
@@ -458,9 +454,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   ledgerTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 16,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 16.5,
   },
   countPill: {
     paddingHorizontal: 10,
@@ -468,9 +463,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   countPillText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
   ledgerRow: {
@@ -494,14 +488,12 @@ const styles = StyleSheet.create({
   },
   ledgerCustomer: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 14,
-    fontWeight: '600',
   },
   ledgerAmount: {
-    fontFamily: RIDER_FONT,
-    fontSize: 14,
-    fontWeight: '700',
+    ...riderFont('700'),
+    fontSize: 14.5,
     fontVariant: ['tabular-nums'],
   },
   ledgerBottomLine: {
@@ -512,15 +504,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   ledgerOrderCode: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '500',
+    ...riderFont('500'),
+    fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
   ledgerTime: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 11.5,
-    fontWeight: '400',
     fontVariant: ['tabular-nums'],
   },
   emptyBox: {
@@ -537,13 +527,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   emptyTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 14.5,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 15,
     textAlign: 'center',
   },
   emptySub: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12.5,
     lineHeight: 18,
     textAlign: 'center',

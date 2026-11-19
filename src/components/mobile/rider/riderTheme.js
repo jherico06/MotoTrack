@@ -111,7 +111,58 @@ export function getRiderPalette(isDark = false) {
   };
 }
 
-export const RIDER_FONT = fontFamily.sans;
+export const RIDER_FONTS = {
+  regular: Platform.select({
+    web: fontFamily.sans,
+    default: 'GoogleSansFlex-Regular',
+  }),
+  medium: Platform.select({
+    web: fontFamily.sans,
+    default: 'GoogleSansFlex-Medium',
+  }),
+  semiBold: Platform.select({
+    web: fontFamily.sans,
+    default: 'GoogleSansFlex-SemiBold',
+  }),
+  bold: Platform.select({
+    web: fontFamily.sans,
+    default: 'GoogleSansFlex-Bold',
+  }),
+};
+
+export const RIDER_FONT = RIDER_FONTS.regular;
+
+/**
+ * Returns platform-safe typography font properties for Rider mobile UI.
+ * Native iOS/Android use explicit weight-mapped fontFamily names with no fontWeight
+ * so Expo static fonts render true Medium/SemiBold/Bold weights instead of 400.
+ */
+export function riderFont(weight = '400') {
+  const key = String(weight || '400').toLowerCase();
+  let family = RIDER_FONTS.regular;
+  let webWeight = '400';
+
+  if (
+    key === '700' ||
+    key === '800' ||
+    key === '900' ||
+    key === 'bold' ||
+    key === 'extrabold'
+  ) {
+    family = RIDER_FONTS.bold;
+    webWeight = '700';
+  } else if (key === '600' || key === 'semibold') {
+    family = RIDER_FONTS.semiBold;
+    webWeight = '600';
+  } else if (key === '500' || key === 'medium') {
+    family = RIDER_FONTS.medium;
+    webWeight = '500';
+  }
+
+  return Platform.OS === 'web'
+    ? { fontFamily: family, fontWeight: webWeight }
+    : { fontFamily: family };
+}
 
 export const cardShadowStyle = Platform.select({
   ios: {
@@ -150,19 +201,134 @@ export function formatOrderCode(orderId) {
 }
 
 export function isDeliveredOrder(delivery) {
-  return String(delivery?.deliveryStatus || '').trim().toLowerCase() === 'delivered';
+  const ds = String(delivery?.deliveryStatus || '').trim().toLowerCase();
+  const os = String(delivery?.orderStatus || '').trim().toLowerCase();
+  return ds === 'delivered' || os === 'delivered' || os === 'completed';
+}
+
+export function isCancelledOrder(delivery) {
+  const ds = String(delivery?.deliveryStatus || '').trim().toLowerCase();
+  const os = String(delivery?.orderStatus || '').trim().toLowerCase();
+  return (
+    ds.includes('cancel') ||
+    os.includes('cancel') ||
+    ds === 'refunded' ||
+    os === 'refunded'
+  );
+}
+
+/**
+ * Returns true once an order has been marked as shipped / out for delivery
+ * (or reached a post-shipped stage such as reported/delivered/failed).
+ * Orders still in Pending Approval, Processing, Ready for Delivery, Assigned,
+ * Accepted, or Rescheduled return false so riders see them as "Need to pick up".
+ */
+export function isOrderMarkedShipped(orderStatus, deliveryStatus) {
+  const oRaw = String(orderStatus || '').trim().toLowerCase();
+  const dRaw = String(deliveryStatus || '').trim().toLowerCase();
+
+  if (oRaw) {
+    return (
+      oRaw === 'shipped' ||
+      oRaw === 'in transit' ||
+      oRaw.includes('transit') ||
+      oRaw.includes('out') ||
+      oRaw.includes('report') ||
+      oRaw === 'delivered' ||
+      oRaw === 'completed' ||
+      oRaw.includes('fail') ||
+      oRaw.includes('issue')
+    );
+  }
+
+  return (
+    dRaw === 'shipped' ||
+    dRaw === 'in transit' ||
+    dRaw.includes('transit') ||
+    dRaw.includes('out') ||
+    dRaw.includes('report') ||
+    dRaw === 'delivered' ||
+    dRaw === 'completed' ||
+    dRaw.includes('fail') ||
+    dRaw.includes('issue')
+  );
+}
+
+/**
+ * Reconciles a rider delivery card against the authoritative `orders.status`
+ * so any order not yet marked as Shipped / Out for Delivery renders as
+ * "Need to pick up".
+ */
+export function reconcileDeliveryWithOrderStatus(delivery, orderStatus) {
+  if (!delivery) return delivery;
+  const resolvedOrderStatus = String(
+    orderStatus || delivery.orderStatus || ''
+  ).trim();
+  const oRaw = resolvedOrderStatus.toLowerCase();
+
+  if (oRaw === 'delivered' || oRaw === 'completed') {
+    return {
+      ...delivery,
+      orderStatus: resolvedOrderStatus,
+      deliveryStatus: 'Delivered',
+    };
+  }
+  if (oRaw.includes('cancel')) {
+    return {
+      ...delivery,
+      orderStatus: resolvedOrderStatus,
+      deliveryStatus: 'Cancelled',
+    };
+  }
+  if (oRaw === 'refunded') {
+    return {
+      ...delivery,
+      orderStatus: resolvedOrderStatus,
+      deliveryStatus: 'Refunded',
+    };
+  }
+  if (oRaw.includes('fail') || oRaw.includes('issue')) {
+    return {
+      ...delivery,
+      orderStatus: resolvedOrderStatus,
+      deliveryStatus: 'Delivery Failed',
+    };
+  }
+  if (oRaw.includes('report')) {
+    return {
+      ...delivery,
+      orderStatus: resolvedOrderStatus,
+      deliveryStatus: 'Delivery Reported',
+    };
+  }
+  if (!isOrderMarkedShipped(resolvedOrderStatus, delivery.deliveryStatus)) {
+    return {
+      ...delivery,
+      ...(resolvedOrderStatus ? { orderStatus: resolvedOrderStatus } : {}),
+      deliveryStatus: 'Need to pick up',
+    };
+  }
+  return {
+    ...delivery,
+    ...(resolvedOrderStatus ? { orderStatus: resolvedOrderStatus } : {}),
+  };
 }
 
 export function isNeedsPickupOrder(delivery) {
-  if (isDeliveredOrder(delivery)) return false;
+  if (isDeliveredOrder(delivery) || isCancelledOrder(delivery)) return false;
   const s = String(delivery?.deliveryStatus || '').trim().toLowerCase();
+  if (s.includes('fail') || s.includes('issue') || s.includes('report')) {
+    return false;
+  }
+  if (!isOrderMarkedShipped(delivery?.orderStatus, delivery?.deliveryStatus)) {
+    return true;
+  }
   if (!s) return true;
   if (
     s.includes('out') ||
-    s.includes('way') ||
-    s.includes('fail') ||
-    s.includes('issue') ||
-    s.includes('report')
+    s.includes('shipped') ||
+    s.includes('transit') ||
+    s.includes('way')
   ) {
     return false;
   }
@@ -248,8 +414,10 @@ function formatClock(date) {
 }
 
 export function formatActiveDeadlineLabel(delivery) {
+  if (isCancelledOrder(delivery)) return 'Order cancelled';
   const raw = delivery?.expectedDeliveryEndAt || delivery?.expectedDeliveryAt;
   if (!raw) {
+    if (isNeedsPickupOrder(delivery)) return 'Need to pick up · Store hub';
     const s = String(delivery?.deliveryStatus || '').toLowerCase();
     if (s.includes('out')) return 'Out for delivery today';
     return 'Today · Ready for drop-off';
@@ -302,12 +470,24 @@ export function formatCompletedTimeLabel(delivery) {
 
 export function getOrderStatusBadge(delivery, palette) {
   const s = String(delivery?.deliveryStatus || '').toLowerCase();
-  if (s === 'delivered') {
+  if (isDeliveredOrder(delivery) || s === 'delivered') {
     return {
       label: 'Delivered',
       bg: palette.completedBadgeBg,
       text: palette.completedBadgeText,
       border: palette.border,
+      isCompleted: true,
+      isUrgent: false,
+    };
+  }
+  if (isCancelledOrder(delivery)) {
+    const isRefund = s === 'refunded' || String(delivery?.orderStatus || '').toLowerCase() === 'refunded';
+    return {
+      label: isRefund ? 'Refunded' : 'Cancelled',
+      detailLabel: isRefund ? 'Refunded' : 'Cancelled',
+      bg: palette.dangerSoft,
+      text: palette.dangerText,
+      border: palette.dangerBorder,
       isCompleted: true,
       isUrgent: false,
     };
@@ -332,7 +512,18 @@ export function getOrderStatusBadge(delivery, palette) {
       isUrgent: false,
     };
   }
-  if (s.includes('out')) {
+  if (isNeedsPickupOrder(delivery)) {
+    return {
+      label: 'Need to pick up',
+      detailLabel: delivery?.orderStatus || delivery?.deliveryStatus || 'Need to pick up',
+      bg: palette.isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+      text: palette.isDark ? '#FBBF24' : '#B45309',
+      border: palette.isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
+      isCompleted: false,
+      isUrgent: true,
+    };
+  }
+  if (s.includes('out') || s.includes('shipped') || s.includes('transit')) {
     return {
       label: 'Needs confirmation',
       detailLabel: 'Out for delivery',
@@ -344,8 +535,8 @@ export function getOrderStatusBadge(delivery, palette) {
     };
   }
   return {
-    label: 'Needs pickup',
-    detailLabel: delivery?.deliveryStatus || 'Assigned',
+    label: 'Need to pick up',
+    detailLabel: delivery?.deliveryStatus || 'Need to pick up',
     bg: palette.isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
     text: palette.isDark ? '#FBBF24' : '#B45309',
     border: palette.isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { AuthProvider, CartProvider, WishlistProvider, ThemeProvider, useTheme, useAuth, useCart, useWishlist } from '../context';
 import {
   ShopPage,
@@ -56,6 +56,13 @@ import {
   Inter_700Bold,
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
+import { GoogleSansFlex_200ExtraLight } from '@expo-google-fonts/google-sans-flex/200ExtraLight';
+import { GoogleSansFlex_300Light } from '@expo-google-fonts/google-sans-flex/300Light';
+import { GoogleSansFlex_400Regular } from '@expo-google-fonts/google-sans-flex/400Regular';
+import { GoogleSansFlex_500Medium } from '@expo-google-fonts/google-sans-flex/500Medium';
+import { GoogleSansFlex_600SemiBold } from '@expo-google-fonts/google-sans-flex/600SemiBold';
+import { GoogleSansFlex_700Bold } from '@expo-google-fonts/google-sans-flex/700Bold';
+import { GoogleSansFlex_800ExtraBold } from '@expo-google-fonts/google-sans-flex/800ExtraBold';
 
 // Configure Android status bar to be translucent edge-to-edge
 if (Platform.OS === 'android') {
@@ -73,17 +80,18 @@ LogBox.ignoreLogs([
 ]);
 LogBox.ignoreAllLogs(true);
 
-// Enforce Inter as the default font across all React Native Text & TextInput elements
+// Enforce Google Sans Flex on native mobile (and Inter on Web) as the default font across Text & TextInput
 try {
+  const defaultAppFont = Platform.OS === 'web' ? 'Inter' : 'GoogleSansFlex';
   if (Text.defaultProps == null) {
     Text.defaultProps = {};
   }
-  Text.defaultProps.style = [{ fontFamily: 'Inter' }, Text.defaultProps.style];
+  Text.defaultProps.style = [{ fontFamily: defaultAppFont }, Text.defaultProps.style];
 
   if (TextInput.defaultProps == null) {
     TextInput.defaultProps = {};
   }
-  TextInput.defaultProps.style = [{ fontFamily: 'Inter' }, TextInput.defaultProps.style];
+  TextInput.defaultProps.style = [{ fontFamily: defaultAppFont }, TextInput.defaultProps.style];
 } catch (_e) {}
 
 // Global Web Font Injection for Inter & Bootstrap Icons
@@ -256,6 +264,12 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     document.head.appendChild(style);
   }
 }
+
+// Freeze JS re-renders of hidden cached tabs while keeping them mounted for 0ms tab switching.
+const MemoTabLayer = memo(
+  ({ children }) => children,
+  (prev, next) => !prev.isActive && !next.isActive
+);
 
 function parsePublicRoute(url) {
   const out = { screen: '', token: '' };
@@ -1149,7 +1163,8 @@ function MainAppRouter() {
           pointerEvents={isShopActive ? 'auto' : 'none'}
           aria-hidden={!isShopActive}
         >
-          <ShopPage
+          <MemoTabLayer isActive={isShopActive}>
+            <ShopPage
             onNavigateToWishlist={() => navigateScreen('wishlist')}
             onRequireLogin={promptRequireLogin}
             onNavigateToScreen={(screen, params) => {
@@ -1170,7 +1185,8 @@ function MainAppRouter() {
                 navigateScreen(screen, params);
               }
             }}
-          />
+            />
+          </MemoTabLayer>
         </View>
       )}
 
@@ -1185,7 +1201,8 @@ function MainAppRouter() {
           pointerEvents={isGarageActive ? 'auto' : 'none'}
           aria-hidden={!isGarageActive}
         >
-          <GaragePage
+          <MemoTabLayer isActive={isGarageActive}>
+            <GaragePage
             activeView="book"
             onNavigateToStore={() => navigateScreen('shop')}
             onNavigateToWishlist={() => navigateScreen('wishlist')}
@@ -1204,7 +1221,8 @@ function MainAppRouter() {
             onOpenCart={() => setIsCartOpen(true)}
             onLogout={handleLogout}
             initialSearchQuery={garageParams?.search || garageParams?.searchQuery || ''}
-          />
+            />
+          </MemoTabLayer>
         </View>
       )}
 
@@ -1219,7 +1237,8 @@ function MainAppRouter() {
           pointerEvents={isAppointmentsActive ? 'auto' : 'none'}
           aria-hidden={!isAppointmentsActive}
         >
-          <GaragePage
+          <MemoTabLayer isActive={isAppointmentsActive}>
+            <GaragePage
             activeView="appointments"
             selectedBookingInitial={appointmentParams?.booking}
             onNavigateToStore={() => navigateScreen('shop')}
@@ -1239,7 +1258,8 @@ function MainAppRouter() {
             onOpenCart={() => setIsCartOpen(true)}
             onLogout={handleLogout}
             initialSearchQuery={garageParams?.search || ''}
-          />
+            />
+          </MemoTabLayer>
         </View>
       )}
 
@@ -1254,7 +1274,8 @@ function MainAppRouter() {
           pointerEvents={isCustomizerActive ? 'auto' : 'none'}
           aria-hidden={!isCustomizerActive}
         >
-          <CustomizerPage
+          <MemoTabLayer isActive={isCustomizerActive}>
+            <CustomizerPage
             initialSelectedProduct={customizerProduct}
             onNavigateToStore={() => navigateScreen('shop')}
             onNavigateToGarage={() => navigateScreen('garage')}
@@ -1270,7 +1291,8 @@ function MainAppRouter() {
             onOpenCart={() => setIsCartOpen(true)}
             onLogout={handleLogout}
             onRequireLogin={promptRequireLogin}
-          />
+            />
+          </MemoTabLayer>
         </View>
       )}
 
@@ -1285,7 +1307,8 @@ function MainAppRouter() {
           pointerEvents={isProfileActive ? 'auto' : 'none'}
           aria-hidden={!isProfileActive}
         >
-          <ProfilePage
+          <MemoTabLayer isActive={isProfileActive}>
+            <ProfilePage
             initialTab={profileInitialTab}
             onNavigateToStore={() => navigateScreen('shop')}
             onNavigateToGarage={(params) => params?.tab === 'appointments' ? navigateScreen('appointments') : navigateScreen('garage')}
@@ -1297,7 +1320,8 @@ function MainAppRouter() {
             onNavigateToLogin={() => navigateScreen('login')}
             onNavigateToProductDetails={(product) => navigateScreen('product-details', { product })}
             onLogout={handleLogout}
-          />
+            />
+          </MemoTabLayer>
         </View>
       )}
 
@@ -1336,56 +1360,81 @@ function MainAppContainer() {
 }
 
 export default function App() {
+  // Mobile (iOS/Android) uses Google Sans Flex; Web keeps Inter untouched.
+  const F_200 = Platform.OS === 'web' ? Inter_200ExtraLight : GoogleSansFlex_200ExtraLight;
+  const F_300 = Platform.OS === 'web' ? Inter_300Light : GoogleSansFlex_300Light;
+  const F_400 = Platform.OS === 'web' ? Inter_400Regular : GoogleSansFlex_400Regular;
+  const F_500 = Platform.OS === 'web' ? Inter_500Medium : GoogleSansFlex_500Medium;
+  const F_600 = Platform.OS === 'web' ? Inter_600SemiBold : GoogleSansFlex_600SemiBold;
+  const F_700 = Platform.OS === 'web' ? Inter_700Bold : GoogleSansFlex_700Bold;
+  const F_800 = Platform.OS === 'web' ? Inter_800ExtraBold : GoogleSansFlex_800ExtraBold;
+
   const [fontsLoaded] = useFonts({
-    // Inter (Primary Application Font)
-    Inter: Inter_400Regular,
-    'Inter': Inter_400Regular,
-    'Inter-ExtraLight': Inter_200ExtraLight,
-    'Inter-Light': Inter_300Light,
-    'Inter-Regular': Inter_400Regular,
-    'Inter-Medium': Inter_500Medium,
-    'Inter-SemiBold': Inter_600SemiBold,
-    'Inter-Bold': Inter_700Bold,
-    'Inter-ExtraBold': Inter_800ExtraBold,
-    Inter_200ExtraLight,
-    Inter_300Light,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-    // Native aliases mapped to Inter for backward compatibility
-    PlusJakartaSans: Inter_400Regular,
-    'Plus Jakarta Sans': Inter_400Regular,
-    'PlusJakartaSans-ExtraLight': Inter_200ExtraLight,
-    'PlusJakartaSans-Light': Inter_300Light,
-    'PlusJakartaSans-Regular': Inter_400Regular,
-    'PlusJakartaSans-Medium': Inter_500Medium,
-    'PlusJakartaSans-SemiBold': Inter_600SemiBold,
-    'PlusJakartaSans-Bold': Inter_700Bold,
-    'PlusJakartaSans-ExtraBold': Inter_800ExtraBold,
-    PlusJakartaSans_200ExtraLight: Inter_200ExtraLight,
-    PlusJakartaSans_300Light: Inter_300Light,
-    PlusJakartaSans_400Regular: Inter_400Regular,
-    PlusJakartaSans_500Medium: Inter_500Medium,
-    PlusJakartaSans_600SemiBold: Inter_600SemiBold,
-    PlusJakartaSans_700Bold: Inter_700Bold,
-    PlusJakartaSans_800ExtraBold: Inter_800ExtraBold,
-    Manrope: Inter_400Regular,
-    'Manrope-ExtraLight': Inter_200ExtraLight,
-    'Manrope-Light': Inter_300Light,
-    'Manrope-Regular': Inter_400Regular,
-    'Manrope-Medium': Inter_500Medium,
-    'Manrope-SemiBold': Inter_600SemiBold,
-    'Manrope-Bold': Inter_700Bold,
-    'Manrope-ExtraBold': Inter_800ExtraBold,
-    Poppins: Inter_400Regular,
-    'Poppins-Regular': Inter_400Regular,
-    'Poppins-Light': Inter_300Light,
-    'Poppins-Medium': Inter_500Medium,
-    'Poppins-SemiBold': Inter_600SemiBold,
-    'Poppins-Bold': Inter_700Bold,
-    'Poppins-ExtraBold': Inter_800ExtraBold,
+    // Google Sans Flex (Mobile Application Font)
+    GoogleSansFlex: GoogleSansFlex_400Regular,
+    'Google Sans Flex': GoogleSansFlex_400Regular,
+    'GoogleSansFlex-ExtraLight': GoogleSansFlex_200ExtraLight,
+    'GoogleSansFlex-Light': GoogleSansFlex_300Light,
+    'GoogleSansFlex-Regular': GoogleSansFlex_400Regular,
+    'GoogleSansFlex-Medium': GoogleSansFlex_500Medium,
+    'GoogleSansFlex-SemiBold': GoogleSansFlex_600SemiBold,
+    'GoogleSansFlex-Bold': GoogleSansFlex_700Bold,
+    'GoogleSansFlex-ExtraBold': GoogleSansFlex_800ExtraBold,
+    GoogleSansFlex_200ExtraLight,
+    GoogleSansFlex_300Light,
+    GoogleSansFlex_400Regular,
+    GoogleSansFlex_500Medium,
+    GoogleSansFlex_600SemiBold,
+    GoogleSansFlex_700Bold,
+    GoogleSansFlex_800ExtraBold,
+    // Primary & legacy font aliases (Google Sans Flex on Mobile, Inter on Web)
+    Inter: F_400,
+    'Inter': F_400,
+    'Inter-ExtraLight': F_200,
+    'Inter-Light': F_300,
+    'Inter-Regular': F_400,
+    'Inter-Medium': F_500,
+    'Inter-SemiBold': F_600,
+    'Inter-Bold': F_700,
+    'Inter-ExtraBold': F_800,
+    Inter_200ExtraLight: F_200,
+    Inter_300Light: F_300,
+    Inter_400Regular: F_400,
+    Inter_500Medium: F_500,
+    Inter_600SemiBold: F_600,
+    Inter_700Bold: F_700,
+    Inter_800ExtraBold: F_800,
+    PlusJakartaSans: F_400,
+    'Plus Jakarta Sans': F_400,
+    'PlusJakartaSans-ExtraLight': F_200,
+    'PlusJakartaSans-Light': F_300,
+    'PlusJakartaSans-Regular': F_400,
+    'PlusJakartaSans-Medium': F_500,
+    'PlusJakartaSans-SemiBold': F_600,
+    'PlusJakartaSans-Bold': F_700,
+    'PlusJakartaSans-ExtraBold': F_800,
+    PlusJakartaSans_200ExtraLight: F_200,
+    PlusJakartaSans_300Light: F_300,
+    PlusJakartaSans_400Regular: F_400,
+    PlusJakartaSans_500Medium: F_500,
+    PlusJakartaSans_600SemiBold: F_600,
+    PlusJakartaSans_700Bold: F_700,
+    PlusJakartaSans_800ExtraBold: F_800,
+    Manrope: F_400,
+    'Manrope-ExtraLight': F_200,
+    'Manrope-Light': F_300,
+    'Manrope-Regular': F_400,
+    'Manrope-Medium': F_500,
+    'Manrope-SemiBold': F_600,
+    'Manrope-Bold': F_700,
+    'Manrope-ExtraBold': F_800,
+    Poppins: F_400,
+    'Poppins-Regular': F_400,
+    'Poppins-Light': F_300,
+    'Poppins-Medium': F_500,
+    'Poppins-SemiBold': F_600,
+    'Poppins-Bold': F_700,
+    'Poppins-ExtraBold': F_800,
   });
 
   return (
@@ -1437,7 +1486,9 @@ const tabShellStyles = StyleSheet.create({
         visibility: 'visible',
       }
     : {
-        display: 'flex',
+        opacity: 1,
+        zIndex: 2,
+        elevation: 2,
       },
   tabInactive: Platform.OS === 'web'
     ? {
@@ -1446,7 +1497,9 @@ const tabShellStyles = StyleSheet.create({
         visibility: 'hidden',
       }
     : {
-        display: 'none',
+        opacity: 0,
+        zIndex: -1,
+        elevation: 0,
       },
 });
 

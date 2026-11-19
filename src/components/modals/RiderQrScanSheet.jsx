@@ -25,13 +25,11 @@ import { parseDeliveryQrPayload, sameOrderIdentifier } from '../../utils/orderId
  * Long-distance scanning strategy (expo-camera SDK 58):
  * - `autofocus="off"` = continuous autofocus ("focus automatically when needed").
  *   `"on"` would focus once and lock, which breaks scanning as the rider moves.
- * - Highest practical resolution: Android's barcode analyzer already runs on
- *   `HIGHEST_AVAILABLE_STRATEGY`; on iOS the session uses the full-resolution `Photo` preset.
- * - Native detectors (ML Kit / AVFoundation) scan the full frame continuously, so small
- *   codes outside the guide frame are still decoded.
- * - Auto-zoom sweep: while nothing is decoded, zoom steps 1× → 1.5× → 2× → 3× and back,
- *   which enlarges distant codes for the detector. Auto-zoom is capped at ~3× (manual at ~4×)
- *   so digital zoom never degrades the image beyond what the decoder can use.
+ * - `pictureSize="High"` on iOS uses the full-frame 1080p video/preview pipeline instead
+ *   of `.photo`, and omitting `code39` avoids `ExpoCameraZXingProvider`'s extra
+ *   `AVCaptureVideoDataOutput` CPU pipeline so hardware `AVCaptureMetadataOutput` runs smoothly.
+ * - Starts at 1× (`zoom = 0`) with manual `+` / `−` zoom controls so autofocus isn't
+ *   interrupted by periodic `lockForConfiguration()` zoom jumps.
  *
  * Props: `{ visible, order, onClose, onScanned }`. Once a valid MotoTrack QR or parcel barcode
  * is detected, the scanner locks out duplicate frames, briefly flashes "QR code detected!",
@@ -54,24 +52,25 @@ const COLORS = {
 };
 
 // Preserves compatibility with existing order QR codes and packing-label barcodes.
+// Note: 'code39' is intentionally omitted because expo-camera iOS routes code39 through
+// ExpoCameraZXingProvider (extra AVCaptureVideoDataOutput + CPU binarizer per frame),
+// which competes with hardware AVFoundation QR detection.
 const BARCODE_SETTINGS = {
-  barcodeTypes: ['qr', 'code128', 'code39', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e'],
+  barcodeTypes: ['qr', 'code128', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e'],
 };
 
 // Approximate optical magnification steps shown to the user.
 const ZOOM_STEPS = [1, 1.5, 2, 3, 4];
-const AUTO_ZOOM_MAX_STEP = 3; // auto sweep stops at ~3× to keep the image sharp
-const AUTO_ZOOM_DWELL_MS = 2200; // time per zoom step (lets autofocus settle)
-const UNREADABLE_AFTER_MS = 9000; // roughly one full auto-zoom sweep
+const UNREADABLE_AFTER_MS = 9000;
 const INVALID_REPEAT_MS = 2500; // ignore the same non-MotoTrack code for this long
 const INVALID_RESET_MS = 3000;
 
 // expo-camera `zoom` is 0–1 of the device's max zoom, mapped differently per platform:
 //   Android (CameraX): ratio = zoom × maxZoomRatio  → linear
-//   iOS (AVFoundation): factor = (maxFactor / wideFactor) ^ zoom → exponential
-// The device maximum is not exposed, so typical values are assumed.
+//   iOS (AVFoundation): factor = minZoom * (maxZoom / minZoom) ^ zoom → exponential
+// Modern multi-lens iPhones report videoMaxZoomFactor ~120–189 with minZoomFactor 2.0 (~90× range).
 const ANDROID_ASSUMED_MAX_ZOOM_RATIO = 8;
-const IOS_ASSUMED_ZOOM_RANGE = 30;
+const IOS_ASSUMED_ZOOM_RANGE = 90;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -124,12 +123,12 @@ export default function RiderQrScanSheet({
   const [result, setResult] = useState(null); // { raw, parsed }
   const [submitting, setSubmitting] = useState(false);
   const [zoomStep, setZoomStep] = useState(0);
-  const [autoZoom, setAutoZoom] = useState(true);
   const [torchOn, setTorchOn] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [paste, setPaste] = useState('');
   const [manualError, setManualError] = useState('');
   const [previewBox, setPreviewBox] = useState({ width: 0, height: 0 });
+  const [sessionKey, setSessionKey] = useState(0);
 
   const lockedRef = useRef(false); // blocks duplicate detections
   const submittedRef = useRef(false); // blocks duplicate submissions to the backend
@@ -151,7 +150,12 @@ export default function RiderQrScanSheet({
   const hasPermission = Boolean(permission?.granted);
   const isDetected = status === 'detected';
   const cameraSupported = !isWeb && !camError;
-  const cameraLive = Boolean(visible) && cameraSupported && hasPermission && !isDetected && !submitting;
+  const cameraLive =
+    Boolean(visible) &&
+    cameraSupported &&
+    hasPermission &&
+    !isDetected &&
+    !submitting;
   const scanningActive = cameraLive && cameraReady;
 
   // Fresh session every time the scanner opens; the camera unmounts (and is released) on close.
@@ -168,13 +172,13 @@ export default function RiderQrScanSheet({
     setResult(null);
     setSubmitting(false);
     setZoomStep(0);
-    setAutoZoom(true);
     setTorchOn(false);
     setManualOpen(false);
     setPaste('');
     setManualError('');
     setCamError('');
     setCameraReady(false);
+    setSessionKey((k) => k + 1);
     return () => clearAutoEmitTimer();
   }, [visible, clearAutoEmitTimer]);
 
@@ -215,16 +219,7 @@ export default function RiderQrScanSheet({
     return () => loop.stop();
   }, [scanningActive, scanAnim]);
 
-  // Automatic zoom sweep while no code has been decoded (stops on manual zoom).
-  useEffect(() => {
-    if (!scanningActive || !autoZoom) return undefined;
-    const id = setInterval(() => {
-      setZoomStep((s) => (s >= AUTO_ZOOM_MAX_STEP ? 0 : s + 1));
-    }, AUTO_ZOOM_DWELL_MS);
-    return () => clearInterval(id);
-  }, [scanningActive, autoZoom]);
-
-  // Guidance when nothing is readable after a full sweep.
+  // Guidance when nothing is readable after searching for a few seconds.
   useEffect(() => {
     if (!scanningActive || status !== 'searching') return undefined;
     const id = setTimeout(() => {
@@ -245,7 +240,7 @@ export default function RiderQrScanSheet({
   const handleBarcodeScanned = useCallback(
     (event) => {
       if (lockedRef.current) return;
-      const raw = String(event?.data ?? event?.nativeEvent?.data ?? '').trim();
+      const raw = String(event?.data ?? event?.nativeEvent?.data ?? event?.raw ?? '').trim();
       if (!raw) return;
 
       const parsed = parseDeliveryQrPayload(raw);
@@ -291,7 +286,7 @@ export default function RiderQrScanSheet({
     setStatus('searching');
     setCameraReady(false);
     setZoomStep(0);
-    setAutoZoom(true);
+    setSessionKey((k) => k + 1);
   }, [clearAutoEmitTimer]);
 
   const handleManualSubmit = useCallback(
@@ -314,7 +309,6 @@ export default function RiderQrScanSheet({
   );
 
   const changeZoom = useCallback((delta) => {
-    setAutoZoom(false);
     setZoomStep((s) => clamp(s + delta, 0, ZOOM_STEPS.length - 1));
     setStatus((s) => (s === 'unreadable' ? 'searching' : s));
   }, []);
@@ -436,6 +430,7 @@ export default function RiderQrScanSheet({
     return (
       <>
         <CameraView
+          key={sessionKey}
           style={StyleSheet.absoluteFill}
           facing="back"
           // 'off' = continuous autofocus in expo-camera SDK 58 ('on' focuses once and locks).
@@ -443,7 +438,7 @@ export default function RiderQrScanSheet({
           zoom={zoomPropForMagnification(zoomMag)}
           enableTorch={torchOn}
           animateShutter={false}
-          {...(Platform.OS === 'ios' ? { pictureSize: 'Photo' } : null)}
+          {...(Platform.OS === 'ios' ? { active: cameraLive, pictureSize: 'High' } : null)}
           barcodeScannerSettings={BARCODE_SETTINGS}
           onBarcodeScanned={cameraLive ? handleBarcodeScanned : undefined}
           onCameraReady={() => setCameraReady(true)}
@@ -590,7 +585,6 @@ export default function RiderQrScanSheet({
                       </TouchableOpacity>
                       <View style={styles.zoomValueWrap}>
                         <Text style={styles.zoomValue}>{formatZoom(zoomMag)}</Text>
-                        {autoZoom ? <Text style={styles.zoomAuto}>Auto</Text> : null}
                       </View>
                       <TouchableOpacity
                         style={[
@@ -950,13 +944,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     fontVariant: ['tabular-nums'],
-  },
-  zoomAuto: {
-    fontSize: 10,
-    lineHeight: 12,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    color: COLORS.orange,
   },
   torchBtn: {
     width: 48,

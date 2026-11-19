@@ -113,10 +113,8 @@ export function createProductDetailsStyles(isDark = false) {
     },
     heroImage: {
       width: '100%',
-      height: 320,
-      maxHeight: 420,
-      aspectRatio: 1,
-      backgroundColor: bgCard,
+      height: 340,
+      backgroundColor: '#FFFFFF',
     },
     topTagPill: {
       position: 'absolute',

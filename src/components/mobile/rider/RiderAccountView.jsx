@@ -5,104 +5,74 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  Modal,
+  Platform,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
-import ExternalLink from '../../common/ExternalLink.jsx';
 import { RIDER_STATUSES } from '../../../services/staff/riderService.js';
+import { appStorage } from '../../../services/system/storageAdapter.js';
+import { ANDROID_TOP_INSET } from '../../../utils/safeArea.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
-import { RIDER_FONT, cardShadowStyle, getInitials } from './riderTheme.js';
+import { riderFont, cardShadowStyle, getInitials } from './riderTheme.js';
+import {
+  RiderAppPreferencesCard,
+  RiderSecuritySection,
+  RiderHelpSupportSection,
+} from './RiderSettingsSections.jsx';
 
-const HELP_TOPICS = [
-  {
-    id: 'qr',
-    icon: 'qr-code-scan',
-    title: 'Scanning & confirming drop-offs',
-    body: 'Tap the racing-orange QR button or "Scan & confirm" on any active order card to scan the customer packing slip or order QR token. Once verified, confirm drop-off to immediately credit your delivery fee.',
-  },
-  {
-    id: 'cod',
-    icon: 'wallet2',
-    title: 'COD collection & store remittance',
-    body: 'Collect the exact COD total shown on the order card before handing over the parcel. Remit collected COD cash to the MotoTrack dispatch desk at end-of-shift.',
-  },
-  {
-    id: 'gps',
-    icon: 'geo-alt',
-    title: 'Live GPS & route navigation',
-    body: 'Keep location services enabled while marked "Out for Delivery" so MotoTrack dispatch and customers receive accurate arrival estimates.',
-  },
-];
+const RIDER_HERO_BOTTOM_FADE_GRADIENT =
+  'linear-gradient(to bottom, rgba(18, 21, 25, 0) 0%, rgba(18, 21, 25, 0.04) 16%, rgba(18, 21, 25, 0.14) 32%, rgba(18, 21, 25, 0.30) 46%, rgba(18, 21, 25, 0.52) 60%, rgba(18, 21, 25, 0.74) 72%, rgba(18, 21, 25, 0.90) 83%, rgba(18, 21, 25, 0.98) 92%, rgba(18, 21, 25, 1) 100%)';
 
-function SettingToggleRow({
+function AccountDetailRow({
   icon,
-  title,
-  description,
+  label,
   value,
-  onToggle,
   palette,
+  dotColor = null,
+  tabular = false,
+  multiline = false,
+  boldValue = false,
   isLast = false,
 }) {
   return (
-    <TouchableOpacity
+    <View
       style={[
-        styles.toggleRow,
+        styles.infoRow,
         !isLast && {
           borderBottomWidth: 1,
-          borderBottomColor: palette.border,
+          borderBottomColor: palette.borderSubtle,
         },
       ]}
-      onPress={() => onToggle?.(!value)}
-      activeOpacity={0.8}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: Boolean(value) }}
-      accessibilityLabel={title}
     >
-      <View
-        style={[
-          styles.toggleIconBox,
-          {
-            backgroundColor: value ? palette.orangeSoft : palette.bgMuted,
-          },
-        ]}
-      >
-        <BootstrapIcon
-          name={icon}
-          size={16}
-          color={value ? palette.orange : palette.textSecondary}
-        />
+      <View style={[styles.infoIconBox, { backgroundColor: palette.bgMuted }]}>
+        <BootstrapIcon name={icon} size={15} color={palette.textSecondary} />
       </View>
-
       <View style={{ flex: 1 }}>
-        <Text style={[styles.toggleTitle, { color: palette.textPrimary }]}>
-          {title}
+        <Text style={[styles.infoRowLabel, { color: palette.textMuted }]}>
+          {label}
         </Text>
-        <Text style={[styles.toggleDesc, { color: palette.textMuted }]}>
-          {description}
-        </Text>
+        <View style={styles.infoValueRow}>
+          {dotColor ? (
+            <View style={[styles.availDot, { backgroundColor: dotColor }]} />
+          ) : null}
+          <Text
+            numberOfLines={multiline ? 2 : 1}
+            style={[
+              styles.infoRowValue,
+              boldValue && styles.infoRowValueBold,
+              tabular && { fontVariant: ['tabular-nums'] },
+              { color: palette.textPrimary },
+            ]}
+          >
+            {value}
+          </Text>
+        </View>
       </View>
-
-      <View
-        style={[
-          styles.switchTrack,
-          {
-            backgroundColor: value
-              ? palette.orange
-              : palette.isDark
-                ? '#3A4044'
-                : '#D5D9DC',
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.switchThumb,
-            value ? styles.switchThumbOn : styles.switchThumbOff,
-          ]}
-        />
-      </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -115,6 +85,16 @@ export default function RiderAccountView({
   riderId,
   availabilityStatus,
   onSelectAvailability,
+  onCycleAvailability,
+  unreadNotifCount = 0,
+  deliveredCount = 0,
+  activeCount = 0,
+  weekEarnings = 0,
+  onOpenNotifications,
+  onOpenMenu,
+  onOpenSettings,
+  onNavigateMainTab,
+  onScrollToSection,
   preferences,
   onUpdatePreference,
   isDarkMode,
@@ -135,16 +115,99 @@ export default function RiderAccountView({
   const [profileBanner, setProfileBanner] = useState(null); // { type: 'success' | 'error', text }
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  // Password Form State
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordBanner, setPasswordBanner] = useState(null);
+  // Rider Cover Photo State
+  const coverStorageKey = `mototrack_rider_cover_${currentUser?.id || riderId || 'guest'}`;
+  const [riderCoverUri, setRiderCoverUri] = useState(() => {
+    try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+        const localCover = window.localStorage.getItem(coverStorageKey);
+        if (localCover) return localCover;
+      }
+      return riderProfile?.coverPhoto || currentUser?.coverPhoto || currentUser?.cover_url || appStorage.getItem(coverStorageKey) || null;
+    } catch (_e) {
+      return null;
+    }
+  });
+  const [coverImageFailed, setCoverImageFailed] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isViewingCoverModal, setIsViewingCoverModal] = useState(false);
 
-  // Help Center Accordion State
-  const [expandedTopic, setExpandedTopic] = useState('qr');
+  useEffect(() => {
+    let active = true;
+    const loadCover = async () => {
+      try {
+        const direct = riderProfile?.coverPhoto || currentUser?.coverPhoto || currentUser?.cover_url || null;
+        if (direct) {
+          if (active) {
+            setCoverImageFailed(false);
+            setRiderCoverUri(direct);
+          }
+          return;
+        }
+        const asyncVal = await AsyncStorage.getItem(coverStorageKey);
+        if (asyncVal && active) {
+          setCoverImageFailed(false);
+          setRiderCoverUri(asyncVal);
+          return;
+        }
+        const adapterVal = appStorage.getItem(coverStorageKey);
+        if (adapterVal && active) {
+          setCoverImageFailed(false);
+          setRiderCoverUri(adapterVal);
+        }
+      } catch (_e) {}
+    };
+    loadCover();
+    return () => {
+      active = false;
+    };
+  }, [coverStorageKey, riderProfile?.coverPhoto, currentUser?.coverPhoto, currentUser?.cover_url]);
+
+  const handleUploadCover = async () => {
+    if (isUploadingCover) return;
+    setIsUploadingCover(true);
+    try {
+      const res = await pickImageFromFile();
+      if (res?.success && res.uri) {
+        setCoverImageFailed(false);
+        setRiderCoverUri(res.uri);
+        try {
+          await AsyncStorage.setItem(coverStorageKey, res.uri);
+        } catch (_e) {}
+        try {
+          appStorage.setItem(coverStorageKey, res.uri);
+        } catch (_e) {}
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+          try {
+            window.localStorage.setItem(coverStorageKey, res.uri);
+          } catch (_e) {}
+        }
+        onShowFeedback?.('Cover photo updated.');
+      }
+    } catch (_e) {
+      onShowFeedback?.('Could not update cover photo. Please try a smaller image.', true);
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    setRiderCoverUri(null);
+    setCoverImageFailed(false);
+    setIsViewingCoverModal(false);
+    try {
+      await AsyncStorage.removeItem(coverStorageKey);
+    } catch (_e) {}
+    try {
+      appStorage.removeItem?.(coverStorageKey);
+    } catch (_e) {}
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem(coverStorageKey);
+      } catch (_e) {}
+    }
+    onShowFeedback?.('Cover photo removed.');
+  };
 
   const resolvedName =
     riderProfile?.name || currentUser?.name || 'Jherico Maurin';
@@ -182,10 +245,13 @@ export default function RiderAccountView({
     const res = await pickImageFromFile();
     if (res?.success && res.uri) {
       setAvatarUri(res.uri);
+      onChangeAccountTab?.('profile');
+      setIsEditingProfile(true);
       setProfileBanner({
         type: 'success',
         text: 'New rider photo staged. Tap "Save profile changes" to apply.',
       });
+      setTimeout(() => onScrollToSection?.(220), 80);
     }
   };
 
@@ -260,122 +326,553 @@ export default function RiderAccountView({
     }
   };
 
-  const handleSubmitPassword = async () => {
-    setPasswordBanner(null);
-    if (!currentPassword.trim()) {
-      setPasswordBanner({
-        type: 'error',
-        text: 'Enter your current password.',
-      });
-      return;
-    }
-    if (newPassword.trim().length < 8) {
-      setPasswordBanner({
-        type: 'error',
-        text: 'New password must be at least 8 characters.',
-      });
-      return;
-    }
-    if (newPassword.trim() !== confirmPassword.trim()) {
-      setPasswordBanner({
-        type: 'error',
-        text: 'New password and confirmation do not match.',
-      });
-      return;
-    }
-
-    setSavingPassword(true);
-    try {
-      const res = await onChangePassword?.({
-        currentPassword: currentPassword.trim(),
-        newPassword: newPassword.trim(),
-      });
-      if (!res?.success) {
-        setPasswordBanner({
-          type: 'error',
-          text: res?.error || 'Could not update password.',
-        });
-        return;
-      }
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      const msg = 'Password updated successfully.';
-      setPasswordBanner({ type: 'success', text: msg });
-      onShowFeedback?.(msg);
-    } catch (_e) {
-      setPasswordBanner({
-        type: 'error',
-        text: 'Unable to update password right now.',
-      });
-    } finally {
-      setSavingPassword(false);
-    }
-  };
-
   const heroDisplayName = fullName || resolvedName || 'MotoTrack Rider';
   const heroInitials = getInitials(heroDisplayName);
-  const heroOverline = `VERIFIED RIDER · ${riderId ? String(riderId).toUpperCase() : 'RDR-MOTO'}`;
-  const heroSubtitleParts = [
-    riderProfile?.vehicleInfo
-      ? `${riderProfile.vehicleInfo}${riderProfile.plateNumber ? ` · ${riderProfile.plateNumber}` : ''}`
-      : 'MotoTrack Delivery Rider',
-    availabilityStatus || RIDER_STATUSES.AVAILABLE,
-  ].filter(Boolean);
+  const riderAvatarSrc = avatarUri || resolvedAvatar || null;
+  const activeUploadedCover = !coverImageFailed ? riderCoverUri : null;
+  const heroBackdropUri = activeUploadedCover || riderAvatarSrc;
+  const heroBlurRadius = activeUploadedCover
+    ? 0
+    : Platform.select({ ios: 8, android: 5, default: 8 });
+  const profileTopInset =
+    Platform.OS === 'ios'
+      ? Math.max(Number(Constants.statusBarHeight) || 0, 50)
+      : ANDROID_TOP_INSET + 12;
+  const heroHeight = profileTopInset + 242;
+  const heroGlassBtnStyle = {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(20, 22, 26, 0.56)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+  const riderHandle = currentUser?.username
+    ? `@${String(currentUser.username).replace(/^@/, '')}`
+    : emailAddress
+      ? `@${String(emailAddress).split('@')[0]}`
+      : '@mototrack_rider';
+  const riderHandleLine = `${riderHandle} · ${riderId ? String(riderId).toUpperCase() : 'RDR-MOTO'}`;
+  const currentAvail = availabilityStatus || RIDER_STATUSES.AVAILABLE;
+  const availDotColor =
+    String(currentAvail).toLowerCase() === 'available'
+      ? '#10B981'
+      : String(currentAvail).toLowerCase().includes('delivery')
+        ? '#EA580C'
+        : '#94A3B8';
 
-  const infoRows = [
-    { label: 'Full name', value: heroDisplayName },
-    { label: 'Phone', value: mobileNumber || 'Not set' },
-    { label: 'Email', value: emailAddress || 'Not set' },
-    { label: 'Address', value: homeAddress || 'Not set' },
+  const riderStats = [
+    {
+      label: 'Delivered',
+      value: deliveredCount,
+      onPress: () => onNavigateMainTab?.('orders'),
+    },
+    {
+      label: 'Active',
+      value: activeCount,
+      onPress: () => onNavigateMainTab?.('orders'),
+    },
+    {
+      label: 'This Week',
+      value: `₱${Math.round(Number(weekEarnings) || 0).toLocaleString()}`,
+      onPress: () => onNavigateMainTab?.('earnings'),
+    },
+  ];
+
+  const personalInfoRows = [
+    { icon: 'person', label: 'Full name', value: heroDisplayName },
+    {
+      icon: 'telephone',
+      label: 'Mobile number',
+      value: mobileNumber || 'Not set',
+      tabular: true,
+    },
+    { icon: 'envelope', label: 'Email address', value: emailAddress || 'Not set' },
+    {
+      icon: 'house',
+      label: 'Home address',
+      value: homeAddress || 'Not set',
+      multiline: true,
+    },
+  ];
+
+  const fleetInfoRows = [
+    {
+      icon: 'tag',
+      label: 'Rider ID',
+      value: riderId ? String(riderId).toUpperCase() : 'RDR-MOTO',
+      tabular: true,
+      boldValue: true,
+    },
+    {
+      icon: 'motorcycle',
+      label: 'Assigned vehicle',
+      value: riderProfile?.vehicleInfo
+        ? `${riderProfile.vehicleInfo}${riderProfile.plateNumber ? ` · ${riderProfile.plateNumber}` : ''}`
+        : 'MotoTrack Delivery Fleet',
+    },
+    {
+      icon: 'check-circle',
+      label: 'Duty status',
+      value: currentAvail,
+      dotColor: availDotColor,
+      boldValue: true,
+    },
   ];
 
   return (
     <View style={styles.container}>
-      {/* 1. Customer-Style Dark Forest Hero Profile Card */}
-      <View style={styles.heroProfileCard}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handlePickAvatar}
-          accessibilityRole="button"
-          accessibilityLabel="Update rider profile photo"
-          style={styles.heroAvatarCircle}
-        >
-          {avatarUri || resolvedAvatar ? (
-            <Image
-              source={{ uri: avatarUri || resolvedAvatar }}
-              style={styles.heroAvatarImg}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.heroAvatarInitials}>{heroInitials}</Text>
-          )}
-        </TouchableOpacity>
+      {/* 1. Customer-Style Full-Bleed Cover Hero Header */}
+      <View
+        style={{
+          width: '100%',
+          height: heroHeight,
+          backgroundColor: '#121519',
+          position: 'relative',
+          overflow: 'hidden',
+          justifyContent: 'space-between',
+        }}
+      >
+        {heroBackdropUri ? (
+          <Image
+            key={String(heroBackdropUri).slice(0, 80)}
+            source={{ uri: heroBackdropUri }}
+            blurRadius={heroBlurRadius}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              zIndex: 0,
+            }}
+            resizeMode="cover"
+            onError={() => {
+              if (activeUploadedCover) setCoverImageFailed(true);
+            }}
+          />
+        ) : (
+          <View
+            pointerEvents="none"
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: '#1E232A',
+            }}
+          />
+        )}
 
-        <Text style={styles.heroOverline} numberOfLines={1}>
-          {heroOverline}
-        </Text>
-
-        <Text style={styles.heroName} numberOfLines={1}>
-          {heroDisplayName}
-        </Text>
-
-        <Text style={styles.heroSubtitle} numberOfLines={1}>
-          {heroSubtitleParts.join(' · ')}
-        </Text>
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => {
-            onChangeAccountTab?.('profile');
-            setIsEditingProfile((prev) => !prev);
+        {/* Top Status-Bar Readability Scrim */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: profileTopInset + 56,
+            zIndex: 1,
+            backgroundImage:
+              'linear-gradient(to bottom, rgba(12, 14, 18, 0.56) 0%, rgba(12, 14, 18, 0.24) 55%, rgba(12, 14, 18, 0) 100%)',
           }}
-          style={styles.heroEditBtn}
+        />
+
+        {/* Seamless Eased Charcoal Bottom Fade */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: '72%',
+            zIndex: 4,
+            backgroundImage: RIDER_HERO_BOTTOM_FADE_GRADIENT,
+          }}
+        />
+
+        {/* Tap Background Layer to View Full-Screen Cover Photo */}
+        {heroBackdropUri ? (
+          <TouchableOpacity
+            activeOpacity={0.95}
+            onPress={() => setIsViewingCoverModal(true)}
+            accessibilityLabel="View cover photo"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 5,
+            }}
+          />
+        ) : null}
+
+        {/* Foreground Hero Controls & Rider Identity */}
+        <View
+          pointerEvents="box-none"
+          style={{
+            flex: 1,
+            zIndex: 6,
+            paddingTop: profileTopInset,
+            paddingBottom: 24,
+            paddingHorizontal: 16,
+            justifyContent: 'space-between',
+          }}
         >
-          <Text style={styles.heroEditBtnText}>
-            {isEditingProfile ? 'Done editing' : 'Edit profile'}
+          {/* Top Circular Glass Action Row */}
+          <View
+            pointerEvents="box-none"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  onChangeAccountTab?.('profile');
+                  setIsEditingProfile((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setTimeout(() => onScrollToSection?.(220), 80);
+                    }
+                    return next;
+                  });
+                }}
+                accessibilityLabel="Edit rider profile"
+                style={heroGlassBtnStyle}
+              >
+                <BootstrapIcon name="pencil" size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleUploadCover}
+                disabled={isUploadingCover}
+                accessibilityLabel="Change cover photo"
+                style={heroGlassBtnStyle}
+              >
+                {isUploadingCover ? (
+                  <ActivityIndicator size="small" color="#FBBF24" />
+                ) : (
+                  <BootstrapIcon name="image" size={15} color="#FBBF24" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={onOpenNotifications}
+                accessibilityLabel="Notifications"
+                style={heroGlassBtnStyle}
+              >
+                <BootstrapIcon name="bell" size={15} color="#FFFFFF" />
+                {unreadNotifCount > 0 ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 7,
+                      right: 8,
+                      width: 7,
+                      height: 7,
+                      borderRadius: 3.5,
+                      backgroundColor: '#EA580C',
+                    }}
+                  />
+                ) : null}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (onOpenSettings) {
+                    onOpenSettings();
+                  } else {
+                    onChangeAccountTab?.('preferences');
+                  }
+                }}
+                accessibilityLabel="Open rider settings"
+                style={heroGlassBtnStyle}
+              >
+                <BootstrapIcon name="gear" size={15} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={onOpenMenu}
+                accessibilityLabel="Rider quick menu"
+                style={heroGlassBtnStyle}
+              >
+                <BootstrapIcon name="list" size={17} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Bottom Split: Left Name/Handle/Stats + Right Avatar */}
+          <View
+            pointerEvents="box-none"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              gap: 14,
+            }}
+          >
+            <View style={{ flex: 1, paddingBottom: 2 }}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  onChangeAccountTab?.('profile');
+                  setIsEditingProfile(true);
+                  setTimeout(() => onScrollToSection?.(220), 80);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    ...riderFont('700'),
+                    fontSize: 24,
+                    lineHeight: 30,
+                    color: '#FFFFFF',
+                    letterSpacing: -0.4,
+                    flexShrink: 1,
+                    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 4,
+                  }}
+                >
+                  {heroDisplayName}
+                </Text>
+                <BootstrapIcon name="caret-down-fill" size={11} color="#FFFFFF" />
+                <View
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 3.5,
+                    backgroundColor: availDotColor,
+                    marginBottom: 8,
+                    marginLeft: -2,
+                  }}
+                />
+              </TouchableOpacity>
+
+              <Text
+                numberOfLines={1}
+                style={{
+                  ...riderFont('500'),
+                  marginTop: 2,
+                  fontSize: 13,
+                  lineHeight: 18,
+                  color: 'rgba(255, 255, 255, 0.82)',
+                }}
+              >
+                {riderHandleLine}
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 22,
+                  marginTop: 14,
+                }}
+              >
+                {riderStats.map((stat) => (
+                  <TouchableOpacity
+                    key={stat.label}
+                    activeOpacity={0.75}
+                    onPress={stat.onPress}
+                  >
+                    <Text
+                      style={{
+                        ...riderFont('700'),
+                        fontSize: 18,
+                        lineHeight: 22,
+                        color: '#FFFFFF',
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {stat.value}
+                    </Text>
+                    <Text
+                      style={{
+                        ...riderFont('500'),
+                        fontSize: 12,
+                        lineHeight: 15,
+                        color: 'rgba(255, 255, 255, 0.76)',
+                        marginTop: 2,
+                      }}
+                    >
+                      {stat.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Right Circular Avatar + Add Badge */}
+            <View style={{ alignItems: 'center', position: 'relative' }}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handlePickAvatar}
+                accessibilityRole="button"
+                accessibilityLabel="Update rider profile photo"
+                style={{
+                  width: 84,
+                  height: 84,
+                  borderRadius: 42,
+                  backgroundColor: '#FFFFFF',
+                  padding: 2,
+                  borderWidth: 1.5,
+                  borderColor: 'rgba(255, 255, 255, 0.85)',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.28,
+                  shadowRadius: 8,
+                  elevation: 5,
+                }}
+              >
+                <View
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 40,
+                    backgroundColor: '#EA580C',
+                    overflow: 'hidden',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {riderAvatarSrc ? (
+                    <Image
+                      source={{ uri: riderAvatarSrc }}
+                      style={styles.heroAvatarImg}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={styles.heroAvatarInitials}>{heroInitials}</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handlePickAvatar}
+                accessibilityLabel="Edit rider avatar"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: -1,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: '#EA580C',
+                  borderWidth: 2,
+                  borderColor: '#121519',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.28,
+                  shadowRadius: 3,
+                  elevation: 4,
+                }}
+              >
+                <BootstrapIcon name="plus" size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Rounded Rider Profile Content Sheet */}
+      <View
+        style={{
+          backgroundColor: palette.bgCanvas,
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          marginTop: -12,
+          paddingHorizontal: 16,
+          paddingTop: 18,
+          paddingBottom: 16,
+          gap: 14,
+        }}
+      >
+
+      {/* Availability Quick Selector */}
+      <View
+        style={[
+          styles.availabilityBlock,
+          {
+            marginTop: 0,
+            backgroundColor: palette.bgCard,
+            borderColor: palette.border,
+          },
+        ]}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Text style={[styles.availabilityCaption, { color: palette.textMuted, marginBottom: 0 }]}>
+            Duty status
           </Text>
-        </TouchableOpacity>
+          {typeof onCycleAvailability === 'function' ? (
+            <TouchableOpacity onPress={onCycleAvailability} activeOpacity={0.75}>
+              <Text style={[styles.quickToggleText, { color: palette.orange }]}>
+                Quick toggle
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.availabilityPillsRow}>
+          {[
+            { status: RIDER_STATUSES.AVAILABLE, dot: '#10B981' },
+            { status: RIDER_STATUSES.ON_DELIVERY, dot: '#EA580C' },
+            { status: RIDER_STATUSES.OFF_DUTY, dot: '#94A3B8' },
+          ].map((opt) => {
+            const active = currentAvail === opt.status;
+            return (
+              <TouchableOpacity
+                key={opt.status}
+                onPress={() => onSelectAvailability?.(opt.status)}
+                activeOpacity={0.8}
+                style={[
+                  styles.availPill,
+                  {
+                    backgroundColor: active
+                      ? palette.isDark
+                        ? '#232830'
+                        : '#18181B'
+                      : palette.bgMuted,
+                    borderColor: active
+                      ? palette.isDark
+                        ? '#38404C'
+                        : '#18181B'
+                      : palette.border,
+                  },
+                ]}
+              >
+                <View style={[styles.availDot, { backgroundColor: opt.dot }]} />
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                  style={[
+                    styles.availPillText,
+                    active && styles.availPillTextActive,
+                    { color: active ? '#FFFFFF' : palette.textSecondary },
+                  ]}
+                >
+                  {opt.status}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {/* Account Tabs Segmented Control (Customer Segmented Pill Track) */}
@@ -388,7 +885,7 @@ export default function RiderAccountView({
         {[
           { id: 'profile', label: 'Profile', icon: 'person' },
           { id: 'preferences', label: 'Preferences', icon: 'sliders' },
-          { id: 'security', label: 'Security & Help', icon: 'shield-check' },
+          { id: 'security', label: 'Security', icon: 'shield-check' },
         ].map((tab) => {
           const active = accountTab === tab.id;
           return (
@@ -412,12 +909,12 @@ export default function RiderAccountView({
               <Text
                 style={[
                   styles.accountTabText,
-                  {
-                    color: active ? '#FFFFFF' : palette.textMuted,
-                    fontWeight: active ? '600' : '500',
-                  },
+                  active && styles.accountTabTextActive,
+                  { color: active ? '#FFFFFF' : palette.textMuted },
                 ]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
               >
                 {tab.label}
               </Text>
@@ -426,8 +923,9 @@ export default function RiderAccountView({
         })}
       </View>
 
-      {/* ─── TAB 1: PERSONAL INFORMATION CARD (Customer Profile Style) ─── */}
+      {/* ─── TAB 1: PERSONAL & FLEET INFORMATION CARDS ─── */}
       {accountTab === 'profile' ? (
+        <>
         <View
           style={[
             styles.formCard,
@@ -471,32 +969,17 @@ export default function RiderAccountView({
 
           {!isEditingProfile ? (
             <View>
-              {infoRows.map((row, idx) => (
-                <View
+              {personalInfoRows.map((row, idx) => (
+                <AccountDetailRow
                   key={row.label}
-                  style={[
-                    styles.infoRow,
-                    idx < infoRows.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: palette.borderSubtle,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[styles.infoRowLabel, { color: palette.textMuted }]}
-                  >
-                    {row.label}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.infoRowValue,
-                      { color: palette.textPrimary },
-                    ]}
-                  >
-                    {row.value}
-                  </Text>
-                </View>
+                  icon={row.icon}
+                  label={row.label}
+                  value={row.value}
+                  tabular={row.tabular}
+                  multiline={row.multiline}
+                  palette={palette}
+                  isLast={idx === personalInfoRows.length - 1}
+                />
               ))}
             </View>
           ) : (
@@ -736,463 +1219,92 @@ export default function RiderAccountView({
             </>
           )}
         </View>
+
+        {!isEditingProfile ? (
+          <View
+            style={[
+              styles.formCard,
+              !palette.isDark && cardShadowStyle,
+              {
+                backgroundColor: palette.bgCard,
+                borderColor: palette.border,
+                paddingBottom: 6,
+              },
+            ]}
+          >
+            <View style={[styles.personalInfoHeader, { marginBottom: 6 }]}>
+              <Text style={[styles.cardHeading, { color: palette.textPrimary }]}>
+                Rider &amp; fleet details
+              </Text>
+              <View
+                style={[
+                  styles.fleetVerifiedBadge,
+                  {
+                    backgroundColor: palette.orangeSoft,
+                    borderColor: palette.orangeBorder,
+                  },
+                ]}
+              >
+                <BootstrapIcon
+                  name="patch-check-fill"
+                  size={12}
+                  color={palette.orange}
+                />
+                <Text
+                  style={[
+                    styles.fleetVerifiedText,
+                    { color: palette.orangeText },
+                  ]}
+                >
+                  Verified
+                </Text>
+              </View>
+            </View>
+
+            <View>
+              {fleetInfoRows.map((row, idx) => (
+                <AccountDetailRow
+                  key={row.label}
+                  icon={row.icon}
+                  label={row.label}
+                  value={row.value}
+                  dotColor={row.dotColor}
+                  tabular={row.tabular}
+                  boldValue={row.boldValue}
+                  palette={palette}
+                  isLast={idx === fleetInfoRows.length - 1}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+        </>
       ) : null}
 
       {/* ─── TAB 2: NOTIFICATION & DISPLAY PREFERENCES ─── */}
       {accountTab === 'preferences' ? (
-        <View
-          style={[
-            styles.formCard,
-            !palette.isDark && cardShadowStyle,
-            {
-              backgroundColor: palette.bgCard,
-              borderColor: palette.border,
-            },
-          ]}
-        >
-          <Text style={[styles.cardHeading, { color: palette.textPrimary }]}>
-            App & alert preferences
-          </Text>
-          <Text style={[styles.cardSubheading, { color: palette.textMuted }]}>
-            Control how MotoTrack notifies you while on the road.
-          </Text>
-
-          <View style={styles.togglesList}>
-            <SettingToggleRow
-              icon="bell"
-              title="Push & dispatch notifications"
-              description="Instant alerts for new assigned deliveries and route changes"
-              value={Boolean(preferences?.pushNotifications)}
-              onToggle={(val) =>
-                onUpdatePreference?.(
-                  'pushNotifications',
-                  val,
-                  `Dispatch notifications ${val ? 'enabled' : 'muted'}.`
-                )
-              }
-              palette={palette}
-            />
-
-            <SettingToggleRow
-              icon="envelope"
-              title="Email delivery updates"
-              description="Receive email alerts for urgent COD dispatches and customer notes"
-              value={Boolean(preferences?.emailUpdates ?? preferences?.smsUpdates)}
-              onToggle={(val) =>
-                onUpdatePreference?.(
-                  'emailUpdates',
-                  val,
-                  `Email delivery updates ${val ? 'enabled' : 'disabled'}.`
-                )
-              }
-              palette={palette}
-            />
-
-            <SettingToggleRow
-              icon="moon"
-              title="Dark mode"
-              description="High-contrast charcoal interface for night riding"
-              value={Boolean(isDarkMode)}
-              onToggle={(val) => {
-                onToggleDarkMode?.(val);
-                onShowFeedback?.(
-                  `Dark mode ${val ? 'enabled' : 'disabled'}.`
-                );
-              }}
-              palette={palette}
-              isLast
-            />
-          </View>
-        </View>
+        <RiderAppPreferencesCard
+          palette={palette}
+          preferences={preferences}
+          onUpdatePreference={onUpdatePreference}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={onToggleDarkMode}
+          onShowFeedback={onShowFeedback}
+          showDarkModeRow
+        />
       ) : null}
 
       {/* ─── TAB 3: SECURITY, 2FA & HELP CENTER ─── */}
       {accountTab === 'security' ? (
         <>
-          {/* Two-Step Verification Card */}
-          <View
-            style={[
-              styles.formCard,
-              !palette.isDark && cardShadowStyle,
-              {
-                backgroundColor: palette.bgCard,
-                borderColor: palette.border,
-              },
-            ]}
-          >
-            <View style={styles.twoFactorHead}>
-              <Text
-                style={[styles.cardHeading, { color: palette.textPrimary }]}
-              >
-                Two-step verification
-              </Text>
-              <View
-                style={[
-                  styles.twoFactorBadge,
-                  {
-                    backgroundColor: preferences?.twoFactorEnabled
-                      ? palette.successSoft
-                      : palette.bgMuted,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.twoFactorBadgeText,
-                    {
-                      color: preferences?.twoFactorEnabled
-                        ? palette.successText
-                        : palette.textMuted,
-                    },
-                  ]}
-                >
-                  {preferences?.twoFactorEnabled ? 'Protected' : 'Off'}
-                </Text>
-              </View>
-            </View>
-
-            <SettingToggleRow
-              icon="shield-check"
-              title="Require 2-step login verification"
-              description="Protect your MotoTrack rider payouts and account with email OTP verification on new devices"
-              value={Boolean(preferences?.twoFactorEnabled)}
-              onToggle={(val) =>
-                onUpdatePreference?.(
-                  'twoFactorEnabled',
-                  val,
-                  `Two-step verification ${val ? 'enabled' : 'turned off'}.`
-                )
-              }
-              palette={palette}
-              isLast
-            />
-          </View>
-
-          {/* Password Management Card */}
-          <View
-            style={[
-              styles.formCard,
-              !palette.isDark && cardShadowStyle,
-              {
-                backgroundColor: palette.bgCard,
-                borderColor: palette.border,
-              },
-            ]}
-          >
-            <View style={styles.pwdHeaderRow}>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.cardHeading, { color: palette.textPrimary }]}
-                >
-                  Password management
-                </Text>
-                <Text
-                  style={[styles.cardSubheading, { color: palette.textMuted }]}
-                >
-                  Use a strong password of at least 8 characters.
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowPasswords((v) => !v)}
-                style={[
-                  styles.eyeToggleBtn,
-                  { backgroundColor: palette.bgMuted },
-                ]}
-                activeOpacity={0.75}
-              >
-                <BootstrapIcon
-                  name={showPasswords ? 'eye-slash' : 'eye'}
-                  size={15}
-                  color={palette.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text
-                style={[styles.fieldLabel, { color: palette.textSecondary }]}
-              >
-                Current password
-              </Text>
-              <View
-                style={[
-                  styles.inputWrap,
-                  {
-                    backgroundColor: palette.bgInput,
-                    borderColor: palette.borderStrong,
-                  },
-                ]}
-              >
-                <BootstrapIcon
-                  name="lock"
-                  size={15}
-                  color={palette.textMuted}
-                />
-                <TextInput
-                  style={[styles.inputField, { color: palette.textPrimary }]}
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  secureTextEntry={!showPasswords}
-                  autoCapitalize="none"
-                  placeholder="Enter current password"
-                  placeholderTextColor={palette.textSubtle}
-                />
-              </View>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text
-                style={[styles.fieldLabel, { color: palette.textSecondary }]}
-              >
-                New password
-              </Text>
-              <View
-                style={[
-                  styles.inputWrap,
-                  {
-                    backgroundColor: palette.bgInput,
-                    borderColor: palette.borderStrong,
-                  },
-                ]}
-              >
-                <BootstrapIcon name="key" size={15} color={palette.textMuted} />
-                <TextInput
-                  style={[styles.inputField, { color: palette.textPrimary }]}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={!showPasswords}
-                  autoCapitalize="none"
-                  placeholder="Minimum 8 characters"
-                  placeholderTextColor={palette.textSubtle}
-                />
-              </View>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text
-                style={[styles.fieldLabel, { color: palette.textSecondary }]}
-              >
-                Confirm new password
-              </Text>
-              <View
-                style={[
-                  styles.inputWrap,
-                  {
-                    backgroundColor: palette.bgInput,
-                    borderColor: palette.borderStrong,
-                  },
-                ]}
-              >
-                <BootstrapIcon name="key" size={15} color={palette.textMuted} />
-                <TextInput
-                  style={[styles.inputField, { color: palette.textPrimary }]}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showPasswords}
-                  autoCapitalize="none"
-                  placeholder="Re-enter new password"
-                  placeholderTextColor={palette.textSubtle}
-                />
-              </View>
-            </View>
-
-            {passwordBanner ? (
-              <View
-                style={[
-                  styles.feedbackBanner,
-                  {
-                    backgroundColor:
-                      passwordBanner.type === 'error'
-                        ? palette.dangerSoft
-                        : palette.successSoft,
-                    borderColor:
-                      passwordBanner.type === 'error'
-                        ? palette.dangerBorder
-                        : palette.successBorder,
-                  },
-                ]}
-              >
-                <BootstrapIcon
-                  name={
-                    passwordBanner.type === 'error'
-                      ? 'exclamation-circle'
-                      : 'check-circle-fill'
-                  }
-                  size={15}
-                  color={
-                    passwordBanner.type === 'error'
-                      ? palette.dangerText
-                      : palette.successText
-                  }
-                />
-                <Text
-                  style={[
-                    styles.feedbackBannerText,
-                    {
-                      color:
-                        passwordBanner.type === 'error'
-                          ? palette.dangerText
-                          : palette.successText,
-                    },
-                  ]}
-                >
-                  {passwordBanner.text}
-                </Text>
-              </View>
-            ) : null}
-
-            <TouchableOpacity
-              style={[
-                styles.primarySaveBtn,
-                {
-                  backgroundColor: palette.charcoal,
-                  opacity: savingPassword ? 0.7 : 1,
-                },
-              ]}
-              disabled={savingPassword}
-              onPress={handleSubmitPassword}
-              activeOpacity={0.85}
-            >
-              {savingPassword ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primarySaveBtnText}>Update password</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Help Center Card */}
-          <View
-            style={[
-              styles.formCard,
-              !palette.isDark && cardShadowStyle,
-              {
-                backgroundColor: palette.bgCard,
-                borderColor: palette.border,
-              },
-            ]}
-          >
-            <Text style={[styles.cardHeading, { color: palette.textPrimary }]}>
-              Rider help center
-            </Text>
-            <Text style={[styles.cardSubheading, { color: palette.textMuted }]}>
-              Quick answers and direct MotoTrack dispatch support.
-            </Text>
-
-            <View style={{ marginTop: 10, gap: 8 }}>
-              {HELP_TOPICS.map((topic) => {
-                const open = expandedTopic === topic.id;
-                return (
-                  <TouchableOpacity
-                    key={topic.id}
-                    style={[
-                      styles.helpAccordion,
-                      {
-                        backgroundColor: palette.bgMuted,
-                        borderColor: open
-                          ? palette.orangeBorder
-                          : palette.border,
-                      },
-                    ]}
-                    onPress={() =>
-                      setExpandedTopic((prev) =>
-                        prev === topic.id ? '' : topic.id
-                      )
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.helpAccordionHead}>
-                      <BootstrapIcon
-                        name={topic.icon}
-                        size={15}
-                        color={palette.orange}
-                      />
-                      <Text
-                        style={[
-                          styles.helpAccordionTitle,
-                          { color: palette.textPrimary },
-                        ]}
-                      >
-                        {topic.title}
-                      </Text>
-                      <BootstrapIcon
-                        name={open ? 'chevron-up' : 'chevron-down'}
-                        size={14}
-                        color={palette.textMuted}
-                      />
-                    </View>
-                    {open ? (
-                      <Text
-                        style={[
-                          styles.helpAccordionBody,
-                          { color: palette.textSecondary },
-                        ]}
-                      >
-                        {topic.body}
-                      </Text>
-                    ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.supportActionsRow}>
-              <ExternalLink href="tel:+639179990001" style={{ flex: 1 }}>
-                <View
-                  style={[
-                    styles.supportBtn,
-                    {
-                      borderColor: palette.borderStrong,
-                      backgroundColor: palette.bgCard,
-                    },
-                  ]}
-                >
-                  <BootstrapIcon
-                    name="telephone"
-                    size={14}
-                    color={palette.textPrimary}
-                  />
-                  <Text
-                    style={[
-                      styles.supportBtnText,
-                      { color: palette.textPrimary },
-                    ]}
-                  >
-                    Call dispatch
-                  </Text>
-                </View>
-              </ExternalLink>
-
-              <ExternalLink
-                href="mailto:support@mototrack.com"
-                style={{ flex: 1 }}
-              >
-                <View
-                  style={[
-                    styles.supportBtn,
-                    {
-                      borderColor: palette.borderStrong,
-                      backgroundColor: palette.bgCard,
-                    },
-                  ]}
-                >
-                  <BootstrapIcon
-                    name="envelope"
-                    size={14}
-                    color={palette.textPrimary}
-                  />
-                  <Text
-                    style={[
-                      styles.supportBtnText,
-                      { color: palette.textPrimary },
-                    ]}
-                  >
-                    Email support
-                  </Text>
-                </View>
-              </ExternalLink>
-            </View>
-          </View>
+          <RiderSecuritySection
+            palette={palette}
+            preferences={preferences}
+            onUpdatePreference={onUpdatePreference}
+            onChangePassword={onChangePassword}
+            onShowFeedback={onShowFeedback}
+          />
+          <RiderHelpSupportSection palette={palette} />
         </>
       ) : null}
 
@@ -1219,93 +1331,144 @@ export default function RiderAccountView({
           Sign out of MotoTrack
         </Text>
       </TouchableOpacity>
+      </View>
+
+      {/* Full-Screen Rider Cover Photo Viewer Modal */}
+      {isViewingCoverModal && heroBackdropUri ? (
+        <Modal
+          visible={isViewingCoverModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsViewingCoverModal(false)}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0, 0, 0, 0.88)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            }}
+            activeOpacity={1}
+            onPress={() => setIsViewingCoverModal(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation?.()}
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                backgroundColor: '#181A1D',
+                borderRadius: 18,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.12)',
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderBottomWidth: 1,
+                  borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+                }}
+              >
+                <Text style={{ fontSize: 15.5, ...riderFont('700'), color: '#F9FAFB' }}>
+                  Cover Photo
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setIsViewingCoverModal(false)}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="x-lg" size={13} color="#F9FAFB" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ width: '100%', height: 260, backgroundColor: '#0E1014' }}>
+                <Image
+                  source={{ uri: heroBackdropUri }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="contain"
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, padding: 14 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    height: 42,
+                    borderRadius: 10,
+                    backgroundColor: '#EA580C',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                  onPress={() => {
+                    setIsViewingCoverModal(false);
+                    handleUploadCover();
+                  }}
+                >
+                  <BootstrapIcon name="image" size={14} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13.5, ...riderFont('700'), color: '#FFFFFF' }}>
+                    Change Cover
+                  </Text>
+                </TouchableOpacity>
+
+                {riderCoverUri ? (
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      height: 42,
+                      borderRadius: 10,
+                      backgroundColor: 'rgba(239, 68, 68, 0.16)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(248, 113, 113, 0.36)',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                    onPress={handleRemoveCover}
+                  >
+                    <BootstrapIcon name="trash3" size={13} color="#FCA5A5" />
+                    <Text style={{ fontSize: 13.5, ...riderFont('700'), color: '#FCA5A5' }}>
+                      Remove
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    gap: 14,
-  },
-  heroProfileCard: {
-    backgroundColor: '#152923',
-    borderColor: '#1E3730',
-    borderWidth: 1,
-    borderRadius: 24,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  heroAvatarCircle: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    backgroundColor: '#EA580C',
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: '100%',
   },
   heroAvatarImg: {
     width: '100%',
     height: '100%',
   },
   heroAvatarInitials: {
-    fontFamily: RIDER_FONT,
-    fontSize: 25,
-    fontWeight: '700',
+    ...riderFont('700'),
+    fontSize: 24,
     color: '#FFFFFF',
     letterSpacing: 0.5,
-  },
-  heroOverline: {
-    fontFamily: RIDER_FONT,
-    marginTop: 14,
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: '#6BB39B',
-    textTransform: 'uppercase',
-  },
-  heroName: {
-    fontFamily: RIDER_FONT,
-    marginTop: 5,
-    fontSize: 21,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontFamily: RIDER_FONT,
-    marginTop: 4,
-    fontSize: 12.5,
-    fontWeight: '400',
-    color: '#B5C5BF',
-    textAlign: 'center',
-  },
-  heroEditBtn: {
-    marginTop: 18,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroEditBtnText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#18181B',
   },
   personalInfoHeader: {
     flexDirection: 'row',
@@ -1319,123 +1482,71 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   editToggleText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 12.5,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
-    paddingVertical: 13,
+    paddingVertical: 12,
   },
-  infoRowLabel: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13,
-    fontWeight: '400',
-  },
-  infoRowValue: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13,
-    fontWeight: '500',
-    flexShrink: 1,
-    textAlign: 'right',
-  },
-  identityCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 16,
-  },
-  identityTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  avatarEditWrap: {
-    position: 'relative',
-  },
-  cameraBadgeBtn: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
+  infoIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nameBadgeRow: {
+  infoRowLabel: {
+    ...riderFont('500'),
+    fontSize: 11.5,
+    lineHeight: 15,
+    marginBottom: 2,
+  },
+  infoValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
   },
-  riderFullName: {
-    fontFamily: RIDER_FONT,
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+  infoRowValue: {
+    ...riderFont('600'),
+    fontSize: 14,
+    lineHeight: 19,
     flexShrink: 1,
   },
-  badgesWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
+  infoRowValueBold: {
+    ...riderFont('700'),
   },
-  verifiedBadge: {
+  fleetVerifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 9,
-    paddingVertical: 3.5,
+    paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
   },
-  verifiedBadgeText: {
-    fontFamily: RIDER_FONT,
+  fleetVerifiedText: {
+    ...riderFont('700'),
     fontSize: 11,
-    fontWeight: '600',
-  },
-  riderIdPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: 999,
-  },
-  riderIdPillText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  vehicleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 7,
-  },
-  vehicleText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    fontWeight: '500',
-    flexShrink: 1,
   },
   availabilityBlock: {
     marginTop: 14,
-    padding: 12,
-    borderRadius: 16,
+    padding: 13,
+    borderRadius: 18,
     borderWidth: 1,
   },
   availabilityCaption: {
-    fontFamily: RIDER_FONT,
-    fontSize: 10.5,
-    fontWeight: '700',
+    ...riderFont('700'),
+    fontSize: 11,
     textTransform: 'uppercase',
-    letterSpacing: 0.7,
+    letterSpacing: 0.8,
     marginBottom: 9,
+  },
+  quickToggleText: {
+    ...riderFont('600'),
+    fontSize: 12,
   },
   availabilityPillsRow: {
     flexDirection: 'row',
@@ -1458,9 +1569,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   availPillText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11.5,
-    fontWeight: '600',
+    ...riderFont('600'),
+    fontSize: 12,
+  },
+  availPillTextActive: {
+    ...riderFont('700'),
   },
   accountTabsTrack: {
     flexDirection: 'row',
@@ -1486,8 +1599,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   accountTabText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 12.5,
+  },
+  accountTabTextActive: {
+    ...riderFont('700'),
   },
   formCard: {
     borderRadius: 22,
@@ -1495,27 +1611,24 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   cardHeading: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 16.5,
     lineHeight: 22,
-    fontWeight: '700',
     letterSpacing: -0.2,
   },
   cardSubheading: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '400',
-    marginTop: 2,
+    marginTop: 3,
   },
   fieldGroup: {
     marginTop: 13,
   },
   fieldLabel: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600',
     marginBottom: 6,
   },
   inputWrap: {
@@ -1534,9 +1647,8 @@ const styles = StyleSheet.create({
   },
   inputField: {
     flex: 1,
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    fontWeight: '400',
+    ...riderFont('500'),
+    fontSize: 14,
     paddingVertical: 8,
   },
   textAreaInput: {
@@ -1556,10 +1668,9 @@ const styles = StyleSheet.create({
   },
   feedbackBannerText: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '500',
   },
   primarySaveBtn: {
     minHeight: 48,
@@ -1571,129 +1682,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   primarySaveBtnText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 14,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 14.5,
     color: '#FFFFFF',
-  },
-  togglesList: {
-    marginTop: 10,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 13,
-  },
-  toggleIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  toggleDesc: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '400',
-    marginTop: 2,
-  },
-  switchTrack: {
-    width: 46,
-    height: 27,
-    borderRadius: 14,
-    padding: 3,
-    justifyContent: 'center',
-  },
-  switchThumb: {
-    width: 21,
-    height: 21,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-  },
-  switchThumbOn: {
-    alignSelf: 'flex-end',
-  },
-  switchThumbOff: {
-    alignSelf: 'flex-start',
-  },
-  twoFactorHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  twoFactorBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  twoFactorBadgeText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  pwdHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  eyeToggleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpAccordion: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-  },
-  helpAccordionHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  helpAccordionTitle: {
-    flex: 1,
-    fontFamily: RIDER_FONT,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  helpAccordionBody: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: '400',
-    marginTop: 8,
-  },
-  supportActionsRow: {
-    flexDirection: 'row',
-    gap: 9,
-    marginTop: 12,
-  },
-  supportBtn: {
-    minHeight: 42,
-    borderRadius: 11,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  supportBtnText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 12.5,
-    fontWeight: '600',
   },
   signOutBtn: {
     minHeight: 48,
@@ -1706,9 +1697,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   signOutBtnText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 13.5,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 14,
   },
 });
 

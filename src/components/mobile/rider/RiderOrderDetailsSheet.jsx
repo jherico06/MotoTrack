@@ -14,11 +14,13 @@ import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import ExternalLink from '../../common/ExternalLink.jsx';
 import { googleMapsNavigateUrl } from '../../../utils/geo.js';
 import {
-  RIDER_FONT,
+  riderFont,
   formatOrderCode,
   formatPhp,
   formatPhpExact,
   isDeliveredOrder,
+  isCancelledOrder,
+  isNeedsPickupOrder,
   isCodOrder,
   getInitials,
   formatActiveDeadlineLabel,
@@ -44,12 +46,13 @@ export default function RiderOrderDetailsSheet({
   if (!delivery) return null;
 
   const delivered = isDeliveredOrder(delivery);
+  const cancelled = isCancelledOrder(delivery);
+  const isClosed = delivered || cancelled;
   const badge = getOrderStatusBadge(delivery, palette);
   const cod = isCodOrder(delivery);
   const statusStr = String(delivery?.deliveryStatus || '').toLowerCase();
-  const isAssigned =
-    statusStr.includes('assigned') || statusStr.includes('ready');
-  const isReported = statusStr.includes('report');
+  const isAssigned = !isClosed && isNeedsPickupOrder(delivery);
+  const isReported = !isClosed && statusStr.includes('report');
   const cleanPhone = String(delivery?.customerPhone || '').replace(
     /[^\d+]/g,
     ''
@@ -309,7 +312,7 @@ export default function RiderOrderDetailsSheet({
                         { color: palette.orange },
                       ]}
                     >
-                      View map
+                      Track route
                     </Text>
                   </TouchableOpacity>
 
@@ -521,7 +524,7 @@ export default function RiderOrderDetailsSheet({
             </View>
 
             {/* 4. Optional Route Start (for Assigned orders) */}
-            {!delivered && isAssigned ? (
+            {!isClosed && isAssigned ? (
               <TouchableOpacity
                 style={[
                   styles.startRouteBtn,
@@ -544,7 +547,7 @@ export default function RiderOrderDetailsSheet({
             ) : null}
 
             {/* 5. Proof of Delivery Photo */}
-            {!delivered ? (
+            {!isClosed ? (
               <View
                 style={[
                   styles.sectionCard,
@@ -707,7 +710,28 @@ export default function RiderOrderDetailsSheet({
               },
             ]}
           >
-            {delivered ? (
+            {cancelled ? (
+              <View
+                style={[
+                  styles.completedFooterBanner,
+                  { backgroundColor: palette.dangerSoft },
+                ]}
+              >
+                <BootstrapIcon
+                  name="x-circle-fill"
+                  size={17}
+                  color={palette.dangerText}
+                />
+                <Text
+                  style={[
+                    styles.completedFooterText,
+                    { color: palette.dangerText },
+                  ]}
+                >
+                  This order was cancelled and does not require delivery
+                </Text>
+              </View>
+            ) : delivered ? (
               <View
                 style={[
                   styles.completedFooterBanner,
@@ -819,17 +843,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orderOverline: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 10,
     lineHeight: 13,
-    fontWeight: '600',
     letterSpacing: 0.7,
   },
   orderNumberTitle: {
-    fontFamily: RIDER_FONT,
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '700',
+    ...riderFont('700'),
+    fontSize: 17,
+    lineHeight: 22,
     fontVariant: ['tabular-nums'],
   },
   headerRight: {
@@ -843,9 +865,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusBadgeText: {
-    fontFamily: RIDER_FONT,
-    fontSize: 11,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 11.5,
   },
   closeCircle: {
     width: 34,
@@ -872,10 +893,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionLabel: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 11,
     lineHeight: 15,
-    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -894,21 +914,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   customerInitials: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 15,
-    fontWeight: '600',
   },
   customerFullName: {
-    fontFamily: RIDER_FONT,
-    fontSize: 15.5,
-    lineHeight: 20,
-    fontWeight: '600',
+    ...riderFont('700'),
+    fontSize: 16,
+    lineHeight: 21,
   },
   customerPhone: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '400',
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
@@ -922,9 +939,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   callActionText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 12.5,
-    fontWeight: '600',
   },
   inlineNavLink: {
     flexDirection: 'row',
@@ -933,9 +949,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   inlineNavText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 12,
-    fontWeight: '600',
   },
   addressBlock: {
     flexDirection: 'row',
@@ -951,16 +966,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fullAddressText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 13.5,
     lineHeight: 19,
-    fontWeight: '500',
   },
   landmarkText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '400',
     marginTop: 4,
   },
   scheduleStrip: {
@@ -973,9 +986,8 @@ const styles = StyleSheet.create({
     marginTop: 11,
   },
   scheduleStripText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 12.5,
-    fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
   codHeroBox: {
@@ -989,15 +1001,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   codHeroCaption: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 11.5,
-    fontWeight: '600',
   },
   codHeroValue: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 22,
     lineHeight: 28,
-    fontWeight: '700',
     marginTop: 2,
     letterSpacing: -0.3,
     fontVariant: ['tabular-nums'],
@@ -1006,14 +1016,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   earningLabel: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 11,
-    fontWeight: '500',
   },
   earningValue: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 15,
-    fontWeight: '700',
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
@@ -1024,14 +1032,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   metaKey: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('400'),
     fontSize: 12.5,
-    fontWeight: '400',
   },
   metaVal: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 12.5,
-    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   itemsDivider: {
@@ -1047,14 +1053,12 @@ const styles = StyleSheet.create({
   },
   itemName: {
     flex: 1,
-    fontFamily: RIDER_FONT,
+    ...riderFont('500'),
     fontSize: 13,
-    fontWeight: '400',
   },
   itemQty: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 13,
-    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   startRouteBtn: {
@@ -1067,9 +1071,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   startRouteText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 13.5,
-    fontWeight: '600',
     color: '#FFFFFF',
   },
   podPreviewWrap: {
@@ -1089,9 +1092,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   podReplaceText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 12,
-    fontWeight: '600',
   },
   podStagedActions: {
     flexDirection: 'row',
@@ -1107,9 +1109,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   podSaveBtnText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 12.5,
-    fontWeight: '600',
     color: '#FFFFFF',
   },
   podCancelBtn: {
@@ -1121,9 +1122,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   podCancelText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 12.5,
-    fontWeight: '600',
   },
   podUploadBox: {
     marginTop: 10,
@@ -1137,9 +1137,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   podUploadText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('600'),
     fontSize: 13,
-    fontWeight: '600',
   },
   sheetFooter: {
     paddingHorizontal: 16,
@@ -1156,10 +1155,9 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   largeScanCtaText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 15,
     lineHeight: 20,
-    fontWeight: '600',
     color: '#FFFFFF',
   },
   completedFooterBanner: {
@@ -1172,9 +1170,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   completedFooterText: {
-    fontFamily: RIDER_FONT,
+    ...riderFont('700'),
     fontSize: 13,
-    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
 });

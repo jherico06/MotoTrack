@@ -427,6 +427,16 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
     compatOnly,
   ]);
 
+  const [visibleProductCount, setVisibleProductCount] = useState(16);
+  useEffect(() => {
+    setVisibleProductCount(16);
+  }, [selectedCategory, searchQuery, filterSort, ratingFilter, priceFilter, activeBike, compatOnly]);
+
+  const displayedProducts = useMemo(
+    () => filteredProducts.slice(0, visibleProductCount),
+    [filteredProducts, visibleProductCount]
+  );
+
   // Add to cart with auth check
   const handleAddToCartAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
@@ -579,6 +589,8 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
       customerPhone,
       customerAddress,
       deliveryNotes,
+      deliveryLat,
+      deliveryLng,
       paymentMethod,
       gcashNumber,
       gcashReference,
@@ -598,6 +610,8 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
         customerEmail: currentUser?.email || null,
         customerAddress,
         deliveryNotes,
+        deliveryLat: deliveryLat ?? currentUser?.latitude ?? currentUser?.delivery_lat ?? null,
+        deliveryLng: deliveryLng ?? currentUser?.longitude ?? currentUser?.delivery_lng ?? null,
         paymentMethod,
         gcashNumber,
         gcashReference,
@@ -726,6 +740,15 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
         style={[styles.container, { backgroundColor: isDarkMode ? '#121518' : '#F7F5F0' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={Platform.OS === 'android'}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          if (visibleProductCount >= filteredProducts.length) return;
+          const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 320) {
+            setVisibleProductCount((prev) => Math.min(filteredProducts.length, prev + 16));
+          }
+        }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -767,6 +790,7 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
           />
 
           {/* Motorcycle Selection Bottom Sheet Modal (Mobile) */}
+          {isBikeModalOpen && (
           <Modal
             visible={isBikeModalOpen}
             transparent={true}
@@ -1071,6 +1095,7 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
               </TouchableOpacity>
             </TouchableOpacity>
           </Modal>
+          )}
 
           {/* Dynamic Active Admin Promos Strip */}
           {activePromos.length > 0 && (
@@ -1167,7 +1192,7 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
                 </Text>
               </View>
             ) : (
-              filteredProducts.map((product, pIdx) => (
+              displayedProducts.map((product, pIdx) => (
                 <ProductCard
                   key={product.id ? `prod-${product.id}` : `prod-${pIdx}`}
                   product={product}
@@ -1184,6 +1209,28 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
               ))
             )}
           </View>
+
+          {displayedProducts.length < filteredProducts.length && (
+            <TouchableOpacity
+              onPress={() => setVisibleProductCount((prev) => Math.min(filteredProducts.length, prev + 16))}
+              activeOpacity={0.85}
+              style={{
+                alignSelf: 'center',
+                marginTop: 8,
+                marginBottom: 8,
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 9999,
+                backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#2B3035' : '#EDE9E0',
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F9FAFB' : '#18181B' }}>
+                Load more ({filteredProducts.length - displayedProducts.length} remaining)
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Mobile Footer with Company Links & Copyright */}
           <View style={{ alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 }}>
@@ -1283,92 +1330,108 @@ export default function ShopPage({ onNavigateToScreen, onNavigateToWishlist, onR
       />
 
       {/* ─── MODALS ─── */}
-      <ProductSpecsModal
-        visible={isSpecsOpen}
-        product={selectedProduct}
-        onClose={() => setIsSpecsOpen(false)}
-        onAddToCart={handleAddToCartAttempt}
-        onBuyNow={handleBuyNowAttempt}
-      />
+      {isSpecsOpen && (
+        <ProductSpecsModal
+          visible={isSpecsOpen}
+          product={selectedProduct}
+          onClose={() => setIsSpecsOpen(false)}
+          onAddToCart={handleAddToCartAttempt}
+          onBuyNow={handleBuyNowAttempt}
+        />
+      )}
 
-      <MobileCartPage
-        visible={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        onProceedToCheckout={handleProceedToCheckout}
-        onNavigateToWishlist={() => {
-          setIsCartOpen(false);
-          onNavigateToWishlist?.();
-        }}
-        onNavigateToStore={() => setIsCartOpen(false)}
-        onBuyNow={handleBuyNowAttempt}
-      />
+      {isCartOpen && (
+        <MobileCartPage
+          visible={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          onProceedToCheckout={handleProceedToCheckout}
+          onNavigateToWishlist={() => {
+            setIsCartOpen(false);
+            onNavigateToWishlist?.();
+          }}
+          onNavigateToStore={() => setIsCartOpen(false)}
+          onBuyNow={handleBuyNowAttempt}
+        />
+      )}
 
-      <CheckoutModal
-        visible={isCheckoutOpen}
-        onClose={() => {
-          if (isPlacingOrder) return;
-          setIsCheckoutOpen(false);
-          setBuyNowItems(null);
-        }}
-        onCompleteOrder={handleCompleteOrder}
-        isPlacingOrder={isPlacingOrder}
-        overrideItemCount={isBuyNowCheckout ? checkoutItemCount : null}
-        overrideTotal={isBuyNowCheckout ? checkoutTotal : null}
-        overrideItems={isBuyNowCheckout ? checkoutItems : null}
-        onOpenProfile={() => {
-          setIsCheckoutOpen(false);
-          setBuyNowItems(null);
-          setIsProfileOpen(true);
-        }}
-      />
+      {isCheckoutOpen && (
+        <CheckoutModal
+          visible={isCheckoutOpen}
+          onClose={() => {
+            if (isPlacingOrder) return;
+            setIsCheckoutOpen(false);
+            setBuyNowItems(null);
+          }}
+          onCompleteOrder={handleCompleteOrder}
+          isPlacingOrder={isPlacingOrder}
+          overrideItemCount={isBuyNowCheckout ? checkoutItemCount : null}
+          overrideTotal={isBuyNowCheckout ? checkoutTotal : null}
+          overrideItems={isBuyNowCheckout ? checkoutItems : null}
+          onOpenProfile={() => {
+            setIsCheckoutOpen(false);
+            setBuyNowItems(null);
+            setIsProfileOpen(true);
+          }}
+        />
+      )}
 
-      <ProfileModal
-        visible={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        onNavigateToOrders={() => onNavigateToScreen?.('profile', { tab: 'orders' })}
-        onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
-        onNavigateToAdmin={() => {
-          if (currentUser?.role === 'admin') {
-            onNavigateToScreen?.('admin');
-          } else {
-            setIsAccessDeniedModalOpen(true);
-          }
-        }}
-        showToast={showToast}
-      />
+      {isProfileOpen && (
+        <ProfileModal
+          visible={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          onNavigateToOrders={() => onNavigateToScreen?.('profile', { tab: 'orders' })}
+          onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
+          onNavigateToAdmin={() => {
+            if (currentUser?.role === 'admin') {
+              onNavigateToScreen?.('admin');
+            } else {
+              setIsAccessDeniedModalOpen(true);
+            }
+          }}
+          showToast={showToast}
+        />
+      )}
 
-      <AccessDeniedModal
-        visible={isAccessDeniedModalOpen}
-        onClose={() => setIsAccessDeniedModalOpen(false)}
-        onNavigateToLogin={() => {
-          setRedirectReason('Please sign in with your Store Administrator account.');
-          onNavigateToScreen?.('login');
-        }}
-        onNavigateToAdmin={() => onNavigateToScreen?.('admin')}
-      />
+      {isAccessDeniedModalOpen && (
+        <AccessDeniedModal
+          visible={isAccessDeniedModalOpen}
+          onClose={() => setIsAccessDeniedModalOpen(false)}
+          onNavigateToLogin={() => {
+            setRedirectReason('Please sign in with your Store Administrator account.');
+            onNavigateToScreen?.('login');
+          }}
+          onNavigateToAdmin={() => onNavigateToScreen?.('admin')}
+        />
+      )}
 
-      <LiveOrderTrackingMapModal
-        visible={isLiveTrackingOpen}
-        order={selectedOrderForTracking}
-        onClose={() => setIsLiveTrackingOpen(false)}
-        showToast={showToast}
-      />
+      {isLiveTrackingOpen && (
+        <LiveOrderTrackingMapModal
+          visible={isLiveTrackingOpen}
+          order={selectedOrderForTracking}
+          onClose={() => setIsLiveTrackingOpen(false)}
+          showToast={showToast}
+        />
+      )}
 
-      <GCashPaymentModal
-        visible={isGcashModalOpen}
-        amount={cartTotal}
-        orderData={pendingGcashOrderData}
-        onClose={() => setIsGcashModalOpen(false)}
-        onPaymentSuccess={handleGcashPaymentSuccess}
-        showToast={showToast}
-      />
+      {isGcashModalOpen && (
+        <GCashPaymentModal
+          visible={isGcashModalOpen}
+          amount={cartTotal}
+          orderData={pendingGcashOrderData}
+          onClose={() => setIsGcashModalOpen(false)}
+          onPaymentSuccess={handleGcashPaymentSuccess}
+          showToast={showToast}
+        />
+      )}
 
-      <CompanyInfoModal
-        visible={isCompanyInfoOpen}
-        initialTab={companyInfoTab}
-        onClose={() => setIsCompanyInfoOpen(false)}
-        showToast={showToast}
-      />
+      {isCompanyInfoOpen && (
+        <CompanyInfoModal
+          visible={isCompanyInfoOpen}
+          initialTab={companyInfoTab}
+          onClose={() => setIsCompanyInfoOpen(false)}
+          showToast={showToast}
+        />
+      )}
     </SafeAreaView>
   );
 }

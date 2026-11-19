@@ -959,12 +959,12 @@ export const productService = {
    * Validate stock availability without mutating inventory.
    * Aggregates quantities when the same product appears multiple times.
    */
-  async validateStock(items) {
+  async validateStock(items, prefetchedCatalog = null) {
     if (!Array.isArray(items) || items.length === 0) {
       return { success: false, error: 'No items to validate' };
     }
 
-    const catalog = await this.getProducts();
+    const catalog = Array.isArray(prefetchedCatalog) ? prefetchedCatalog : await this.getProducts();
     const needed = new Map();
 
     for (const item of items) {
@@ -1032,36 +1032,39 @@ export const productService = {
   async deductStock(items, meta = {}) {
     if (!Array.isArray(items) || items.length === 0) return { success: true };
 
-    const validation = await this.validateStock(items);
+    const catalog = await this.getProducts();
+    const validation = await this.validateStock(items, catalog);
     if (!validation.success) {
       return { success: false, error: validation.error, insufficient: validation.insufficient };
     }
 
-    const catalog = await this.getProducts();
     const updated = [...catalog];
     const applied = [];
     const client = supabaseManager.getClient();
     const orderRef = meta.orderId || meta.referenceId || null;
 
-    for (const step of validation.plan) {
-      const index = updated.findIndex((p) => p.id === step.productId || p.product_id === step.productId);
-      if (index === -1) {
-        return {
-          success: false,
-          error: `Product not found for "${step.name}"`,
-          deductions: applied,
-        };
-      }
+    if (client) {
+      const rpcResults = await Promise.all(
+        validation.plan.map(async (step) => {
+          const index = updated.findIndex(
+            (p) => p.id === step.productId || p.product_id === step.productId
+          );
+          if (index === -1) {
+            return { step, index: -1, res: { success: false, error: `Product not found for "${step.name}"` } };
+          }
+          const res = await adjustStockRpc(client, {
+            productId: step.productId,
+            delta: -Math.abs(step.quantity),
+            reason: 'sale',
+            referenceType: meta.referenceType || 'order',
+            referenceId: orderRef,
+            actorId: meta.actorId || null,
+          });
+          return { step, index, res };
+        })
+      );
 
-      if (client) {
-        const res = await adjustStockRpc(client, {
-          productId: step.productId,
-          delta: -Math.abs(step.quantity),
-          reason: 'sale',
-          referenceType: meta.referenceType || 'order',
-          referenceId: orderRef,
-          actorId: meta.actorId || null,
-        });
+      for (const { step, index, res } of rpcResults) {
         if (!res.success) {
           return {
             success: false,
@@ -1072,7 +1075,17 @@ export const productService = {
         }
         updated[index] = { ...updated[index], stock: res.stock };
         applied.push({ ...step, newStock: res.stock });
-      } else {
+      }
+    } else {
+      for (const step of validation.plan) {
+        const index = updated.findIndex((p) => p.id === step.productId || p.product_id === step.productId);
+        if (index === -1) {
+          return {
+            success: false,
+            error: `Product not found for "${step.name}"`,
+            deductions: applied,
+          };
+        }
         const next = Number(updated[index].stock || 0) - step.quantity;
         if (next < 0) {
           return { success: false, error: `Insufficient stock for "${step.name}"`, deductions: applied };

@@ -13,6 +13,7 @@ import {
   Modal,
   Linking,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { BootstrapIcon } from '../common';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { garageService, TIME_SLOTS as DEFAULT_TIME_SLOTS } from '../../services/bookings/garageService.js';
@@ -91,7 +92,7 @@ export default function BookInstallationModal({
   errorMessage = '',
 }) {
   const { isDarkMode } = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const width = windowWidth;
   const isMobile = windowWidth < 640;
   const isDesktop = windowWidth >= 768;
@@ -292,6 +293,27 @@ export default function BookInstallationModal({
   // Workshop interactive map mode: 'street' | 'map' | 'satellite'
   const [mapMode, setMapMode] = useState('street');
 
+  const streetViewHtml = useMemo(() => {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    html, body, iframe { margin: 0; padding: 0; width: 100%; height: 100%; border: 0; overflow: hidden; background: #0F172A; }
+  </style>
+</head>
+<body>
+  <iframe
+    src="${GOOGLE_STREET_VIEW_EMBED_URL}"
+    allowfullscreen
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+  ></iframe>
+</body>
+</html>`;
+  }, []);
+
   const satelliteMapHtml = useMemo(() => {
     const lat = SHOP_LAT;
     const lng = SHOP_LNG;
@@ -436,21 +458,26 @@ export default function BookInstallationModal({
     serviceName ||
     'Custom Parts Installation';
 
+  const isBottomSheet = !isDesktop;
   const isPhoneValid = Boolean(phone && phone.trim().length >= 7);
   const showPhoneError = phoneTouched && !isPhoneValid;
+  const isPhoneRequired = !isBottomSheet;
+  const canConfirmBooking = isPhoneRequired ? isPhoneValid : true;
 
   const handlePhoneBlur = () => {
     setPhoneTouched(true);
   };
 
   const handleConfirmPress = () => {
-    setPhoneTouched(true);
-    if (!isPhoneValid) return;
+    if (isPhoneRequired) {
+      setPhoneTouched(true);
+      if (!isPhoneValid) return;
+    }
     onConfirm?.({
       date: effectiveDate,
       timeSlot: selectedTimeSlot,
       branch: selectedBranch,
-      phone,
+      phone: (phone && phone.trim()) || 'Customer on file',
       notes,
       downpaymentPercent,
       downpaymentAmount,
@@ -486,27 +513,73 @@ export default function BookInstallationModal({
             styles.sheet,
             isDesktop ? styles.sheetDesktop : styles.sheetMobile,
             {
-              backgroundColor: SURFACE,
+              backgroundColor: isBottomSheet ? (isDarkMode ? '#181A1D' : '#FFFFFF') : SURFACE,
               borderColor: CARD_BORDER,
               maxWidth: isDesktop ? 900 : '100%',
+              ...(isBottomSheet ? { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomWidth: 0, borderLeftWidth: 0, borderRightWidth: 0 } : {}),
+              ...(Platform.OS === 'web'
+                ? { maxHeight: '90vh' }
+                : {
+                    height: Math.max(480, Math.round(windowHeight * 0.9)),
+                    maxHeight: Math.round(windowHeight * 0.92),
+                  }),
             },
           ]}
         >
+          {isBottomSheet && (
+            <View
+              style={{
+                alignItems: 'center',
+                paddingTop: 10,
+                paddingBottom: 2,
+                backgroundColor: isDarkMode ? '#181A1D' : '#FFFFFF',
+              }}
+            >
+              <View
+                style={{
+                  width: 36,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: isDarkMode ? '#3A3F45' : '#CBD5E1',
+                }}
+              />
+            </View>
+          )}
+
           {/* ─── 1. FIXED HEADER (MINIMALIST) ─── */}
           <View
             style={[
               styles.header,
               {
                 borderBottomColor: CARD_BORDER,
-                backgroundColor: isDarkMode ? '#141816' : '#FFFFFF',
+                backgroundColor: isBottomSheet
+                  ? (isDarkMode ? '#181A1D' : '#FFFFFF')
+                  : (isDarkMode ? '#141816' : '#FFFFFF'),
+                ...(isBottomSheet ? { paddingHorizontal: 16, paddingVertical: 12 } : {}),
               },
             ]}
           >
             <View style={styles.headerTitleRow}>
+              {isBottomSheet && (
+                <View
+                  style={[
+                    styles.headerIconBadge,
+                    {
+                      backgroundColor: isDarkMode ? '#2A1D15' : '#FFF7ED',
+                      borderColor: isDarkMode ? '#EA580C' : '#FED7AA',
+                      borderRadius: 10,
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="calendar2-check" size={16} color={BRAND} />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.headerTitle, { color: INK }]}>Book Installation</Text>
-                <Text style={[styles.headerSubtitle, { color: MUTED }]}>
-                  Select your service schedule, workshop pit bay, and contact details.
+                <Text style={[styles.headerSubtitle, { color: MUTED }]} numberOfLines={1}>
+                  {isBottomSheet
+                    ? `${displayBike} • Select date & time`
+                    : 'Select your service schedule, workshop pit bay, and contact details.'}
                 </Text>
               </View>
             </View>
@@ -515,8 +588,11 @@ export default function BookInstallationModal({
               style={[
                 styles.closeButton,
                 {
-                  backgroundColor: isDarkMode ? '#1E2822' : '#F8FAFC',
+                  backgroundColor: isBottomSheet
+                    ? (isDarkMode ? '#25292E' : '#F1F5F9')
+                    : (isDarkMode ? '#1E2822' : '#F8FAFC'),
                   borderColor: CARD_BORDER,
+                  ...(isBottomSheet ? { width: 34, height: 34, borderRadius: 17, borderWidth: 0 } : {}),
                 },
               ]}
               onPress={() => !busy && onClose?.()}
@@ -524,16 +600,24 @@ export default function BookInstallationModal({
               activeOpacity={0.7}
               accessibilityLabel="Close installation booking modal"
             >
-              <BootstrapIcon name="x-lg" size={12} color={MUTED} />
+              <BootstrapIcon name="x-lg" size={13} color={isBottomSheet ? (isDarkMode ? '#D4D4D8' : '#475569') : MUTED} />
             </TouchableOpacity>
           </View>
 
           {/* ─── 2. SCROLLABLE CONTENT BODY ─── */}
           <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
+            style={[
+              styles.scrollArea,
+              isBottomSheet && { backgroundColor: isDarkMode ? '#141619' : '#F8FAFC' },
+            ]}
+            contentContainerStyle={[
+              styles.scrollContent,
+              isBottomSheet && { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 22, gap: 14 },
+            ]}
             showsVerticalScrollIndicator={true}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
+            automaticallyAdjustKeyboardInsets={true}
           >
             {/* Inline Error Alert */}
             {errorMessage ? (
@@ -543,26 +627,29 @@ export default function BookInstallationModal({
               </View>
             ) : null}
 
-            {/* ─── UNIFIED HERO SUMMARY (MINIMALIST) ─── */}
-            <View
-              style={[
-                styles.unifiedSummaryCard,
-                {
-                  backgroundColor: isDarkMode ? '#18201B' : '#F8FAFC',
-                  borderColor: CARD_BORDER,
-                },
-              ]}
-            >
-              <View style={styles.unifiedSummaryRow}>
-                {/* 1. Bike & Service Thumbnail + Details */}
-                <View style={styles.summaryBikeGroup}>
+            {/* ─── UNIFIED HERO SUMMARY ─── */}
+            {isBottomSheet ? (
+              <View
+                style={{
+                  backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+                  borderColor: isDarkMode ? '#2B3035' : '#E2E8F0',
+                  borderWidth: 1,
+                  borderRadius: 14,
+                  padding: 14,
+                  gap: 12,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   {previewImageUri ? (
                     <View
                       style={[
                         styles.imageThumb,
                         {
-                          backgroundColor: isDarkMode ? '#111315' : '#FFFFFF',
-                          borderColor: CARD_BORDER,
+                          width: 46,
+                          height: 46,
+                          borderRadius: 10,
+                          backgroundColor: isDarkMode ? '#141619' : '#F8FAFC',
+                          borderColor: isDarkMode ? '#2B3035' : '#E2E8F0',
                         },
                       ]}
                     >
@@ -574,8 +661,8 @@ export default function BookInstallationModal({
                     </View>
                   ) : null}
 
-                  <View style={{ flex: 1, minWidth: 160 }}>
-                    <Text style={[styles.serviceTitle, { color: INK }]} numberOfLines={1}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.serviceTitle, { color: INK, fontSize: 14 }]} numberOfLines={1}>
                       {displayService}
                     </Text>
                     <View style={styles.bikeModelRow}>
@@ -587,44 +674,156 @@ export default function BookInstallationModal({
                   </View>
                 </View>
 
-                {/* 2. Price & Itemization */}
-                <View style={styles.summaryPriceGroup}>
+                <View style={{ height: 1, backgroundColor: isDarkMode ? '#2B3035' : '#F1F5F9' }} />
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   {freeInstallPromo ? (
-                    <View style={styles.freeBadge}>
-                      <BootstrapIcon name="tag-fill" size={11} color="#059669" />
-                      <Text style={styles.freeBadgeText}>FREE INSTALL</Text>
-                    </View>
+                    <>
+                      <Text style={{ fontSize: 12, color: MUTED, fontWeight: '500' }}>Installation</Text>
+                      <View style={styles.freeBadge}>
+                        <BootstrapIcon name="tag-fill" size={11} color="#059669" />
+                        <Text style={styles.freeBadgeText}>FREE INSTALL</Text>
+                      </View>
+                    </>
                   ) : (
                     <>
-                      <Text style={[styles.priceAmount, { color: INK }]}>
-                        ₱{Number(totalEstimate).toLocaleString('en-US')}
+                      <Text style={{ fontSize: 12, color: MUTED, fontWeight: '500', fontVariant: ['tabular-nums'] }}>
+                        Parts ₱{Number(partsCostPhp || 0).toLocaleString()} · Labor ₱{Number(effectiveLaborFee).toLocaleString()}
                       </Text>
-                      <Text style={[styles.priceSublabel, { color: MUTED }]}>
-                        {downpaymentPercent > 0 ? (
-                          <>
-                            <Text style={{ color: BRAND, fontWeight: '700' }}>
-                              ₱{Number(downpaymentAmount).toLocaleString()} ({downpaymentPercent}% Deposit)
-                            </Text>
-                            {' • '}
-                          </>
-                        ) : null}
-                        Parts ₱{Number(partsCostPhp || 0).toLocaleString()} + Labor ₱{Number(effectiveLaborFee).toLocaleString()}
+                      <Text style={{ fontSize: 15.5, fontWeight: '700', color: INK, fontVariant: ['tabular-nums'] }}>
+                        ₱{Number(totalEstimate).toLocaleString('en-US')}
                       </Text>
                     </>
                   )}
                 </View>
               </View>
-            </View>
+            ) : (
+              <View
+                style={[
+                  styles.unifiedSummaryCard,
+                  {
+                    backgroundColor: isDarkMode ? '#18201B' : '#F8FAFC',
+                    borderColor: CARD_BORDER,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.unifiedSummaryRow,
+                    {
+                      flexDirection: isDesktop ? 'row' : 'column',
+                      alignItems: isDesktop ? 'center' : 'stretch',
+                    },
+                  ]}
+                >
+                  {/* 1. Bike & Service Thumbnail + Details */}
+                  <View
+                    style={[
+                      styles.summaryBikeGroup,
+                      !isDesktop && { flex: undefined, width: '100%', minWidth: 0 },
+                    ]}
+                  >
+                    {previewImageUri ? (
+                      <View
+                        style={[
+                          styles.imageThumb,
+                          {
+                            backgroundColor: isDarkMode ? '#111315' : '#FFFFFF',
+                            borderColor: CARD_BORDER,
+                          },
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: previewImageUri }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                    ) : null}
 
-            {/* ─── SCHEDULE & TIME SLOTS (SIDE-BY-SIDE MINIMALIST) ─── */}
-            <View style={styles.scheduleRowContainer}>
-              {/* LEFT: FULL MONTH CALENDAR CARD (MINIMALIST APPLE/STRIPE STYLE) */}
+                    <View style={{ flex: 1, minWidth: 160 }}>
+                      <Text style={[styles.serviceTitle, { color: INK }]} numberOfLines={1}>
+                        {displayService}
+                      </Text>
+                      <View style={styles.bikeModelRow}>
+                        <BootstrapIcon name="bicycle" size={12} color={BRAND} />
+                        <Text style={[styles.bikeModelText, { color: MUTED }]} numberOfLines={1}>
+                          {displayBike}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 2. Price & Itemization */}
+                  <View
+                    style={[
+                      styles.summaryPriceGroup,
+                      !isDesktop && { alignItems: 'flex-start', width: '100%', minWidth: 0 },
+                    ]}
+                  >
+                    {freeInstallPromo ? (
+                      <View style={styles.freeBadge}>
+                        <BootstrapIcon name="tag-fill" size={11} color="#059669" />
+                        <Text style={styles.freeBadgeText}>FREE INSTALL</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <Text style={[styles.priceAmount, { color: INK }]}>
+                          ₱{Number(totalEstimate).toLocaleString('en-US')}
+                        </Text>
+                        <Text style={[styles.priceSublabel, { color: MUTED }]}>
+                          {downpaymentPercent > 0 ? (
+                            <>
+                              <Text style={{ color: BRAND, fontWeight: '700' }}>
+                                ₱{Number(downpaymentAmount).toLocaleString()} ({downpaymentPercent}% Deposit)
+                              </Text>
+                              {' • '}
+                            </>
+                          ) : null}
+                          Parts ₱{Number(partsCostPhp || 0).toLocaleString()} + Labor ₱{Number(effectiveLaborFee).toLocaleString()}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* ─── SCHEDULE SECTION LABEL (BOTTOM SHEET) ─── */}
+            {isBottomSheet && (
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  color: MUTED,
+                  textTransform: 'uppercase',
+                  marginBottom: -6,
+                  marginLeft: 2,
+                }}
+              >
+                Schedule
+              </Text>
+            )}
+
+            {/* ─── SCHEDULE & TIME SLOTS ─── */}
+            <View
+              style={[
+                styles.scheduleRowContainer,
+                { flexDirection: isDesktop ? 'row' : 'column', gap: isBottomSheet ? 12 : 14 },
+              ]}
+            >
+              {/* LEFT: FULL MONTH CALENDAR CARD */}
               <View
                 style={[
                   styles.calendarCard,
+                  !isDesktop && { flex: undefined, width: '100%', minWidth: 0 },
                   {
-                    backgroundColor: isDarkMode ? '#181E1A' : '#FFFFFF',
-                    borderColor: CARD_BORDER,
+                    backgroundColor: isBottomSheet
+                      ? (isDarkMode ? '#1C1F23' : '#FFFFFF')
+                      : (isDarkMode ? '#181E1A' : '#FFFFFF'),
+                    borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                    ...(isBottomSheet ? { borderRadius: 14 } : {}),
                   },
                 ]}
               >
@@ -641,8 +840,10 @@ export default function BookInstallationModal({
                       style={[
                         styles.navChevronBtn,
                         {
-                          borderColor: CARD_BORDER,
-                          backgroundColor: isDarkMode ? '#222B26' : '#FFFFFF',
+                          borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                          backgroundColor: isBottomSheet
+                            ? (isDarkMode ? '#25292E' : '#F8FAFC')
+                            : (isDarkMode ? '#222B26' : '#FFFFFF'),
                           opacity: canGoPrev ? 1 : 0.35,
                         },
                       ]}
@@ -657,8 +858,10 @@ export default function BookInstallationModal({
                       style={[
                         styles.navChevronBtn,
                         {
-                          borderColor: CARD_BORDER,
-                          backgroundColor: isDarkMode ? '#222B26' : '#FFFFFF',
+                          borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                          backgroundColor: isBottomSheet
+                            ? (isDarkMode ? '#25292E' : '#F8FAFC')
+                            : (isDarkMode ? '#222B26' : '#FFFFFF'),
                         },
                       ]}
                       activeOpacity={0.7}
@@ -744,9 +947,13 @@ export default function BookInstallationModal({
                     <Text style={{ fontSize: 10, fontWeight: '500', color: MUTED }}>Selected</Text>
                   </View>
                   <Text style={{ fontSize: 10, color: SUBTLE }}>•</Text>
-                  <Text style={{ fontSize: 10, fontWeight: '500', color: MUTED }}>Mon–Sat available</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '500', color: MUTED }}>
+                    {isBottomSheet ? 'Mon–Sat' : 'Mon–Sat available'}
+                  </Text>
                   <Text style={{ fontSize: 10, color: SUBTLE }}>•</Text>
-                  <Text style={{ fontSize: 10, fontWeight: '400', color: SUBTLE }}>Sun closed</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '400', color: SUBTLE }}>
+                    {isBottomSheet ? 'Closed Sun' : 'Sun closed'}
+                  </Text>
                 </View>
               </View>
 
@@ -754,18 +961,22 @@ export default function BookInstallationModal({
               <View
                 style={[
                   styles.timeSlotsCard,
+                  !isDesktop && { flex: undefined, width: '100%', minWidth: 0 },
                   {
-                    backgroundColor: isDarkMode ? '#181E1A' : '#FFFFFF',
-                    borderColor: CARD_BORDER,
+                    backgroundColor: isBottomSheet
+                      ? (isDarkMode ? '#1C1F23' : '#FFFFFF')
+                      : (isDarkMode ? '#181E1A' : '#FFFFFF'),
+                    borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                    ...(isBottomSheet ? { borderRadius: 14 } : {}),
                   },
                 ]}
               >
                 {/* Header */}
-                <View style={{ marginBottom: 12 }}>
+                <View style={isBottomSheet ? { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 } : { marginBottom: 12 }}>
                   <Text style={{ fontSize: 14.5, fontWeight: '700', color: INK, letterSpacing: -0.2 }}>
-                    Live Booking Time & Availability
+                    {isBottomSheet ? 'Time Slot' : 'Live Booking Time & Availability'}
                   </Text>
-                  <Text style={{ fontSize: 11.5, fontWeight: '500', color: MUTED, marginTop: 2 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '500', color: MUTED, marginTop: isBottomSheet ? 0 : 2 }} numberOfLines={1}>
                     {formatSelectedFullDate(effectiveDate)}
                   </Text>
                 </View>
@@ -776,7 +987,7 @@ export default function BookInstallationModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                       <BootstrapIcon name="sun" size={11} color={MUTED} />
                       <Text style={{ fontSize: 10, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Morning Sessions (8:00 AM – 12:00 PM)
+                        {isBottomSheet ? 'Morning' : 'Morning Sessions (8:00 AM – 12:00 PM)'}
                       </Text>
                     </View>
                     {morningSlots.map((slot) => {
@@ -787,15 +998,16 @@ export default function BookInstallationModal({
                           key={slot}
                           style={[
                             styles.minimalSlotRow,
+                            isBottomSheet && { paddingVertical: 10, borderRadius: 10, marginBottom: 6 },
                             {
                               backgroundColor: isSelected
-                                ? (isDarkMode ? '#221E1A' : '#FFFBF5')
-                                : (isDarkMode ? '#1A211D' : '#FFFFFF'),
+                                ? (isBottomSheet ? (isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED') : (isDarkMode ? '#221E1A' : '#FFFBF5'))
+                                : (isBottomSheet ? (isDarkMode ? '#141619' : '#F8FAFC') : (isDarkMode ? '#1A211D' : '#FFFFFF')),
                               borderColor: isSelected
                                 ? BRAND
                                 : isBooked
-                                  ? (isDarkMode ? '#202824' : '#F1F5F9')
-                                  : (isDarkMode ? '#27342D' : '#E2E8F0'),
+                                  ? (isDarkMode ? '#23272D' : '#F1F5F9')
+                                  : (isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : (isDarkMode ? '#27342D' : '#E2E8F0')),
                               borderWidth: isSelected ? 1.5 : 1,
                               opacity: isBooked ? 0.45 : 1,
                             },
@@ -827,13 +1039,17 @@ export default function BookInstallationModal({
                           </View>
 
                           {isSelected ? (
-                            <View style={styles.selectedPillMinimal}>
-                              <BootstrapIcon name="check-lg" size={11} color="#FFFFFF" />
-                              <Text style={styles.selectedPillText}>Selected</Text>
-                            </View>
+                            isBottomSheet ? (
+                              <BootstrapIcon name="check-circle-fill" size={15} color={BRAND} />
+                            ) : (
+                              <View style={styles.selectedPillMinimal}>
+                                <BootstrapIcon name="check-lg" size={11} color="#FFFFFF" />
+                                <Text style={styles.selectedPillText}>Selected</Text>
+                              </View>
+                            )
                           ) : isBooked ? (
                             <Text style={{ fontSize: 11, fontWeight: '500', color: '#94A3B8' }}>Full</Text>
-                          ) : (
+                          ) : isBottomSheet ? null : (
                             <View style={[styles.selectPillMinimal, { borderColor: CARD_BORDER }]}>
                               <Text style={[styles.selectPillText, { color: MUTED }]}>Select</Text>
                             </View>
@@ -850,7 +1066,7 @@ export default function BookInstallationModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6, marginTop: 2 }}>
                       <BootstrapIcon name="sun-fill" size={11} color={MUTED} />
                       <Text style={{ fontSize: 10, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Afternoon Sessions (1:30 PM – 6:00 PM)
+                        {isBottomSheet ? 'Afternoon' : 'Afternoon Sessions (1:30 PM – 6:00 PM)'}
                       </Text>
                     </View>
                     {afternoonSlots.map((slot) => {
@@ -861,15 +1077,16 @@ export default function BookInstallationModal({
                           key={slot}
                           style={[
                             styles.minimalSlotRow,
+                            isBottomSheet && { paddingVertical: 10, borderRadius: 10, marginBottom: 6 },
                             {
                               backgroundColor: isSelected
-                                ? (isDarkMode ? '#221E1A' : '#FFFBF5')
-                                : (isDarkMode ? '#1A211D' : '#FFFFFF'),
+                                ? (isBottomSheet ? (isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED') : (isDarkMode ? '#221E1A' : '#FFFBF5'))
+                                : (isBottomSheet ? (isDarkMode ? '#141619' : '#F8FAFC') : (isDarkMode ? '#1A211D' : '#FFFFFF')),
                               borderColor: isSelected
                                 ? BRAND
                                 : isBooked
-                                  ? (isDarkMode ? '#202824' : '#F1F5F9')
-                                  : (isDarkMode ? '#27342D' : '#E2E8F0'),
+                                  ? (isDarkMode ? '#23272D' : '#F1F5F9')
+                                  : (isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : (isDarkMode ? '#27342D' : '#E2E8F0')),
                               borderWidth: isSelected ? 1.5 : 1,
                               opacity: isBooked ? 0.45 : 1,
                             },
@@ -901,13 +1118,17 @@ export default function BookInstallationModal({
                           </View>
 
                           {isSelected ? (
-                            <View style={styles.selectedPillMinimal}>
-                              <BootstrapIcon name="check-lg" size={11} color="#FFFFFF" />
-                              <Text style={styles.selectedPillText}>Selected</Text>
-                            </View>
+                            isBottomSheet ? (
+                              <BootstrapIcon name="check-circle-fill" size={15} color={BRAND} />
+                            ) : (
+                              <View style={styles.selectedPillMinimal}>
+                                <BootstrapIcon name="check-lg" size={11} color="#FFFFFF" />
+                                <Text style={styles.selectedPillText}>Selected</Text>
+                              </View>
+                            )
                           ) : isBooked ? (
                             <Text style={{ fontSize: 11, fontWeight: '500', color: '#94A3B8' }}>Full</Text>
-                          ) : (
+                          ) : isBottomSheet ? null : (
                             <View style={[styles.selectPillMinimal, { borderColor: CARD_BORDER }]}>
                               <Text style={[styles.selectPillText, { color: MUTED }]}>Select</Text>
                             </View>
@@ -920,16 +1141,37 @@ export default function BookInstallationModal({
               </View>
             </View>
 
-            {/* ─── PAYMENT TERMS & DOWNPAYMENT CARD (MATCHES BOOKING) ─── */}
+            {/* ─── PAYMENT SECTION LABEL (BOTTOM SHEET) ─── */}
+            {isBottomSheet && (
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  color: MUTED,
+                  textTransform: 'uppercase',
+                  marginBottom: -6,
+                  marginLeft: 2,
+                }}
+              >
+                Payment
+              </Text>
+            )}
+
+            {/* ─── PAYMENT TERMS & DOWNPAYMENT CARD ─── */}
             <View
               style={[
                 styles.downpaymentCardMinimal,
                 {
-                  backgroundColor: isDarkMode ? '#181E1A' : '#FFFFFF',
-                  borderColor: CARD_BORDER,
+                  backgroundColor: isBottomSheet
+                    ? (isDarkMode ? '#1C1F23' : '#FFFFFF')
+                    : (isDarkMode ? '#181E1A' : '#FFFFFF'),
+                  borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                  ...(isBottomSheet ? { borderRadius: 14 } : {}),
                 },
               ]}
             >
+              {!isBottomSheet && (
               <View style={styles.downpaymentHeaderRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                   <View
@@ -958,28 +1200,39 @@ export default function BookInstallationModal({
                   <Text style={styles.pitRuleBadgeText}>{downpaymentPercent}% Pit Rule Split</Text>
                 </View>
               </View>
+              )}
 
               {/* Split Cards: Down Payment vs Remaining Balance */}
-              <View style={styles.downpaymentSplitRow}>
+              <View
+                style={[
+                  styles.downpaymentSplitRow,
+                  { flexDirection: isDesktop || isBottomSheet ? 'row' : 'column' },
+                ]}
+              >
                 {/* Box 1: Down Payment Due Now */}
                 <View
                   style={[
                     styles.downpaymentBox,
+                    isBottomSheet && { flexDirection: 'column', alignItems: 'flex-start', gap: 3, paddingVertical: 10, borderRadius: 10 },
                     {
-                      backgroundColor: isDarkMode ? '#221B14' : '#FFF7ED',
-                      borderColor: isDarkMode ? '#7C3411' : '#FDBA74',
+                      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.12)' : '#FFF7ED',
+                      borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.45)' : '#FDBA74',
                     },
                   ]}
                 >
-                  <View style={{ flex: 1 }}>
+                  <View style={!isBottomSheet ? { flex: 1 } : undefined}>
                     <Text style={[styles.downpaymentBoxLabel, { color: BRAND }]}>
-                      {downpaymentPercent === 100 ? 'FULL PAYMENT' : `${downpaymentPercent}% DOWN PAYMENT`}
+                      {isBottomSheet
+                        ? (downpaymentPercent === 100 ? 'DUE NOW' : `DUE NOW (${downpaymentPercent}%)`)
+                        : (downpaymentPercent === 100 ? 'FULL PAYMENT' : `${downpaymentPercent}% DOWN PAYMENT`)}
                     </Text>
-                    <Text style={[styles.downpaymentBoxSub, { color: isDarkMode ? '#A1A1AA' : '#7C2D12' }]}>
-                      Due upon confirmation • Pit Rule
-                    </Text>
+                    {!isBottomSheet && (
+                      <Text style={[styles.downpaymentBoxSub, { color: isDarkMode ? '#A1A1AA' : '#7C2D12' }]}>
+                        Due upon confirmation • Pit Rule
+                      </Text>
+                    )}
                   </View>
-                  <Text style={[styles.downpaymentBoxAmount, { color: BRAND }]}>
+                  <Text style={[styles.downpaymentBoxAmount, { color: BRAND, ...(isBottomSheet ? { fontSize: 17 } : {}) }]}>
                     ₱{Number(downpaymentAmount).toLocaleString('en-US')}
                   </Text>
                 </View>
@@ -988,21 +1241,28 @@ export default function BookInstallationModal({
                 <View
                   style={[
                     styles.downpaymentBox,
+                    isBottomSheet && { flexDirection: 'column', alignItems: 'flex-start', gap: 3, paddingVertical: 10, borderRadius: 10 },
                     {
-                      backgroundColor: isDarkMode ? '#1B231F' : '#F8FAFC',
-                      borderColor: CARD_BORDER,
+                      backgroundColor: isBottomSheet
+                        ? (isDarkMode ? '#141619' : '#F8FAFC')
+                        : (isDarkMode ? '#1B231F' : '#F8FAFC'),
+                      borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
                     },
                   ]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.downpaymentBoxLabel, { color: isDarkMode ? '#F2F2F3' : '#334155' }]}>
-                      REMAINING BALANCE ({100 - downpaymentPercent}%)
+                  <View style={!isBottomSheet ? { flex: 1 } : undefined}>
+                    <Text style={[styles.downpaymentBoxLabel, { color: isDarkMode ? '#9CA3AF' : '#334155' }]}>
+                      {isBottomSheet
+                        ? `AT SHOP (${100 - downpaymentPercent}%)`
+                        : `REMAINING BALANCE (${100 - downpaymentPercent}%)`}
                     </Text>
-                    <Text style={[styles.downpaymentBoxSub, { color: MUTED }]}>
-                      Payable at workshop after installation
-                    </Text>
+                    {!isBottomSheet && (
+                      <Text style={[styles.downpaymentBoxSub, { color: MUTED }]}>
+                        Payable at workshop after installation
+                      </Text>
+                    )}
                   </View>
-                  <Text style={[styles.downpaymentBoxAmount, { color: INK }]}>
+                  <Text style={[styles.downpaymentBoxAmount, { color: INK, ...(isBottomSheet ? { fontSize: 17 } : {}) }]}>
                     ₱{Number(remainingBalance).toLocaleString('en-US')}
                   </Text>
                 </View>
@@ -1010,14 +1270,13 @@ export default function BookInstallationModal({
 
               {/* Deposit Payment Method Selector */}
               <View style={styles.paymentMethodSection}>
-                <Text style={[styles.paymentMethodTitle, { color: INK }]}>
-                  Choose Deposit Payment Method:
+                <Text style={[styles.paymentMethodTitle, { color: isBottomSheet ? MUTED : INK, ...(isBottomSheet ? { fontSize: 11.5 } : {}) }]}>
+                  {isBottomSheet ? 'Deposit Method' : 'Choose Deposit Payment Method:'}
                 </Text>
 
-                <View style={styles.paymentMethodRow}>
+                <View style={[styles.paymentMethodRow, isBottomSheet && { gap: 8 }]}>
                   {[
                     { id: 'GCash', icon: 'phone', label: 'GCash' },
-                    { id: 'Maya', icon: 'credit-card', label: 'Maya' },
                     { id: 'Pay at Workshop', icon: 'shop', label: 'Pay at Workshop' },
                   ].map((method) => {
                     const isSelected = paymentChannel === method.id;
@@ -1029,11 +1288,14 @@ export default function BookInstallationModal({
                         activeOpacity={0.75}
                         style={[
                           styles.paymentMethodChip,
+                          isBottomSheet && { flex: 1, justifyContent: 'center', borderRadius: 10, paddingVertical: 10 },
                           {
                             backgroundColor: isSelected
-                              ? (isDarkMode ? '#2A1F17' : '#FFF7ED')
-                              : (isDarkMode ? '#1B231F' : '#FFFFFF'),
-                            borderColor: isSelected ? BRAND : CARD_BORDER,
+                              ? (isBottomSheet ? (isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED') : (isDarkMode ? '#2A1F17' : '#FFF7ED'))
+                              : (isBottomSheet ? (isDarkMode ? '#141619' : '#F8FAFC') : (isDarkMode ? '#1B231F' : '#FFFFFF')),
+                            borderColor: isSelected
+                              ? BRAND
+                              : (isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER),
                             borderWidth: isSelected ? 1.5 : 1,
                           },
                         ]}
@@ -1064,13 +1326,33 @@ export default function BookInstallationModal({
               </View>
             </View>
 
-            {/* ─── 4. WORKSHOP LOCATION & INTERACTIVE MAP (MATCHING BOOKING) ─── */}
+            {/* ─── WORKSHOP SECTION LABEL (BOTTOM SHEET) ─── */}
+            {isBottomSheet && (
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  color: MUTED,
+                  textTransform: 'uppercase',
+                  marginBottom: -6,
+                  marginLeft: 2,
+                }}
+              >
+                Workshop
+              </Text>
+            )}
+
+            {/* ─── 4. WORKSHOP LOCATION ─── */}
             <View
               style={[
                 styles.workshopMapCard,
                 {
-                  backgroundColor: isDarkMode ? '#181E1A' : '#FFFFFF',
-                  borderColor: CARD_BORDER,
+                  backgroundColor: isBottomSheet
+                    ? (isDarkMode ? '#1C1F23' : '#FFFFFF')
+                    : (isDarkMode ? '#181E1A' : '#FFFFFF'),
+                  borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                  ...(isBottomSheet ? { borderRadius: 14, padding: 14 } : {}),
                 },
               ]}
             >
@@ -1097,7 +1379,9 @@ export default function BookInstallationModal({
                     <View style={styles.workshopAddressRow}>
                       <BootstrapIcon name="geo-alt-fill" size={13} color="#EF4444" />
                       <Text style={[styles.workshopAddressText, { color: isDarkMode ? '#A1A1AA' : '#3F3F46' }]}>
-                        109 Natalio B. Bacalso S National Hwy, City of Naga, Cebu, 6037
+                        {isBottomSheet
+                          ? '109 Natalio B. Bacalso Hwy, Naga, Cebu'
+                          : '109 Natalio B. Bacalso S National Hwy, City of Naga, Cebu, 6037'}
                       </Text>
                     </View>
 
@@ -1106,40 +1390,51 @@ export default function BookInstallationModal({
                       style={[
                         styles.workshopSpecsBox,
                         {
-                          backgroundColor: isDarkMode ? '#141A17' : '#F8FAFC',
-                          borderColor: CARD_BORDER,
+                          backgroundColor: isBottomSheet
+                            ? (isDarkMode ? '#141619' : '#F8FAFC')
+                            : (isDarkMode ? '#141A17' : '#F8FAFC'),
+                          borderColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                          ...(isBottomSheet ? { borderRadius: 10 } : {}),
                         },
                       ]}
                     >
                       {/* Operating Hours */}
-                      <View style={[styles.workshopSpecRow, { borderBottomColor: CARD_BORDER }]}>
+                      <View style={[styles.workshopSpecRow, { borderBottomColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER }]}>
                         <View style={[styles.specIconCircle, { backgroundColor: isDarkMode ? '#2A2016' : '#FFF7ED' }]}>
                           <BootstrapIcon name="clock" size={11} color="#D97706" />
                         </View>
                         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                          <Text style={[styles.specLabelText, { color: MUTED }]}>Operating Hours</Text>
-                          <Text style={[styles.specMainText, { color: INK }]}>Mon – Sat, 8:00 AM – 7:00 PM</Text>
+                          <Text style={[styles.specLabelText, { color: MUTED }]}>
+                            {isBottomSheet ? 'Hours' : 'Operating Hours'}
+                          </Text>
+                          <Text style={[styles.specMainText, { color: INK }]}>
+                            {isBottomSheet ? 'Mon – Sat, 8AM – 7PM' : 'Mon – Sat, 8:00 AM – 7:00 PM'}
+                          </Text>
                         </View>
                       </View>
 
-                      {/* Workshop Contact */}
-                      <View style={[styles.workshopSpecRow, { borderBottomColor: CARD_BORDER }]}>
-                        <View style={[styles.specIconCircle, { backgroundColor: isDarkMode ? '#2A2016' : '#FFF7ED' }]}>
-                          <BootstrapIcon name="telephone" size={11} color="#D97706" />
+                      {/* Workshop Contact (Full view only on desktop) */}
+                      {!isBottomSheet && (
+                        <View style={[styles.workshopSpecRow, { borderBottomColor: CARD_BORDER }]}>
+                          <View style={[styles.specIconCircle, { backgroundColor: isDarkMode ? '#2A2016' : '#FFF7ED' }]}>
+                            <BootstrapIcon name="telephone" size={11} color="#D97706" />
+                          </View>
+                          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                            <Text style={[styles.specLabelText, { color: MUTED }]}>Workshop Contact</Text>
+                            <Text style={[styles.specMainText, { color: INK }]}>+63 961 490 4841</Text>
+                          </View>
                         </View>
-                        <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                          <Text style={[styles.specLabelText, { color: MUTED }]}>Workshop Contact</Text>
-                          <Text style={[styles.specMainText, { color: INK }]}>+63 961 490 4841</Text>
-                        </View>
-                      </View>
+                      )}
 
                       {/* Workshop Landmark */}
-                      <View style={styles.workshopSpecRow}>
+                      <View style={[styles.workshopSpecRow, { borderBottomWidth: 0 }]}>
                         <View style={[styles.specIconCircle, { backgroundColor: isDarkMode ? '#2A2016' : '#FFF7ED' }]}>
                           <BootstrapIcon name="cursor" size={11} color="#D97706" />
                         </View>
                         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                          <Text style={[styles.specLabelText, { color: MUTED }]}>Pit Bay Landmark</Text>
+                          <Text style={[styles.specLabelText, { color: MUTED }]}>
+                            {isBottomSheet ? 'Landmark' : 'Pit Bay Landmark'}
+                          </Text>
                           <Text style={[styles.specMainText, { color: INK }]}>Beside Jerome's Gadget, Naga</Text>
                         </View>
                       </View>
@@ -1148,23 +1443,38 @@ export default function BookInstallationModal({
 
                   {/* Open in Google Maps Button */}
                   <TouchableOpacity
-                    style={styles.openGoogleMapsBtn}
+                    style={[
+                      styles.openGoogleMapsBtn,
+                      isBottomSheet && {
+                        backgroundColor: isDarkMode ? '#25292E' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#2B3035' : '#E2E8F0',
+                        borderRadius: 10,
+                        marginTop: 6,
+                      },
+                    ]}
                     onPress={handleOpenGoogleMaps}
                     activeOpacity={0.88}
                   >
                     <BootstrapIcon name="geo-alt-fill" size={13} color="#EF4444" />
-                    <Text style={styles.openGoogleMapsBtnText}>
-                      Open in Google Maps App
+                    <Text
+                      style={[
+                        styles.openGoogleMapsBtnText,
+                        isBottomSheet && { color: isDarkMode ? '#F3F4F6' : '#0F172A' },
+                      ]}
+                    >
+                      {isBottomSheet ? 'Open in Google Maps' : 'Open in Google Maps App'}
                     </Text>
-                    <BootstrapIcon name="box-arrow-up-right" size={10} color="#A1A1AA" />
+                    <BootstrapIcon name="box-arrow-up-right" size={10} color={isBottomSheet ? MUTED : '#A1A1AA'} />
                   </TouchableOpacity>
                 </View>
 
-                {/* ── RIGHT COLUMN: STREET VIEW & MAP VIEWER ── */}
+                {/* ── RIGHT COLUMN: STREET VIEW & MAP VIEWER (Desktop dialog only) ── */}
+                {!isBottomSheet && (
                 <View
                   style={[
                     styles.workshopMapCol,
-                    { flex: isDesktop ? 1.2 : undefined, width: isDesktop ? undefined : '100%' },
+                    { flex: 1.2 },
                   ]}
                 >
                   {/* Header Row: Title & Segmented Tabs */}
@@ -1314,19 +1624,37 @@ export default function BookInstallationModal({
                         />
                       )
                     ) : (
-                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                        <BootstrapIcon name="geo-alt-fill" size={28} color="#EF4444" />
-                        <Text style={{ color: '#FFFFFF', marginTop: 8, fontSize: 12 }}>
-                          109 Natalio B. Bacalso Hwy, Naga City
-                        </Text>
-                      </View>
+                      <WebView
+                        key={`workshop-map-${mapMode}`}
+                        source={{
+                          html:
+                            mapMode === 'street'
+                              ? streetViewHtml
+                              : mapMode === 'map'
+                                ? roadMapHtml
+                                : satelliteMapHtml,
+                        }}
+                        style={{ flex: 1, backgroundColor: '#0F172A' }}
+                        originWhitelist={['*']}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                        nestedScrollEnabled={true}
+                        startInLoadingState={true}
+                        renderLoading={() => (
+                          <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' }}>
+                            <ActivityIndicator size="small" color="#EA580C" />
+                          </View>
+                        )}
+                      />
                     )}
                   </View>
                 </View>
+                )}
               </View>
             </View>
 
-            {/* ─── 5. CONTACT & VEHICLE NOTES (AT THE BOTTOM OF THE MAP) ─── */}
+            {/* ─── 5. CONTACT & VEHICLE NOTES FOR SMS (Desktop dialog only) ─── */}
+            {!isBottomSheet && (
             <View
               style={[
                 styles.contactSectionCard,
@@ -1434,6 +1762,7 @@ export default function BookInstallationModal({
                 </View>
               </View>
             </View>
+            )}
           </ScrollView>
 
           {/* ─── 3. FIXED BOTTOM ACTION FOOTER ─── */}
@@ -1441,19 +1770,34 @@ export default function BookInstallationModal({
             style={[
               styles.footer,
               {
-                borderTopColor: CARD_BORDER,
-                backgroundColor: isDarkMode ? '#18221E' : '#FFFFFF',
+                borderTopColor: isBottomSheet ? (isDarkMode ? '#2B3035' : '#E2E8F0') : CARD_BORDER,
+                backgroundColor: isBottomSheet
+                  ? (isDarkMode ? '#181A1D' : '#FFFFFF')
+                  : (isDarkMode ? '#18221E' : '#FFFFFF'),
+                ...(isBottomSheet ? { paddingHorizontal: 16, paddingTop: 12 } : {}),
               },
             ]}
           >
-            <View style={[styles.footerContentRow, isMobile && styles.footerContentCol]}>
-              {/* Compact Price & Downpayment Summary */}
-              <View style={styles.footerPriceBlock}>
+            <View style={[styles.footerContentRow, isBottomSheet && [styles.footerContentCol, { gap: 10 }]]}>
+              {/* Compact Price & Downpayment Summary (Top row on bottom sheet) */}
+              <View
+                style={[
+                  styles.footerPriceBlock,
+                  isBottomSheet && {
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                  },
+                ]}
+              >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={[styles.footerPriceLabel, { color: MUTED }]}>
-                    {downpaymentPercent > 0 ? `REQUIRED DOWNPAYMENT (${downpaymentPercent}%)` : 'TOTAL ESTIMATED AMOUNT'}
+                  <Text style={[styles.footerPriceLabel, { color: MUTED, ...(isBottomSheet ? { fontSize: 11 } : {}) }]}>
+                    {isBottomSheet
+                      ? (downpaymentPercent > 0 ? `DUE NOW (${downpaymentPercent}%)` : 'TOTAL')
+                      : (downpaymentPercent > 0 ? `REQUIRED DOWNPAYMENT (${downpaymentPercent}%)` : 'TOTAL ESTIMATED AMOUNT')}
                   </Text>
-                  {downpaymentPercent > 0 && (
+                  {!isBottomSheet && downpaymentPercent > 0 && (
                     <View style={styles.footerPitRuleBadge}>
                       <Text style={styles.footerPitRuleBadgeText}>Pit Rule</Text>
                     </View>
@@ -1463,41 +1807,41 @@ export default function BookInstallationModal({
                 <View style={styles.footerPriceRow}>
                   {freeInstallPromo && partsCostPhp === 0 ? (
                     <Text style={[styles.footerPriceVal, { color: '#059669' }]}>
-                      FREE{' '}
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: MUTED }}>
-                        (Promo Active)
-                      </Text>
+                      FREE
                     </Text>
                   ) : (
                     <>
-                      <Text style={[styles.footerPriceVal, { color: BRAND }]}>
+                      <Text style={[styles.footerPriceVal, { color: BRAND, ...(isBottomSheet ? { fontSize: 18 } : {}) }]}>
                         ₱{Number(downpaymentPercent > 0 ? downpaymentAmount : totalEstimate).toLocaleString('en-US')}
                       </Text>
                       {downpaymentPercent > 0 && (
-                        <Text style={[styles.footerDepositSubVal, { color: MUTED }]}>
-                          {' '}/ ₱{Number(totalEstimate).toLocaleString('en-US')} total
+                        <Text style={[styles.footerDepositSubVal, { color: MUTED, ...(isBottomSheet ? { fontSize: 12 } : {}) }]}>
+                          {' '}/ ₱{Number(totalEstimate).toLocaleString('en-US')}
                         </Text>
                       )}
                     </>
                   )}
                 </View>
 
-                <Text style={[styles.footerPriceSub, { color: SUBTLE }]}>
-                  {downpaymentPercent > 0
-                    ? `Deposit via ${paymentChannel} • ₱${Number(remainingBalance).toLocaleString()} balance at workshop`
-                    : `Product ₱${Number(partsCostPhp || 0).toLocaleString()} + Labor ₱${Number(effectiveLaborFee).toLocaleString()}`}
-                </Text>
+                {!isBottomSheet && (
+                  <Text style={[styles.footerPriceSub, { color: SUBTLE }]}>
+                    {downpaymentPercent > 0
+                      ? `Deposit via ${paymentChannel} • ₱${Number(remainingBalance).toLocaleString()} balance at workshop`
+                      : `Product ₱${Number(partsCostPhp || 0).toLocaleString()} + Labor ₱${Number(effectiveLaborFee).toLocaleString()}`}
+                  </Text>
+                )}
               </View>
 
-              {/* Action Buttons */}
-              <View style={[styles.footerActionsRow, isMobile && styles.footerActionsRowMobile]}>
+              {/* Action Buttons (Bottom row on bottom sheet) */}
+              <View style={[styles.footerActionsRow, isBottomSheet && { width: '100%', gap: 10 }]}>
                 {onWishlist ? (
                   <TouchableOpacity
                     style={[
                       styles.wishlistBtn,
                       {
-                        borderColor: isDarkMode ? '#3A3B40' : '#CBD5E1',
-                        backgroundColor: isDarkMode ? '#202124' : '#FFFFFF',
+                        borderColor: isDarkMode ? '#2B3035' : '#CBD5E1',
+                        backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+                        ...(isBottomSheet ? { width: 44, height: 42, paddingHorizontal: 0, borderRadius: 10 } : {}),
                       },
                     ]}
                     onPress={() => !busy && onWishlist()}
@@ -1505,8 +1849,8 @@ export default function BookInstallationModal({
                     activeOpacity={0.8}
                     accessibilityLabel="Save build to wishlist"
                   >
-                    <BootstrapIcon name="bookmark" size={13} color={BRAND} />
-                    <Text style={[styles.wishlistBtnText, { color: INK }]}>Save</Text>
+                    <BootstrapIcon name="bookmark" size={14} color={BRAND} />
+                    {!isBottomSheet && <Text style={[styles.wishlistBtnText, { color: INK }]}>Save</Text>}
                   </TouchableOpacity>
                 ) : null}
 
@@ -1515,11 +1859,12 @@ export default function BookInstallationModal({
                     styles.confirmBtn,
                     {
                       backgroundColor: BRAND,
-                      opacity: busy || !isPhoneValid ? 0.6 : 1,
+                      opacity: busy || !canConfirmBooking ? 0.6 : 1,
+                      ...(isBottomSheet ? { height: 42, borderRadius: 10, minWidth: 0, flex: 1, paddingHorizontal: 14 } : {}),
                     },
                   ]}
                   onPress={handleConfirmPress}
-                  disabled={busy || !isPhoneValid}
+                  disabled={busy || !canConfirmBooking}
                   activeOpacity={0.85}
                   accessibilityLabel="Confirm motorcycle installation booking"
                 >
@@ -1533,12 +1878,14 @@ export default function BookInstallationModal({
                       style={{ marginRight: 6 }}
                     />
                   )}
-                  <Text style={styles.confirmBtnText}>
+                  <Text style={styles.confirmBtnText} numberOfLines={1}>
                     {busy
                       ? 'Booking…'
-                      : downpaymentAmount > 0
-                        ? `Confirm & Reserve (₱${Number(downpaymentAmount).toLocaleString()})`
-                        : 'Confirm Booking'}
+                      : isBottomSheet
+                        ? (downpaymentAmount > 0 ? `Reserve (₱${Number(downpaymentAmount).toLocaleString()})` : 'Confirm')
+                        : downpaymentAmount > 0
+                          ? `Confirm & Reserve (₱${Number(downpaymentAmount).toLocaleString()})`
+                          : 'Confirm Booking'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1850,12 +2197,12 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   weekdaysRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(7, 1fr)',
-    gap: 4,
+    flexDirection: 'row',
+    width: '100%',
     marginBottom: 4,
   },
   weekdayCell: {
+    width: '14.2857%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
@@ -1866,15 +2213,15 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   daysGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(7, 1fr)',
-    gap: 2,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
   },
   dayCellWrapper: {
-    height: 34,
+    width: '14.2857%',
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer',
   },
   dayCircle: {
     width: 30,
@@ -1884,7 +2231,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayCellDimmed: {
-    height: 34,
+    width: '14.2857%',
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
