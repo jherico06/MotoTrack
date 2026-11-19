@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BootstrapIcon } from '../../common/BootstrapIcon.jsx';
 import DeliveryTrackingPanel from '../../common/DeliveryTrackingPanel.jsx';
+import { riderGpsTrackingService } from '../../../services/delivery/riderGpsTrackingService.js';
+import { parseLatLng } from '../../../utils/geo.js';
 import {
   riderFont,
   cardShadowStyle,
@@ -10,14 +12,26 @@ import {
 
 /**
  * Clean map-only route card rendered at the top of the Rider Home tab,
- * showing the live road route for the rider's active delivery without extra
- * header chrome or action buttons.
+ * showing the live road route from the rider's current GPS position to the
+ * active delivery drop-off with auto-follow camera tracking.
  */
 export default function RiderHomeDeliveryMapCard({
   deliveries = [],
   palette,
   riderName = 'Rider',
 }) {
+  const [localRiderCoords, setLocalRiderCoords] = useState(() => {
+    try {
+      const last = riderGpsTrackingService.getLastCoords?.();
+      const parsed = parseLatLng(last?.latitude, last?.longitude);
+      return parsed
+        ? { lat: parsed.lat, lng: parsed.lng, updatedAt: new Date().toISOString() }
+        : null;
+    } catch (_e) {
+      return null;
+    }
+  });
+
   const orderedDeliveries = useMemo(() => {
     const list = Array.isArray(deliveries) ? deliveries.slice() : [];
     return list.sort((a, b) => {
@@ -36,6 +50,52 @@ export default function RiderHomeDeliveryMapCard({
   }, [deliveries]);
 
   const activeDelivery = orderedDeliveries[0] || null;
+
+  // Mirror in-memory device GPS ticks directly (and seed from last known GPS) so the map follows immediately without waiting for DB round-trips
+  useEffect(() => {
+    const activeId = activeDelivery?.orderId;
+    if (!activeId) {
+      setLocalRiderCoords(null);
+      return undefined;
+    }
+
+    const last = riderGpsTrackingService.getLastCoords?.();
+    const initialParsed = parseLatLng(last?.latitude, last?.longitude);
+    setLocalRiderCoords(
+      initialParsed
+        ? { lat: initialParsed.lat, lng: initialParsed.lng, updatedAt: new Date().toISOString() }
+        : null
+    );
+    const unsub = riderGpsTrackingService.subscribe((event, payload) => {
+      if ((event === 'started' || event === 'location') && payload?.coords) {
+        const matchesOrder =
+          !payload.orderId ||
+          String(payload.orderId) === String(activeId) ||
+          (Array.isArray(payload.orderIds) &&
+            payload.orderIds.some((oid) => String(oid) === String(activeId)));
+        if (!matchesOrder) return;
+        const parsed = parseLatLng(payload.coords.latitude, payload.coords.longitude);
+        if (parsed) {
+          setLocalRiderCoords({
+            lat: parsed.lat,
+            lng: parsed.lng,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } else if (event === 'stopped') {
+        const matchesStopped =
+          !payload?.orderId ||
+          String(payload.orderId) === String(activeId) ||
+          (Array.isArray(payload.orderIds) &&
+            payload.orderIds.some((oid) => String(oid) === String(activeId)));
+        if (matchesStopped) {
+          setLocalRiderCoords(null);
+        }
+      }
+    });
+
+    return unsub;
+  }, [activeDelivery?.orderId]);
 
   const trackingOrder = useMemo(() => {
     if (!activeDelivery) return null;
@@ -84,6 +144,10 @@ export default function RiderHomeDeliveryMapCard({
             order={trackingOrder}
             statusOverride={trackingOrder.status}
             height={240}
+            autoFollow={true}
+            routeFromRider={true}
+            showFollowControl={true}
+            localRiderCoords={localRiderCoords}
             title="Live tracking"
             showWhenInactive={true}
             hideHeader={true}

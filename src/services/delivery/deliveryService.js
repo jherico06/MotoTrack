@@ -27,6 +27,7 @@ import { riderAccessService } from './riderAccessService.js';
 import { geocodeAddress } from '../../utils/geo.js';
 import { resolveImageForDatabase } from '../../utils/productImageUpload.js';
 import { deliveryLocationService } from './deliveryLocationService.js';
+import { riderGpsTrackingService } from './riderGpsTrackingService.js';
 
 const STORAGE_KEY_DELIVERIES = 'mototrack_order_deliveries';
 const STORAGE_KEY_HISTORY = 'mototrack_delivery_history';
@@ -940,14 +941,7 @@ export const deliveryService = {
         const { error: orderErr } = await client
           .from('orders')
           .update({
-            status: DELIVERY_STATUSES.ASSIGNED,
-            delivery_status: DELIVERY_STATUSES.ASSIGNED,
-            rider_id: record.rider_id,
-            rider_name: record.rider_name,
-            rider_contact: record.rider_contact,
-            rider_vehicle: record.vehicle_info,
-            rider_plate: record.rider_plate,
-            rider_avatar: record.rider_avatar,
+            status: DELIVERY_STATUSES.READY,
             estimated_delivery: expectedIso ? expectedLabel : 'Assigned to delivery rider',
             updated_at: nowIso,
           })
@@ -961,7 +955,7 @@ export const deliveryService = {
       }
     }
 
-    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.ASSIGNED, 'Delivery assigned', {
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.READY, 'Delivery assigned', {
       allowDelivered: false,
       skipTransitionCheck: true,
       deliveryMeta: {
@@ -975,7 +969,7 @@ export const deliveryService = {
         expected_delivery_at: record.expected_delivery_at,
         expected_delivery_end_at: record.expected_delivery_end_at,
         estimated_delivery: expectedIso ? expectedLabel : 'Assigned to delivery rider',
-        status: DELIVERY_STATUSES.ASSIGNED,
+        status: DELIVERY_STATUSES.READY,
         delivery_status: DELIVERY_STATUSES.ASSIGNED,
       },
     });
@@ -2274,7 +2268,32 @@ export const deliveryService = {
     const paymentStatus =
       order?.payment_status ||
       (/cod|cash on delivery/i.test(paymentMethod) ? 'Unpaid (COD)' : 'Paid');
-    const statusSource = delivery?.delivery_status || order?.status;
+    const orderStatusRaw = String(order?.status || '').trim();
+    const deliveryStatusRaw = String(delivery?.delivery_status || '').trim();
+    const checkShipped = (raw) => {
+      const s = String(raw || '').trim().toLowerCase();
+      if (!s) return false;
+      return (
+        s === 'shipped' ||
+        s === 'in transit' ||
+        s.includes('transit') ||
+        s.includes('out') ||
+        s.includes('report') ||
+        s === 'delivered' ||
+        s === 'completed' ||
+        s.includes('fail') ||
+        s.includes('issue')
+      );
+    };
+    const isMarkedShipped = orderStatusRaw
+      ? checkShipped(orderStatusRaw)
+      : checkShipped(deliveryStatusRaw);
+    const statusSource = isMarkedShipped
+      ? deliveryStatusRaw || orderStatusRaw
+      : orderStatusRaw || deliveryStatusRaw || 'Need to pick up';
+    const resolvedDeliveryStatus = isMarkedShipped
+      ? this.riderFacingStatus(statusSource)
+      : 'Need to pick up';
     return {
       orderId: delivery?.order_id || order?.order_id,
       deliveryId: delivery?.delivery_id,
@@ -2289,7 +2308,8 @@ export const deliveryService = {
       totalAmount: Number(order?.grand_total ?? order?.total_amount ?? 0) || 0,
       paymentMethod,
       paymentStatus,
-      deliveryStatus: this.riderFacingStatus(statusSource),
+      orderStatus: orderStatusRaw || statusSource,
+      deliveryStatus: resolvedDeliveryStatus,
       rawStatus: statusSource,
       lat: order?.delivery_lat ?? delivery?.delivery_lat,
       lng: order?.delivery_lng ?? delivery?.delivery_lng,

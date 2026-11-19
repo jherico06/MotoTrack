@@ -152,43 +152,46 @@ export const deliveryLocationService = {
     }
 
     try {
-      const existing = await this.getLatestForOrder(orderId);
-      let row;
-      if (existing?.id) {
-        const { data, error } = await c
+      let row = null;
+      const runUpdate = () =>
+        c
           .from('delivery_locations')
           .update(payload)
           .eq('order_id', orderId)
           .eq('rider_id', riderId)
           .select('id, order_id, rider_id, latitude, longitude, accuracy, heading, speed, updated_at')
           .maybeSingle();
-        if (error) return { success: false, error: error.message };
-        row = data;
-      } else {
-        const { data, error } = await c
+
+      // Skip extra SELECT when this session already confirmed the row exists
+      let shouldUpdate = Boolean(prev?.id);
+      if (!shouldUpdate) {
+        const existing = await this.getLatestForOrder(orderId);
+        shouldUpdate = Boolean(existing?.id);
+      }
+
+      if (shouldUpdate) {
+        const upd = await runUpdate();
+        if (upd.error) return { success: false, error: upd.error.message };
+        row = upd.data;
+      }
+
+      if (!row) {
+        const ins = await c
           .from('delivery_locations')
           .insert([{ id: newId(), ...payload, created_at: nowIso }])
           .select('id, order_id, rider_id, latitude, longitude, accuracy, heading, speed, updated_at')
           .maybeSingle();
-        if (error) {
-          // Concurrent insert race → update
-          if (String(error.message || '').toLowerCase().includes('duplicate')) {
-            const retry = await c
-              .from('delivery_locations')
-              .update(payload)
-              .eq('order_id', orderId)
-              .eq('rider_id', riderId)
-              .select(
-                'id, order_id, rider_id, latitude, longitude, accuracy, heading, speed, updated_at'
-              )
-              .maybeSingle();
+        if (ins.error) {
+          const msg = String(ins.error.message || '').toLowerCase();
+          if (msg.includes('duplicate') || ins.error.code === '23505') {
+            const retry = await runUpdate();
             if (retry.error) return { success: false, error: retry.error.message };
             row = retry.data;
           } else {
-            return { success: false, error: error.message };
+            return { success: false, error: ins.error.message };
           }
         } else {
-          row = data;
+          row = ins.data;
         }
       }
 

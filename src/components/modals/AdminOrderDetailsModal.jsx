@@ -188,6 +188,7 @@ export default function AdminOrderDetailsModal({
   onProcessReturn,
   onPrint,
   showConfirm,
+  toastMessage = '',
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -1009,6 +1010,42 @@ export default function AdminOrderDetailsModal({
             )}
           </View>
         </View>
+
+        {toastMessage ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 18,
+              left: 0,
+              right: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 999999,
+              elevation: 99,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: '#24272B',
+                paddingHorizontal: 22,
+                paddingVertical: 12,
+                borderRadius: 9999,
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.35,
+                shadowRadius: 14,
+                elevation: 24,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.14)',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5, textAlign: 'center' }}>
+                {toastMessage}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   );

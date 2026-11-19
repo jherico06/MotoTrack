@@ -79,6 +79,7 @@ const riderAccessService = {};
 const geocodeAddress = () => null;
 const resolveImageForDatabase = () => '';
 const deliveryLocationService = {};
+const riderGpsTrackingService = {};
 ${deliveryBody}`
 );
 

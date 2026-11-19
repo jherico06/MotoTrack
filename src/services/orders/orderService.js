@@ -18,6 +18,10 @@ const ORDERS_FETCH_TTL_MS = 60000;
 let ordersFetchInFlight = null;
 let ordersFetchInFlightKey = null;
 
+/** Newly created local orders kept across remote reconciles while their Supabase INSERT is still committing. */
+const recentLocalOrderCreates = new Map();
+const RECENT_CREATE_GRACE_MS = 20000;
+
 function makeEntityId(prefix) {
   const rand = Math.floor(100000 + Math.random() * 900000);
   return `${prefix}-${Date.now()}-${rand}`;
@@ -509,19 +513,50 @@ class OrderService {
   }
 
   setupRealtimeSubscription() {
+    if (!this._broadcastBound) {
+      this._broadcastBound = true;
+      try {
+        const bc = getOrdersBroadcast();
+        if (bc) {
+          bc.onmessage = (ev) => {
+            const type = ev?.data?.type;
+            if (type !== 'orders_updated' && type !== 'orders_cleared') return;
+            if (this._broadcastDebounceTimer) {
+              clearTimeout(this._broadcastDebounceTimer);
+            }
+            this._broadcastDebounceTimer = setTimeout(async () => {
+              try {
+                const fresh = await this.getAllOrders({ force: true });
+                if (Array.isArray(fresh)) {
+                  this.notifyListeners(fresh, { keepCache: true });
+                }
+              } catch (_e) { }
+            }, 250);
+          };
+        }
+      } catch (_e) { }
+    }
+
     if (this._realtimeChannel) return;
     try {
       const client = supabaseManager.getClient();
       if (!client) return;
       this._realtimeChannel = client
         .channel('public:orders_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
-          try {
-            const fresh = await this.getAllOrders();
-            if (Array.isArray(fresh)) this.notifyListeners(fresh);
-          } catch (e) {
-            console.warn('[OrderService] realtime refresh failed:', e);
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          if (this._realtimeDebounceTimer) {
+            clearTimeout(this._realtimeDebounceTimer);
           }
+          this._realtimeDebounceTimer = setTimeout(async () => {
+            try {
+              const fresh = await this.getAllOrders({ force: true });
+              if (Array.isArray(fresh)) {
+                this.notifyListeners(fresh, { keepCache: true });
+              }
+            } catch (e) {
+              console.warn('[OrderService] realtime refresh failed:', e);
+            }
+          }, 350);
         })
         .subscribe();
     } catch (e) {
@@ -529,10 +564,12 @@ class OrderService {
     }
   }
 
-  notifyListeners(orders) {
-    ordersFetchCache.clear();
-    ordersFetchInFlight = null;
-    ordersFetchInFlightKey = null;
+  notifyListeners(orders, { keepCache = false } = {}) {
+    if (!keepCache) {
+      ordersFetchCache.clear();
+      ordersFetchInFlight = null;
+      ordersFetchInFlightKey = null;
+    }
     this.listeners.forEach((fn) => {
       try {
         fn(orders);
@@ -574,11 +611,12 @@ class OrderService {
     );
   }
 
-  saveLocalOrders(orders) {
+  saveLocalOrders(orders, { silent = false } = {}) {
     try {
       const json = JSON.stringify(orders);
       appStorage.setItem(STORAGE_KEY_ORDERS, json);
       writeSharedOrdersJson(json);
+      if (silent) return;
       this.notifyListeners(orders);
       if (typeof window !== 'undefined') {
         try {
@@ -660,10 +698,37 @@ class OrderService {
    */
   reconcileWithRemote(remoteOrders, localOrders) {
     const remote = Array.isArray(remoteOrders) ? remoteOrders : [];
-    // Do not keep local-only rows — DB deletes must disappear from the app.
-    // Fresh offline creates are covered by createOrder writing local + queue;
-    // after a successful remote fetch, only remote rows remain.
-    return mergeOrderLists(remote, []);
+    const local = Array.isArray(localOrders) ? localOrders : [];
+    const remoteIds = new Set(
+      remote.map((o) => o && (o.order_id || o.id)).filter(Boolean)
+    );
+    const pendingCreateIds = this.getPendingCreateOrderIds();
+    const now = Date.now();
+    const recentOrPendingLocals = [];
+
+    for (const [id, entry] of recentLocalOrderCreates.entries()) {
+      if (!entry || now - entry.at > RECENT_CREATE_GRACE_MS) {
+        recentLocalOrderCreates.delete(id);
+      } else if (!remoteIds.has(id) && entry.order) {
+        recentOrPendingLocals.push(entry.order);
+      }
+    }
+
+    for (let i = 0; i < local.length; i += 1) {
+      const ord = local[i];
+      const id = ord && (ord.order_id || ord.id);
+      if (!id || remoteIds.has(id)) continue;
+      const createdMs = new Date(ord.created_at || 0).getTime();
+      const isFreshCreate =
+        Number.isFinite(createdMs) &&
+        createdMs > 0 &&
+        now - createdMs < RECENT_CREATE_GRACE_MS;
+      if (pendingCreateIds.has(id) || isFreshCreate) {
+        recentOrPendingLocals.push(ord);
+      }
+    }
+
+    return mergeOrderLists(remote, recentOrPendingLocals);
   }
 
   /**
@@ -897,7 +962,7 @@ class OrderService {
       : mergeOrderLists(remote, local);
 
     if (isAdminQuery) {
-      this.saveLocalOrders(reconciled);
+      this.saveLocalOrders(reconciled, { silent: true });
       return reconciled;
     }
 
@@ -915,7 +980,7 @@ class OrderService {
           : local.filter((o) => !orderBelongsToUser(o, ownershipUser));
       const mineRemote = remote.filter((o) => orderBelongsToUser(o, ownershipUser));
       const nextCache = mergeOrderLists(others, mineRemote);
-      this.saveLocalOrders(nextCache);
+      this.saveLocalOrders(nextCache, { silent: true });
 
       const ownedPending = [...this.getPendingCreateOrderIds()].filter((id) => {
         const localHit = local.find((o) => (o.order_id || o.id) === id);
@@ -1123,11 +1188,11 @@ class OrderService {
       customerEmail
         ? Promise.resolve(customerEmail)
         : emailService.resolveCustomerEmail({
-            customerEmail,
-            phone: customerPhone,
-            userId,
-            customerId,
-          }),
+          customerEmail,
+          phone: customerPhone,
+          userId,
+          customerId,
+        }),
     ]);
 
     if (!stockResult.success) {
@@ -1228,6 +1293,7 @@ class OrderService {
     };
 
     const existing = this.getLocalOrders();
+    recentLocalOrderCreates.set(orderId, { order: newOrder, at: Date.now() });
     this.saveLocalOrders([newOrder, ...existing]);
 
     try {
@@ -1432,6 +1498,12 @@ class OrderService {
           };
 
           await Promise.all([insertPayments(), insertSales(), insertOrderItems()]);
+          recentLocalOrderCreates.set(orderId, { order: newOrder, at: Date.now() });
+          const currentLocal = this.getLocalOrders();
+          this.saveLocalOrders([
+            newOrder,
+            ...currentLocal.filter((o) => (o.order_id || o.id) !== orderId),
+          ]);
         } else {
           console.warn('[OrderService] Supabase insert failed, enqueuing offline:', ordErr);
         }

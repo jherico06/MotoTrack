@@ -1,6 +1,7 @@
 /**
  * Leaflet + OpenStreetMap live delivery map.
  * Store pin + customer pin + OSRM road route; rider marker updates in place.
+ * Supports responsive ResizeObserver invalidateSize() and auto-follow rider camera.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
@@ -15,15 +16,30 @@ function escapeJs(str) {
     .replace(/\n/g, ' ');
 }
 
-function buildMapHtml({ store, customer, statusLabel, orderId }) {
+function distanceMeters(a, b) {
+  if (!a || !b) return Infinity;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(Number(b.lat) - Number(a.lat));
+  const dLng = toRad(Number(b.lng) - Number(a.lng));
+  const lat1 = toRad(Number(a.lat));
+  const lat2 = toRad(Number(b.lat));
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function buildMapHtml({ store, customer, statusLabel, orderId, initialFollow }) {
   const sLat = store?.lat ?? STORE_LOCATION.lat;
   const sLng = store?.lng ?? STORE_LOCATION.lng;
   const cLat = customer?.lat ?? STORE_LOCATION.lat;
   const cLng = customer?.lng ?? STORE_LOCATION.lng;
   const hasStore = Boolean(store);
   const hasCustomer = Boolean(customer);
-  const status = escapeJs(statusLabel || 'Tracking');
+  const safeOrderId = escapeJs(orderId || 'live');
   const storeName = escapeJs(store?.name || STORE_LOCATION.name || 'Store');
+  const startFollow = Boolean(initialFollow);
 
   return `<!DOCTYPE html>
 <html>
@@ -41,9 +57,9 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
       border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35);
     }
     .pin-rider {
-      background: #0F172A; color: #FBBF24; border-radius: 50%; width: 28px; height: 28px;
-      display: flex; align-items: center; justify-content: center; font-size: 14px;
-      border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35);
+      background: #0F172A; color: #FBBF24; border-radius: 50%; width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+      border: 2.5px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,.4);
     }
     .pin-customer {
       background: #0284C7; color: #fff; border-radius: 50%; width: 28px; height: 28px;
@@ -86,6 +102,7 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
 <body>
   <div id="map"></div>
   <script>
+    var MAP_ORDER_ID = '${safeOrderId}';
     var map = L.map('map', {
       zoomControl: true,
       attributionControl: true,
@@ -95,8 +112,42 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
       boxZoom: true,
       dragging: true
     });
-    map.on('zoomstart', function () { hasFitted = true; });
-    map.on('dragstart', function () { hasFitted = true; });
+
+    function notifyHost(payload) {
+      var msg = JSON.stringify(Object.assign({ orderId: MAP_ORDER_ID }, payload || {}));
+      try {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(msg);
+        }
+      } catch (e) {}
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(msg, '*');
+        }
+      } catch (e) {}
+    }
+
+    var storeMarker = null;
+    var customerMarker = null;
+    var riderMarker = null;
+    var shopRouteOuter = null;
+    var shopRouteInner = null;
+    var routeOuter = null;
+    var routeLine = null;
+    var hasFitted = false;
+    var userMovedMap = false;
+    var followRider = ${startFollow ? 'true' : 'false'};
+
+    map.on('zoomstart', function () { hasFitted = true; userMovedMap = true; });
+    map.on('dragstart', function () {
+      hasFitted = true;
+      userMovedMap = true;
+      if (followRider) {
+        followRider = false;
+        notifyHost({ type: 'followPaused' });
+      }
+    });
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
@@ -104,42 +155,38 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
 
     var storeIcon = L.divIcon({ className: '', html: '<div class="pin-store">🏪</div>', iconSize: [30,30], iconAnchor: [15,15] });
     var customerIcon = L.divIcon({ className: '', html: '<div class="pin-customer">📍</div>', iconSize: [28,28], iconAnchor: [14,14] });
-    var riderIcon = L.divIcon({ className: '', html: '<div class="pin-rider">🛵</div>', iconSize: [28,28], iconAnchor: [14,14] });
-
-    var storeMarker = null;
-    var customerMarker = null;
-    var riderMarker = null;
-    var routeLine = null;
-    var hasFitted = false;
-    var followRider = false;
+    var riderIcon = L.divIcon({ className: '', html: '<div class="pin-rider">🛵</div>', iconSize: [30,30], iconAnchor: [15,15] });
 
     function setStore(lat, lng, label) {
       if (!isFinite(lat) || !isFinite(lng)) return;
       if (!storeMarker) {
-        storeMarker = L.marker([lat, lng], { icon: storeIcon }).addTo(map);
+        storeMarker = L.marker([lat, lng], { icon: storeIcon, zIndexOffset: 300 }).addTo(map);
       } else {
         storeMarker.setLatLng([lat, lng]);
       }
       storeMarker.bindPopup(label || 'Store');
-      if (customerMarker) fitIfNeeded();
+      if (!userMovedMap && customerMarker && !followRider) fitIfNeeded();
     }
 
     function setCustomer(lat, lng, label) {
       if (!isFinite(lat) || !isFinite(lng)) return;
       if (!customerMarker) {
-        customerMarker = L.marker([lat, lng], { icon: customerIcon }).addTo(map);
+        customerMarker = L.marker([lat, lng], { icon: customerIcon, zIndexOffset: 400 }).addTo(map);
       } else {
         customerMarker.setLatLng([lat, lng]);
       }
       if (label) customerMarker.bindPopup(label);
-      hasFitted = false;
-      fitIfNeeded();
+      if (!userMovedMap && (!followRider || !riderMarker)) {
+        hasFitted = false;
+        fitIfNeeded();
+      }
     }
 
     function setRider(lat, lng, label, smooth) {
       if (!isFinite(lat) || !isFinite(lng)) return;
+      var isFirstRiderPin = !riderMarker;
       if (!riderMarker) {
-        riderMarker = L.marker([lat, lng], { icon: riderIcon }).addTo(map);
+        riderMarker = L.marker([lat, lng], { icon: riderIcon, zIndexOffset: 600 }).addTo(map);
       } else if (smooth) {
         var from = riderMarker.getLatLng();
         var to = L.latLng(lat, lng);
@@ -158,14 +205,53 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
       }
       if (label) riderMarker.bindPopup(label);
       if (followRider) {
-        map.panTo([lat, lng], { animate: true, duration: 0.4 });
-      } else {
+        if (isFirstRiderPin || (map.getZoom() || 0) < 14) {
+          map.setView([lat, lng], Math.max(map.getZoom() || 15, 15), { animate: !isFirstRiderPin });
+        } else {
+          map.panTo([lat, lng], { animate: true, duration: 0.45 });
+        }
+        hasFitted = true;
+      } else if (!userMovedMap) {
         fitIfNeeded();
       }
     }
 
-    function setRoute(coords) {
+    function setShopRoute(coords) {
       if (!Array.isArray(coords) || coords.length < 2) {
+        if (shopRouteOuter) { map.removeLayer(shopRouteOuter); shopRouteOuter = null; }
+        if (shopRouteInner) { map.removeLayer(shopRouteInner); shopRouteInner = null; }
+        return;
+      }
+      var latLngs = coords
+        .map(function (p) { return [Number(p.lat), Number(p.lng)]; })
+        .filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); });
+      if (latLngs.length < 2) return;
+      if (shopRouteOuter) map.removeLayer(shopRouteOuter);
+      if (shopRouteInner) map.removeLayer(shopRouteInner);
+      shopRouteOuter = L.polyline(latLngs, {
+        color: '#FFFFFF',
+        weight: 7,
+        opacity: 0.85,
+        lineJoin: 'round',
+        lineCap: 'round'
+      }).addTo(map);
+      shopRouteInner = L.polyline(latLngs, {
+        color: '#EA580C',
+        weight: 4,
+        opacity: 0.92,
+        dashArray: '7, 6',
+        lineJoin: 'round',
+        lineCap: 'round'
+      }).addTo(map);
+      if (!userMovedMap && (!followRider || !riderMarker)) {
+        hasFitted = false;
+        fitIfNeeded();
+      }
+    }
+
+    function setRoute(coords, isLiveLeg) {
+      if (!Array.isArray(coords) || coords.length < 2) {
+        if (routeOuter) { map.removeLayer(routeOuter); routeOuter = null; }
         if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
         return;
       }
@@ -173,39 +259,45 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
         .map(function (p) { return [Number(p.lat), Number(p.lng)]; })
         .filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); });
       if (latLngs.length < 2) return;
-      if (routeLine) {
-        routeLine.setLatLngs(latLngs);
-      } else {
-        routeLine = L.polyline(latLngs, {
-          color: '#EA580C',
-          weight: 5,
-          opacity: 0.9,
-          lineJoin: 'round',
-          lineCap: 'round'
-        }).addTo(map);
+      if (routeOuter) map.removeLayer(routeOuter);
+      if (routeLine) map.removeLayer(routeLine);
+      routeOuter = L.polyline(latLngs, {
+        color: '#FFFFFF',
+        weight: 8,
+        opacity: 0.85,
+        lineJoin: 'round',
+        lineCap: 'round'
+      }).addTo(map);
+      routeLine = L.polyline(latLngs, {
+        color: isLiveLeg ? '#059669' : '#EA580C',
+        weight: 5,
+        opacity: 0.95,
+        lineJoin: 'round',
+        lineCap: 'round'
+      }).addTo(map);
+      if (!userMovedMap && (!followRider || !riderMarker)) {
+        hasFitted = false;
+        fitIfNeeded();
       }
-      hasFitted = false;
-      fitIfNeeded();
     }
 
     function fitIfNeeded() {
       if (hasFitted) return;
-      var pts = [];
-      if (storeMarker) pts.push(storeMarker.getLatLng());
-      if (customerMarker) pts.push(customerMarker.getLatLng());
-      if (riderMarker) pts.push(riderMarker.getLatLng());
-      if (routeLine) {
-        try {
-          map.fitBounds(routeLine.getBounds().pad(0.2), { maxZoom: 16, padding: [40, 40] });
-          hasFitted = true;
-          return;
-        } catch (e) {}
+      var bounds = L.latLngBounds([]);
+      if (storeMarker) bounds.extend(storeMarker.getLatLng());
+      if (customerMarker) bounds.extend(customerMarker.getLatLng());
+      if (riderMarker) bounds.extend(riderMarker.getLatLng());
+      if (shopRouteInner) {
+        try { bounds.extend(shopRouteInner.getBounds()); } catch (e) {}
       }
-      if (pts.length === 0) return;
-      if (pts.length === 1) {
-        map.setView(pts[0], 15);
+      if (routeLine) {
+        try { bounds.extend(routeLine.getBounds()); } catch (e) {}
+      }
+      if (!bounds.isValid()) return;
+      if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
+        map.setView(bounds.getCenter(), 15);
       } else {
-        map.fitBounds(L.latLngBounds(pts).pad(0.28), { maxZoom: 16 });
+        map.fitBounds(bounds.pad(0.2), { maxZoom: 16, padding: [36, 36] });
       }
       hasFitted = true;
     }
@@ -214,7 +306,29 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
       // Unobstructed map view - status is displayed in outer cards
     }
 
-    function setFollow(v) { followRider = !!v; }
+    function setFollow(v) {
+      followRider = !!v;
+      if (followRider && riderMarker) {
+        hasFitted = true;
+        map.setView(riderMarker.getLatLng(), Math.max(map.getZoom() || 15, 15), { animate: true });
+      }
+    }
+
+    function handleResize() {
+      try {
+        map.invalidateSize({ pan: false });
+        if (followRider && riderMarker) {
+          map.panTo(riderMarker.getLatLng(), { animate: false });
+        }
+      } catch (e) {}
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+      try {
+        new ResizeObserver(handleResize).observe(document.getElementById('map'));
+      } catch (e) {}
+    }
+    window.addEventListener('resize', handleResize);
 
     ${hasStore ? `setStore(${sLat}, ${sLng}, '${storeName}');` : ''}
     ${hasCustomer ? `setCustomer(${cLat}, ${cLng}, 'Delivery address');` : `map.setView([${sLat}, ${sLng}], 13);`}
@@ -223,10 +337,11 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
       setStore: setStore,
       setCustomer: setCustomer,
       setRider: setRider,
+      setShopRoute: setShopRoute,
       setRoute: setRoute,
       setStatus: setStatus,
       setFollow: setFollow,
-      fit: function () { hasFitted = false; fitIfNeeded(); }
+      fit: function () { userMovedMap = false; followRider = false; hasFitted = false; fitIfNeeded(); }
     };
 
     function handleMsg(ev) {
@@ -236,10 +351,11 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
         if (data.type === 'store') setStore(data.lat, data.lng, data.label);
         if (data.type === 'customer') setCustomer(data.lat, data.lng, data.label);
         if (data.type === 'rider') setRider(data.lat, data.lng, data.label, data.smooth !== false);
-        if (data.type === 'route') setRoute(data.coords || []);
+        if (data.type === 'shopRoute') setShopRoute(data.coords || []);
+        if (data.type === 'route') setRoute(data.coords || [], Boolean(data.isLiveLeg));
         if (data.type === 'status') setStatus(data.text);
         if (data.type === 'follow') setFollow(data.value);
-        if (data.type === 'fit') { hasFitted = false; fitIfNeeded(); }
+        if (data.type === 'fit') { userMovedMap = false; followRider = false; hasFitted = false; fitIfNeeded(); }
       } catch (e) {}
     }
 
@@ -266,13 +382,20 @@ export default function LiveDeliveryMap({
   lastUpdatedAt,
   height = 280,
   followRider = false,
+  onFollowChange,
+  routeFromRider = false,
+  showShopToRiderRoute = false,
+  fitTrigger = 0,
   hideFooter = false,
   style,
 }) {
   const webRef = useRef(null);
   const iframeRef = useRef(null);
   const mapReady = useRef(false);
+  const lastShopRoutedRef = useRef(null);
+  const lastRoutedOriginRef = useRef(null);
   const [loading, setLoading] = useState(true);
+  const [shopRoutePath, setShopRoutePath] = useState(null);
   const [routePath, setRoutePath] = useState(null);
 
   const store = useMemo(() => {
@@ -281,6 +404,7 @@ export default function LiveDeliveryMap({
   }, [storeLat, storeLng, storeLabel]);
 
   const customer = useMemo(() => parseLatLng(customerLat, customerLng), [customerLat, customerLng]);
+  const riderCoords = useMemo(() => parseLatLng(riderLat, riderLng), [riderLat, riderLng]);
 
   const html = useMemo(
     () =>
@@ -289,21 +413,98 @@ export default function LiveDeliveryMap({
         customer,
         statusLabel,
         orderId,
+        initialFollow: followRider,
       }),
-    // Recreate HTML when order / endpoints change — not on rider GPS ticks
+    // Recreate HTML when order / endpoints change — not on rider GPS ticks or follow toggles
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [orderId, customer?.lat, customer?.lng, store?.lat, store?.lng, store?.name, statusLabel]
   );
 
-  // Fetch accurate road route: store → customer
+  // Leg 1 driving route: shop -> live rider location (when two-leg mode is enabled & rider GPS exists)
   useEffect(() => {
-    if (!customer || !store) {
+    if (!showShopToRiderRoute || !riderCoords || !store) {
+      lastShopRoutedRef.current = null;
+      setShopRoutePath(null);
+      return undefined;
+    }
+
+    if (distanceMeters(store, riderCoords) < 25) {
+      lastShopRoutedRef.current = {
+        lat: riderCoords.lat,
+        lng: riderCoords.lng,
+        storeLat: store.lat,
+        storeLng: store.lng,
+      };
+      setShopRoutePath([store, riderCoords]);
+      return undefined;
+    }
+
+    const last = lastShopRoutedRef.current;
+    if (
+      last &&
+      last.storeLat === store.lat &&
+      last.storeLng === store.lng &&
+      distanceMeters(last, riderCoords) < 40
+    ) {
+      return undefined;
+    }
+
+    lastShopRoutedRef.current = {
+      lat: riderCoords.lat,
+      lng: riderCoords.lng,
+      storeLat: store.lat,
+      storeLng: store.lng,
+    };
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let cancelled = false;
+    fetchDrivingRoute(store, riderCoords, { signal: controller?.signal })
+      .then((path) => {
+        if (!cancelled) {
+          setShopRoutePath(Array.isArray(path) && path.length >= 2 ? path : [store, riderCoords]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setShopRoutePath([store, riderCoords]);
+      });
+    return () => {
+      cancelled = true;
+      try {
+        controller?.abort();
+      } catch (_e) { }
+    };
+  }, [showShopToRiderRoute, store?.lat, store?.lng, riderCoords?.lat, riderCoords?.lng]);
+
+  // Leg 2 driving route (from live rider location when enabled & available, else store -> customer)
+  const routeOrigin = routeFromRider && riderCoords ? riderCoords : store;
+
+  useEffect(() => {
+    if (!customer || !routeOrigin) {
+      lastRoutedOriginRef.current = null;
       setRoutePath(null);
       return undefined;
     }
+
+    const last = lastRoutedOriginRef.current;
+    if (
+      last &&
+      last.destLat === customer.lat &&
+      last.destLng === customer.lng &&
+      distanceMeters(last, routeOrigin) < 40
+    ) {
+      return undefined;
+    }
+
+    lastRoutedOriginRef.current = {
+      lat: routeOrigin.lat,
+      lng: routeOrigin.lng,
+      destLat: customer.lat,
+      destLng: customer.lng,
+    };
+
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     let cancelled = false;
-    fetchDrivingRoute(store, customer, { signal: controller?.signal })
+    fetchDrivingRoute(routeOrigin, customer, { signal: controller?.signal })
       .then((path) => {
         if (!cancelled) setRoutePath(Array.isArray(path) && path.length >= 2 ? path : null);
       })
@@ -316,7 +517,7 @@ export default function LiveDeliveryMap({
         controller?.abort();
       } catch (_e) { }
     };
-  }, [store?.lat, store?.lng, customer?.lat, customer?.lng]);
+  }, [routeOrigin?.lat, routeOrigin?.lng, customer?.lat, customer?.lng]);
 
   const postToMap = useCallback((payload) => {
     const msg = JSON.stringify(payload);
@@ -333,10 +534,34 @@ export default function LiveDeliveryMap({
     }
   }, []);
 
+  const handleHostMessage = useCallback(
+    (raw) => {
+      try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!parsed || parsed.type !== 'followPaused') return;
+        if (parsed.orderId && orderId && String(parsed.orderId) !== String(orderId)) return;
+        onFollowChange?.(false);
+      } catch (_e) {}
+    },
+    [onFollowChange, orderId]
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    const onWinMsg = (ev) => handleHostMessage(ev?.data);
+    window.addEventListener('message', onWinMsg);
+    return () => window.removeEventListener('message', onWinMsg);
+  }, [handleHostMessage]);
+
   useEffect(() => {
     if (!mapReady.current) return;
-    postToMap({ type: 'follow', value: followRider });
+    postToMap({ type: 'follow', value: Boolean(followRider) });
   }, [followRider, postToMap]);
+
+  useEffect(() => {
+    if (!mapReady.current || !fitTrigger) return;
+    postToMap({ type: 'fit' });
+  }, [fitTrigger, postToMap]);
 
   useEffect(() => {
     if (!mapReady.current) return;
@@ -348,27 +573,36 @@ export default function LiveDeliveryMap({
     });
   }, [store.lat, store.lng, store.name, postToMap]);
 
-  useEffect(() => {
-    if (!mapReady.current) return;
-    if (!routePath?.length) {
-      postToMap({ type: 'route', coords: [] });
-      return;
-    }
-    postToMap({ type: 'route', coords: routePath });
-  }, [routePath, postToMap]);
+  const isLiveRiderLeg = Boolean(showShopToRiderRoute && riderCoords);
 
   useEffect(() => {
     if (!mapReady.current) return;
-    const rider = parseLatLng(riderLat, riderLng);
-    if (!rider) return;
+    if (!shopRoutePath?.length) {
+      postToMap({ type: 'shopRoute', coords: [] });
+      return;
+    }
+    postToMap({ type: 'shopRoute', coords: shopRoutePath });
+  }, [shopRoutePath, postToMap]);
+
+  useEffect(() => {
+    if (!mapReady.current) return;
+    if (!routePath?.length) {
+      postToMap({ type: 'route', coords: [], isLiveLeg: isLiveRiderLeg });
+      return;
+    }
+    postToMap({ type: 'route', coords: routePath, isLiveLeg: isLiveRiderLeg });
+  }, [routePath, isLiveRiderLeg, postToMap]);
+
+  useEffect(() => {
+    if (!mapReady.current || !riderCoords) return;
     postToMap({
       type: 'rider',
-      lat: rider.lat,
-      lng: rider.lng,
+      lat: riderCoords.lat,
+      lng: riderCoords.lng,
       label: riderLabel,
       smooth: true,
     });
-  }, [riderLat, riderLng, riderLabel, postToMap]);
+  }, [riderCoords?.lat, riderCoords?.lng, riderLabel, postToMap]);
 
   useEffect(() => {
     if (!mapReady.current) return;
@@ -390,6 +624,7 @@ export default function LiveDeliveryMap({
     mapReady.current = true;
     setLoading(false);
     setTimeout(() => {
+      postToMap({ type: 'follow', value: Boolean(followRider) });
       postToMap({
         type: 'store',
         lat: store.lat,
@@ -406,20 +641,24 @@ export default function LiveDeliveryMap({
           label: destLabelParts.join(' — '),
         });
       }
-      if (routePath?.length) {
-        postToMap({ type: 'route', coords: routePath });
+      if (shopRoutePath?.length) {
+        postToMap({ type: 'shopRoute', coords: shopRoutePath });
       }
-      const rider = parseLatLng(riderLat, riderLng);
-      if (rider) {
+      if (routePath?.length) {
+        postToMap({ type: 'route', coords: routePath, isLiveLeg: isLiveRiderLeg });
+      }
+      if (riderCoords) {
         postToMap({
           type: 'rider',
-          lat: rider.lat,
-          lng: rider.lng,
+          lat: riderCoords.lat,
+          lng: riderCoords.lng,
           label: riderLabel,
           smooth: false,
         });
       }
-      postToMap({ type: 'fit' });
+      if (!followRider || !riderCoords) {
+        postToMap({ type: 'fit' });
+      }
     }, 200);
   };
 
@@ -462,6 +701,7 @@ export default function LiveDeliveryMap({
           originWhitelist={['*']}
           source={{ html, baseUrl: 'https://unpkg.com' }}
           onLoadEnd={onLoad}
+          onMessage={(ev) => handleHostMessage(ev?.nativeEvent?.data)}
           style={[styles.webview, loading && { opacity: 0 }]}
           javaScriptEnabled
           domStorageEnabled
@@ -487,7 +727,13 @@ export default function LiveDeliveryMap({
         ) : (
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              {routePath?.length ? 'Route: store → delivery address' : 'Waiting for rider GPS…'}
+              {routePath?.length
+                ? routeFromRider && riderCoords
+                  ? showShopToRiderRoute
+                    ? 'Route: shop → rider → delivery address'
+                    : 'Route: rider → delivery address'
+                  : 'Route: store → delivery address'
+                : 'Waiting for rider GPS…'}
             </Text>
           </View>
         )

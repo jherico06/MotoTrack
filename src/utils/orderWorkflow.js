@@ -340,11 +340,15 @@ export function resolvePrimaryAction(order, deliveryDetail = null) {
 
   if (status === ORDER_STATUSES.ASSIGNED) {
     return {
-      id: 'awaiting_rider_acceptance',
-      kind: 'none',
-      label: 'Awaiting Rider Confirmation',
-      disabled: false,
-      hint: 'The assigned rider must review and confirm order acceptance on their dashboard.',
+      id: 'mark_shipped_assigned',
+      kind: 'advance',
+      label: 'Mark as Shipped',
+      nextStatus: ORDER_STATUSES.OUT,
+      needsConfirm: true,
+      confirmTitle: 'Mark as Shipped?',
+      confirmBody: `Order ${order.order_id || order.id} will move to Out for Delivery.`,
+      confirmText: 'Mark as Shipped',
+      hint: 'Hand the package to the assigned courier, then mark shipped.',
     };
   }
 

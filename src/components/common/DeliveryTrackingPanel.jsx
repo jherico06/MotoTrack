@@ -1,10 +1,11 @@
 /**
- * Shared admin/customer live tracking panel: status + Leaflet map + last update.
- * Customer view should only pass their own orderId (RLS enforces ownership).
+ * Shared admin/customer/rider live tracking panel: status + Leaflet map + last update.
+ * Supports automatic rider GPS camera-following (`autoFollow`) and Follow/Fit controls.
  */
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import LiveDeliveryMap from './LiveDeliveryMap.jsx';
+import BootstrapIcon from './BootstrapIcon.jsx';
 import { useDeliveryLocation } from '../../hooks/useDeliveryLocation.js';
 import { geocodeAddress, parseLatLng, STORE_LOCATION } from '../../utils/geo.js';
 import { useTheme } from '../../context/ThemeContext.jsx';
@@ -14,6 +15,11 @@ export default function DeliveryTrackingPanel({
   statusOverride,
   height = 300,
   followRider = false,
+  autoFollow = false,
+  routeFromRider = false,
+  showShopToRiderRoute = false,
+  showFollowControl = false,
+  localRiderCoords = null,
   title = 'Live Delivery Tracking',
   showWhenInactive = false,
   hideHeader = false,
@@ -33,6 +39,32 @@ export default function DeliveryTrackingPanel({
 
   const enabled = Boolean(orderId) && (isActive || showWhenInactive);
   const { riderLat, riderLng, lastUpdatedAt, loading } = useDeliveryLocation(orderId, { enabled });
+
+  const localValid = parseLatLng(localRiderCoords?.lat, localRiderCoords?.lng);
+  const effectiveRiderLat = localValid?.lat ?? riderLat;
+  const effectiveRiderLng = localValid?.lng ?? riderLng;
+  const hasRiderCoords = Boolean(parseLatLng(effectiveRiderLat, effectiveRiderLng));
+
+  const userPausedFollowRef = useRef(false);
+  const [isFollowing, setIsFollowing] = useState(() =>
+    Boolean(followRider || (autoFollow && isActive))
+  );
+  const [fitTrigger, setFitTrigger] = useState(0);
+
+  useEffect(() => {
+    userPausedFollowRef.current = false;
+    setIsFollowing(Boolean(followRider || (autoFollow && isActive)));
+  }, [orderId]);
+
+  useEffect(() => {
+    if (followRider) {
+      setIsFollowing(true);
+      return;
+    }
+    if (autoFollow && isActive && !userPausedFollowRef.current) {
+      setIsFollowing(true);
+    }
+  }, [followRider, autoFollow, isActive]);
 
   const storedCustomer = parseLatLng(order?.delivery_lat, order?.delivery_lng);
   const [fallbackGeoCoords, setFallbackGeoCoords] = useState(null);
@@ -83,30 +115,81 @@ export default function DeliveryTrackingPanel({
         </View>
       )}
 
-      {loading && !riderLat ? (
+      {loading && !hasRiderCoords ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={isDark ? '#FF5A00' : '#EA580C'} />
           <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>Connecting to live GPS…</Text>
         </View>
       ) : null}
 
-      <LiveDeliveryMap
-        orderId={orderId}
-        statusLabel={status}
-        customerLat={customerCoords?.lat}
-        customerLng={customerCoords?.lng}
-        customerAddress={address}
-        customerLandmark={landmark}
-        storeLat={STORE_LOCATION.lat}
-        storeLng={STORE_LOCATION.lng}
-        storeLabel={STORE_LOCATION.name}
-        riderLat={riderLat}
-        riderLng={riderLng}
-        lastUpdatedAt={lastUpdatedAt}
-        height={height}
-        followRider={followRider}
-        hideFooter={hideFooter}
-      />
+      <View style={styles.mapFrame}>
+        <LiveDeliveryMap
+          orderId={orderId}
+          statusLabel={status}
+          customerLat={customerCoords?.lat}
+          customerLng={customerCoords?.lng}
+          customerAddress={address}
+          customerLandmark={landmark}
+          storeLat={STORE_LOCATION.lat}
+          storeLng={STORE_LOCATION.lng}
+          storeLabel={STORE_LOCATION.name}
+          riderLat={effectiveRiderLat}
+          riderLng={effectiveRiderLng}
+          lastUpdatedAt={localRiderCoords?.updatedAt || lastUpdatedAt}
+          height={height}
+          followRider={isFollowing}
+          onFollowChange={(next) => {
+            userPausedFollowRef.current = !next;
+            setIsFollowing(Boolean(next));
+          }}
+          routeFromRider={routeFromRider}
+          showShopToRiderRoute={showShopToRiderRoute}
+          fitTrigger={fitTrigger}
+          hideFooter={hideFooter}
+        />
+
+        {showFollowControl && (
+          <View style={styles.floatingControls}>
+            <TouchableOpacity
+              onPress={() => {
+                userPausedFollowRef.current = true;
+                setIsFollowing(false);
+                setFitTrigger((n) => n + 1);
+              }}
+              activeOpacity={0.85}
+              style={[styles.ctrlBtn, isDark && styles.ctrlBtnDark]}
+              accessibilityLabel="Fit full route"
+            >
+              <BootstrapIcon name="map" size={12} color={isDark ? '#F5F5F5' : '#0F172A'} />
+              <Text style={[styles.ctrlText, isDark && styles.ctrlTextDark]}>Fit route</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                const next = !isFollowing;
+                userPausedFollowRef.current = !next;
+                setIsFollowing(next);
+              }}
+              activeOpacity={0.85}
+              style={[
+                styles.ctrlBtn,
+                isDark && styles.ctrlBtnDark,
+                isFollowing && styles.ctrlBtnActive,
+              ]}
+              accessibilityLabel="Toggle live rider follow"
+            >
+              <BootstrapIcon
+                name="crosshair"
+                size={12}
+                color={isFollowing ? '#FFFFFF' : '#EA580C'}
+              />
+              <Text style={[styles.ctrlText, isDark && styles.ctrlTextDark, isFollowing && styles.ctrlTextActive]}>
+                {isFollowing ? 'Following' : 'Follow rider'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       {!hideLegend && (
         <View style={styles.legend}>
@@ -121,6 +204,43 @@ export default function DeliveryTrackingPanel({
 
 const styles = StyleSheet.create({
   wrap: { gap: 8 },
+  mapFrame: { position: 'relative', width: '100%' },
+  floatingControls: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ctrlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  ctrlBtnDark: {
+    backgroundColor: 'rgba(32, 33, 36, 0.94)',
+    borderColor: '#3A3B40',
+  },
+  ctrlBtnActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  ctrlText: { fontSize: 11, fontWeight: '600', color: '#0F172A' },
+  ctrlTextDark: { color: '#F5F5F5' },
+  ctrlTextActive: { color: '#FFFFFF' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

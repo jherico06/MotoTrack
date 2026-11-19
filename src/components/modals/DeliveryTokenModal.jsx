@@ -243,9 +243,26 @@ export default function DeliveryTokenModal({
 
   const isDark = typeof document !== 'undefined' && document.documentElement?.classList.contains('dark');
 
+  const promotePortalToFront = (node) => {
+    if (Platform.OS !== 'web' || !node || typeof document === 'undefined') return;
+    try {
+      let el = node;
+      while (el && el.parentElement && el.parentElement !== document.body) {
+        el = el.parentElement;
+      }
+      if (el && el.parentElement === document.body) {
+        el.style.position = 'relative';
+        el.style.zIndex = '2147483643';
+        if (document.body.lastElementChild !== el) {
+          document.body.appendChild(el);
+        }
+      }
+    } catch (_e) { }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <View ref={promotePortalToFront} style={styles.overlay}>
         <View style={[styles.sheet, isDark && { backgroundColor: '#191A1D', borderWidth: 1, borderColor: '#303236' }]}>
           <View style={styles.header}>
             <Text style={[styles.title, isDark && { color: '#F5F5F5' }]}>Print delivery QR label</Text>

@@ -2784,115 +2784,119 @@ function AdminBookingDetailsPanelInner({
       {/* ─────────────────────────────────────────────────────────────
           MODAL: REJECT BOOKING REASON PROMPT
       ────────────────────────────────────────────────────────────── */}
-      <Modal
-        visible={showRejectBox}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRejectBox(false)}
-      >
-        <View style={styles.dialogBackdrop}>
-          <View style={styles.dialogCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <BootstrapIcon name="shield-exclamation" size={16} color="#DC2626" />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#DC2626' }}>
-                Decline Booking Request
-              </Text>
-            </View>
-            <Text style={{ fontSize: 12.5, color: tokens?.textMuted || '#64748B', marginBottom: 8 }}>
-              Please provide a clear reason. This will be shown directly to the customer.
-            </Text>
-            <TextInput
-              style={[styles.textInput, { minHeight: 70 }]}
-              placeholder="e.g. Bay fully booked at requested time, please choose an afternoon slot"
-              placeholderTextColor="#94A3B8"
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              multiline
-            />
-            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-              <TouchableOpacity onPress={() => setShowRejectBox(false)} style={secondaryBtn} disabled={busy}>
-                <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleRejectBooking}
-                disabled={busy || !rejectReason.trim()}
-                style={[secondaryBtn, { backgroundColor: '#DC2626', borderColor: '#DC2626' }]}
-              >
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFF' }}>
-                  {busy ? 'Declining…' : 'Confirm Decline'}
+      {showRejectBox ? (
+        <Modal
+          visible={showRejectBox}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowRejectBox(false)}
+        >
+          <View style={styles.dialogBackdrop}>
+            <View style={styles.dialogCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <BootstrapIcon name="shield-exclamation" size={16} color="#DC2626" />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#DC2626' }}>
+                  Decline Booking Request
                 </Text>
-              </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 12.5, color: tokens?.textMuted || '#64748B', marginBottom: 8 }}>
+                Please provide a clear reason. This will be shown directly to the customer.
+              </Text>
+              <TextInput
+                style={[styles.textInput, { minHeight: 70 }]}
+                placeholder="e.g. Bay fully booked at requested time, please choose an afternoon slot"
+                placeholderTextColor="#94A3B8"
+                value={rejectReason}
+                onChangeText={setRejectReason}
+                multiline
+              />
+              <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                <TouchableOpacity onPress={() => setShowRejectBox(false)} style={secondaryBtn} disabled={busy}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleRejectBooking}
+                  disabled={busy || !rejectReason.trim()}
+                  style={[secondaryBtn, { backgroundColor: '#DC2626', borderColor: '#DC2626' }]}
+                >
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFF' }}>
+                    {busy ? 'Declining…' : 'Confirm Decline'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      ) : null}
 
       {/* ─────────────────────────────────────────────────────────────
           MODAL: RESCHEDULE APPOINTMENT
       ────────────────────────────────────────────────────────────── */}
-      <Modal
-        visible={showRescheduleBox}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRescheduleBox(false)}
-      >
-        <View style={styles.dialogBackdrop}>
-          <View style={styles.dialogCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <BootstrapIcon name="calendar-event" size={16} color="#EA580C" />
-              <Text
-                style={{ fontSize: 14, fontWeight: '700', color: isDark ? tokens.textPrimary : '#0F172A' }}
-              >
-                Reschedule Service Appointment
-              </Text>
-            </View>
-            <View style={{ gap: 10 }}>
-              <View>
-                <Text style={{ fontSize: 11.5, fontWeight: '600', color: tokens.textMuted, marginBottom: 3 }}>
-                  Preferred Date (YYYY-MM-DD)
+      {showRescheduleBox ? (
+        <Modal
+          visible={showRescheduleBox}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowRescheduleBox(false)}
+        >
+          <View style={styles.dialogBackdrop}>
+            <View style={styles.dialogCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <BootstrapIcon name="calendar-event" size={16} color="#EA580C" />
+                <Text
+                  style={{ fontSize: 14, fontWeight: '700', color: isDark ? tokens.textPrimary : '#0F172A' }}
+                >
+                  Reschedule Service Appointment
                 </Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94A3B8"
-                  value={rescheduleDate}
-                  onChangeText={setRescheduleDate}
-                />
               </View>
-              <View>
-                <Text style={{ fontSize: 11.5, fontWeight: '600', color: tokens.textMuted, marginBottom: 3 }}>
-                  Arrival Time Window
-                </Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. 10:30 AM - 12:00 PM"
-                  placeholderTextColor="#94A3B8"
-                  value={rescheduleTime}
-                  onChangeText={setRescheduleTime}
-                />
+              <View style={{ gap: 10 }}>
+                <View>
+                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: tokens.textMuted, marginBottom: 3 }}>
+                    Preferred Date (YYYY-MM-DD)
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#94A3B8"
+                    value={rescheduleDate}
+                    onChangeText={setRescheduleDate}
+                  />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: tokens.textMuted, marginBottom: 3 }}>
+                    Arrival Time Window
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 10:30 AM - 12:00 PM"
+                    placeholderTextColor="#94A3B8"
+                    value={rescheduleTime}
+                    onChangeText={setRescheduleTime}
+                  />
+                </View>
               </View>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
-              <TouchableOpacity
-                onPress={() => setShowRescheduleBox(false)}
-                style={secondaryBtn}
-                disabled={busy}
-              >
-                <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleRescheduleBooking}
-                disabled={busy || !rescheduleDate || !rescheduleTime}
-                style={[secondaryBtn, { backgroundColor: '#EA580C', borderColor: '#EA580C' }]}
-              >
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFF' }}>
-                  {busy ? 'Saving…' : 'Save New Schedule'}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+                <TouchableOpacity
+                  onPress={() => setShowRescheduleBox(false)}
+                  style={secondaryBtn}
+                  disabled={busy}
+                >
+                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleRescheduleBooking}
+                  disabled={busy || !rescheduleDate || !rescheduleTime}
+                  style={[secondaryBtn, { backgroundColor: '#EA580C', borderColor: '#EA580C' }]}
+                >
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFF' }}>
+                    {busy ? 'Saving…' : 'Save New Schedule'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      ) : null}
     </View>
   );
 }

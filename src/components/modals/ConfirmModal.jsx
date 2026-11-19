@@ -85,6 +85,23 @@ export default function ConfirmModal({
 
   const cleanItemName = itemName ? String(itemName).replace(/^"+|"+$/g, '').trim() : null;
 
+  const promotePortalToFront = (node) => {
+    if (Platform.OS !== 'web' || !node || typeof document === 'undefined') return;
+    try {
+      let el = node;
+      while (el && el.parentElement && el.parentElement !== document.body) {
+        el = el.parentElement;
+      }
+      if (el && el.parentElement === document.body) {
+        el.style.position = 'relative';
+        el.style.zIndex = '2147483645';
+        if (document.body.lastElementChild !== el) {
+          document.body.appendChild(el);
+        }
+      }
+    } catch (_e) {}
+  };
+
   return (
     <Modal
       visible={visible}
@@ -92,7 +109,7 @@ export default function ConfirmModal({
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onCancel}
     >
-      <View style={styles.overlay}>
+      <View ref={promotePortalToFront} style={styles.overlay}>
         {/* Backdrop Click Area */}
         <TouchableOpacity
           style={styles.backdropClickArea}

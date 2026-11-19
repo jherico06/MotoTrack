@@ -8,7 +8,7 @@
 // =========================================================================
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, ActivityIndicator, Platform } from 'react-native';
 import { BootstrapIcon } from '../common';
 import {
   rescheduleService,
@@ -27,9 +27,7 @@ export default function AdminRescheduleModal({
   isDarkMode = false,
   adminName = 'Workshop Admin',
 }) {
-  if (!request) return null;
-
-  const bookingId = request.booking_id;
+  const bookingId = request?.booking_id;
   const allBookings = garageService.getLocalBookings();
   const booking = allBookings.find((b) => (b.id || b.booking_id) === bookingId) || {};
 
@@ -59,17 +57,20 @@ export default function AdminRescheduleModal({
 
   // Live Availability Validation for Requested Slot
   const requestedValidation = useMemo(() => {
+    if (!request) return { available: false, reason: '' };
     return rescheduleService.validateSlotAvailability(
       request.requested_date,
       request.requested_time_slot,
       bookingId
     );
-  }, [request.requested_date, request.requested_time_slot, bookingId]);
+  }, [request, bookingId]);
 
   // Live Availability Validation for Alternative Slot
   const altValidation = useMemo(() => {
     return rescheduleService.validateSlotAvailability(altDate, altTimeSlot, bookingId);
   }, [altDate, altTimeSlot, bookingId]);
+
+  if (!visible || !request) return null;
 
   // Handlers
   const handleApprove = async () => {
@@ -153,9 +154,29 @@ export default function AdminRescheduleModal({
 
   const isPending = request.status === RESCHEDULE_STATUS.PENDING_REVIEW || request.status === RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED;
 
+  if (!visible) return null;
+
+  const promotePortalToFront = (node) => {
+    if (Platform.OS !== 'web' || !node || typeof document === 'undefined') return;
+    try {
+      let el = node;
+      while (el && el.parentElement && el.parentElement !== document.body) {
+        el = el.parentElement;
+      }
+      if (el && el.parentElement === document.body) {
+        el.style.position = 'relative';
+        el.style.zIndex = '2147483644';
+        if (document.body.lastElementChild !== el) {
+          document.body.appendChild(el);
+        }
+      }
+    } catch (_e) {}
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View
+        ref={promotePortalToFront}
         style={{
           flex: 1,
           backgroundColor: 'rgba(15, 23, 42, 0.72)',

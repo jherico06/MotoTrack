@@ -1338,8 +1338,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     await userService.updateUserRole(userId, newRole);
     await loadData();
     showToast(
-      `Updated user role to ${
-        newRole === 'admin' ? 'Store Administrator' : newRole === 'mechanic' ? 'Mechanic' : 'Customer'
+      `Updated user role to ${newRole === 'admin' ? 'Store Administrator' : newRole === 'mechanic' ? 'Mechanic' : 'Customer'
       }`
     );
   };
@@ -1453,7 +1452,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     if (res.success) {
       try {
         await riderService.fetchRiders?.({ force: true });
-      } catch (_e) {}
+      } catch (_e) { }
       setDeliveryRiders(riderService.getRiders());
       setIsAddRiderModalOpen(false);
       setEditingRider(null);
@@ -1461,8 +1460,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         showAlert(
           'OTP email issue',
           res.emailError ||
-            res.message ||
-            'Account is pending. OTP email failed — use Staff email verification → Resend Code, or configure RESEND_API_KEY / Gmail SMTP in server/.env.'
+          res.message ||
+          'Account is pending. OTP email failed — use Staff email verification → Resend Code, or configure RESEND_API_KEY / Gmail SMTP in server/.env.'
         );
       } else if (res.warning) {
         showToast(`✓ Rider invited (dev OTP — check server console)`);
@@ -1908,96 +1907,96 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   }, [overviewHubs, overviewModuleCategory]);
 
   const getOrderStatusMeta = (status) => {
-  const s = String(status || '').toLowerCase().trim();
-  if (s.includes('pending') || s.includes('approval') || s.includes('cod')) {
+    const s = String(status || '').toLowerCase().trim();
+    if (s.includes('pending') || s.includes('approval') || s.includes('cod')) {
+      return {
+        label: 'Pending COD',
+        bg: '#FEF3C7',
+        border: '#FDE68A',
+        color: '#92400E',
+        icon: 'clock-fill',
+      };
+    }
+    if (s === 'processing') {
+      return {
+        label: 'Processing',
+        bg: '#EFF6FF',
+        border: '#BFDBFE',
+        color: '#1D4ED8',
+        icon: 'gear-wide-connected',
+      };
+    }
+    if (s.includes('ready')) {
+      return {
+        label: 'Ready for Delivery',
+        bg: '#F5F3FF',
+        border: '#DDD6FE',
+        color: '#6D28D9',
+        icon: 'box-seam-fill',
+      };
+    }
+    if (s.includes('out') || s === 'shipped' || s.includes('transit')) {
+      return {
+        label: 'Out for Delivery',
+        bg: '#ECFDF5',
+        border: '#A7F3D0',
+        color: '#047857',
+        icon: 'truck',
+      };
+    }
+    if (s === 'delivery reported' || s === 'reported') {
+      return {
+        label: 'Delivery Reported',
+        bg: '#EDE9FE',
+        border: '#DDD6FE',
+        color: '#6D28D9',
+        icon: 'clipboard-check',
+      };
+    }
+    if (s.includes('failed') || s === 'delivery issue') {
+      return {
+        label: 'Delivery Issue',
+        bg: '#FFF1F2',
+        border: '#FECDD3',
+        color: '#BE123C',
+        icon: 'exclamation-triangle-fill',
+      };
+    }
+    if (s.includes('resched')) {
+      return {
+        label: 'Rescheduled',
+        bg: '#FFF7ED',
+        border: '#FFEDD5',
+        color: '#C2410C',
+        icon: 'calendar-event-fill',
+      };
+    }
+    if (s === 'delivered' || s === 'completed') {
+      return {
+        label: 'Delivered',
+        bg: '#D1FAE5',
+        border: '#6EE7B7',
+        color: '#065F46',
+        icon: 'check-circle-fill',
+      };
+    }
+    if (s.includes('cancel') || s.includes('reject')) {
+      return {
+        label: 'Cancelled',
+        bg: '#FEE2E2',
+        border: '#FCA5A5',
+        color: '#B91C1C',
+        icon: 'x-circle-fill',
+      };
+    }
     return {
-      label: 'Pending COD',
-      bg: '#FEF3C7',
-      border: '#FDE68A',
-      color: '#92400E',
-      icon: 'clock-fill',
+      label: status || 'Pending Approval',
+      bg: '#F1F5F9',
+      border: '#CBD5E1',
+      color: '#334155',
+      icon: 'info-circle-fill',
     };
-  }
-  if (s === 'processing') {
-    return {
-      label: 'Processing',
-      bg: '#EFF6FF',
-      border: '#BFDBFE',
-      color: '#1D4ED8',
-      icon: 'gear-wide-connected',
-    };
-  }
-  if (s.includes('ready')) {
-    return {
-      label: 'Ready for Delivery',
-      bg: '#F5F3FF',
-      border: '#DDD6FE',
-      color: '#6D28D9',
-      icon: 'box-seam-fill',
-    };
-  }
-  if (s.includes('out') || s === 'shipped' || s.includes('transit')) {
-    return {
-      label: 'Out for Delivery',
-      bg: '#ECFDF5',
-      border: '#A7F3D0',
-      color: '#047857',
-      icon: 'truck',
-    };
-  }
-  if (s === 'delivery reported' || s === 'reported') {
-    return {
-      label: 'Delivery Reported',
-      bg: '#EDE9FE',
-      border: '#DDD6FE',
-      color: '#6D28D9',
-      icon: 'clipboard-check',
-    };
-  }
-  if (s.includes('failed') || s === 'delivery issue') {
-    return {
-      label: 'Delivery Issue',
-      bg: '#FFF1F2',
-      border: '#FECDD3',
-      color: '#BE123C',
-      icon: 'exclamation-triangle-fill',
-    };
-  }
-  if (s.includes('resched')) {
-    return {
-      label: 'Rescheduled',
-      bg: '#FFF7ED',
-      border: '#FFEDD5',
-      color: '#C2410C',
-      icon: 'calendar-event-fill',
-    };
-  }
-  if (s === 'delivered' || s === 'completed') {
-    return {
-      label: 'Delivered',
-      bg: '#D1FAE5',
-      border: '#6EE7B7',
-      color: '#065F46',
-      icon: 'check-circle-fill',
-    };
-  }
-  if (s.includes('cancel') || s.includes('reject')) {
-    return {
-      label: 'Cancelled',
-      bg: '#FEE2E2',
-      border: '#FCA5A5',
-      color: '#B91C1C',
-      icon: 'x-circle-fill',
-    };
-  }
-  return {
-    label: status || 'Pending Approval',
-    bg: '#F1F5F9',
-    border: '#CBD5E1',
-    color: '#334155',
-    icon: 'info-circle-fill',
   };
-};
 
   const handleApproveCOD = async (orderId) => {
     const target =
@@ -2027,6 +2026,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   };
 
   const handleAdvanceOrderStatus = async (orderId, newStatus) => {
+    const isShippingStep =
+      orderService.canonicalizeStatus?.(newStatus) === 'Out for Delivery' ||
+      /out for delivery|shipped/i.test(String(newStatus || ''));
+
+    if (isShippingStep) {
+      const outRes = await deliveryService.markOutForDelivery(orderId, currentUser);
+      if (outRes?.success) {
+        await loadData();
+        setSelectedOrderForModal((prev) => {
+          if (!prev || (prev.order_id !== orderId && prev.id !== orderId)) return prev;
+          return {
+            ...prev,
+            status: 'Out for Delivery',
+            delivery_status: 'Out for Delivery',
+          };
+        });
+        await refreshOrderDeliveryPanel(orderId);
+        showToast('Order marked as shipped — now Out for Delivery');
+        return;
+      }
+    }
+
     const res = await orderService.updateOrderStatus(orderId, newStatus, `Workflow: ${newStatus}`, {
       adminCorrection: false,
       allowDelivered: false,
@@ -3471,12 +3492,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     alignSelf: 'center',
                                     ...(statusSolid
                                       ? {
-                                          shadowColor: '#1B5E20',
-                                          shadowOffset: { width: 0, height: 1 },
-                                          shadowOpacity: 0.28,
-                                          shadowRadius: 2,
-                                          elevation: 2,
-                                        }
+                                        shadowColor: '#1B5E20',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.28,
+                                        shadowRadius: 2,
+                                        elevation: 2,
+                                      }
                                       : null),
                                   }}
                                 >
@@ -3624,10 +3645,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             orderPaymentFilter === 'COD'
                               ? 'cash'
                               : orderPaymentFilter === 'GCash'
-                              ? 'phone-fill'
-                              : orderPaymentFilter === 'Card'
-                              ? 'credit-card-fill'
-                              : 'credit-card'
+                                ? 'phone-fill'
+                                : orderPaymentFilter === 'Card'
+                                  ? 'credit-card-fill'
+                                  : 'credit-card'
                           }
                           size={13}
                           color={orderPaymentFilter !== 'All' ? '#EA580C' : '#64748B'}
@@ -3636,12 +3657,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           {orderPaymentFilter === 'All'
                             ? 'All Payments'
                             : orderPaymentFilter === 'COD'
-                            ? 'COD Only'
-                            : orderPaymentFilter === 'GCash'
-                            ? 'GCash'
-                            : orderPaymentFilter === 'PayPal'
-                            ? 'PayPal'
-                            : 'Card'}
+                              ? 'COD Only'
+                              : orderPaymentFilter === 'GCash'
+                                ? 'GCash'
+                                : orderPaymentFilter === 'PayPal'
+                                  ? 'PayPal'
+                                  : 'Card'}
                         </Text>
                       </View>
                       <BootstrapIcon
@@ -4106,22 +4127,22 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     backgroundColor: isPending
                                       ? '#FEF3C7'
                                       : isProcessing || isReady
-                                      ? '#EFF6FF'
-                                      : isShipped || isRescheduled
-                                      ? '#F3E8FF'
-                                      : isDelivered
-                                      ? '#D1FAE5'
-                                      : '#FEE2E2',
+                                        ? '#EFF6FF'
+                                        : isShipped || isRescheduled
+                                          ? '#F3E8FF'
+                                          : isDelivered
+                                            ? '#D1FAE5'
+                                            : '#FEE2E2',
                                     borderWidth: 1,
                                     borderColor: isPending
                                       ? '#FDE68A'
                                       : isProcessing || isReady
-                                      ? '#BFDBFE'
-                                      : isShipped || isRescheduled
-                                      ? '#E9D5FF'
-                                      : isDelivered
-                                      ? '#A7F3D0'
-                                      : '#FECACA',
+                                        ? '#BFDBFE'
+                                        : isShipped || isRescheduled
+                                          ? '#E9D5FF'
+                                          : isDelivered
+                                            ? '#A7F3D0'
+                                            : '#FECACA',
                                     paddingHorizontal: 7,
                                     paddingVertical: 3.5,
                                     borderRadius: 6,
@@ -4132,12 +4153,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       color: isPending
                                         ? '#92400E'
                                         : isProcessing || isReady
-                                        ? '#1D4ED8'
-                                        : isShipped || isRescheduled
-                                        ? '#7E22CE'
-                                        : isDelivered
-                                        ? '#065F46'
-                                        : '#DC2626',
+                                          ? '#1D4ED8'
+                                          : isShipped || isRescheduled
+                                            ? '#7E22CE'
+                                            : isDelivered
+                                              ? '#065F46'
+                                              : '#DC2626',
                                       fontSize: 10,
                                       fontWeight: '900',
                                     }}
@@ -4882,11 +4903,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     styles={styles}
                     accent="amber"
                     label="POS In-Store Sales Share"
-                    value={`${
-                      analyticsData.totalRevenue > 0
-                        ? Math.round((analyticsData.posRevenue / analyticsData.totalRevenue) * 100)
-                        : 0
-                    }%`}
+                    value={`${analyticsData.totalRevenue > 0
+                      ? Math.round((analyticsData.posRevenue / analyticsData.totalRevenue) * 100)
+                      : 0
+                      }%`}
                     valueColor="#EA580C"
                     sub={`₱${analyticsData.posRevenue.toLocaleString()} in counter sales`}
                   />
@@ -4966,11 +4986,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           style={[
                             styles.progressBarFill,
                             {
-                              width: `${
-                                analyticsData.totalRevenue > 0
-                                  ? (analyticsData.posRevenue / analyticsData.totalRevenue) * 100
-                                  : 50
-                              }%`,
+                              width: `${analyticsData.totalRevenue > 0
+                                ? (analyticsData.posRevenue / analyticsData.totalRevenue) * 100
+                                : 50
+                                }%`,
                             },
                           ]}
                         />
@@ -4988,11 +5007,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             styles.progressBarFill,
                             {
                               backgroundColor: '#EA580C',
-                              width: `${
-                                analyticsData.totalRevenue > 0
-                                  ? (analyticsData.onlineRevenue / analyticsData.totalRevenue) * 100
-                                  : 50
-                              }%`,
+                              width: `${analyticsData.totalRevenue > 0
+                                ? (analyticsData.onlineRevenue / analyticsData.totalRevenue) * 100
+                                : 50
+                                }%`,
                             },
                           ]}
                         />
@@ -5291,52 +5309,52 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 )}
 
                 {garageSubTab === 'packages' && (
-                <View style={styles.tableCard}>
-                  <View style={styles.tableHeaderRow}>
-                    <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Service Package</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Category</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'right' }]}>Price (₱)</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Duration</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Actions</Text>
-                  </View>
+                  <View style={styles.tableCard}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Service Package</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Category</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'right' }]}>Price (₱)</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Duration</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Actions</Text>
+                    </View>
 
-                  {garageServices.map((srv) => (
-                    <View key={srv.id} style={styles.tableRow}>
-                      <View style={{ flex: 2.5, flexDirection: 'row', alignItems: 'center' }}>
-                        <Image source={{ uri: srv.image }} style={styles.productThumb} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.tableTitle}>{srv.title}</Text>
-                          <Text style={styles.tableSub}>{srv.subtitle || srv.badge}</Text>
+                    {garageServices.map((srv) => (
+                      <View key={srv.id} style={styles.tableRow}>
+                        <View style={{ flex: 2.5, flexDirection: 'row', alignItems: 'center' }}>
+                          <Image source={{ uri: srv.image }} style={styles.productThumb} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.tableTitle}>{srv.title}</Text>
+                            <Text style={styles.tableSub}>{srv.subtitle || srv.badge}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.tableSub, { flex: 1.2, color: '#0F172A', fontWeight: '700' }]}>{srv.category}</Text>
+                        <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#EA580C' }]}>
+                          ₱{(srv.pricePhp || srv.price || 0).toLocaleString()}
+                        </Text>
+                        <Text style={[styles.tableSub, { flex: 1.2, textAlign: 'center' }]}>{srv.duration || '60 mins'}</Text>
+                        <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center' }}>
+                          <TouchableOpacity
+                            style={styles.actionIconBtn}
+                            onPress={() => {
+                              setEditingGarageService(srv);
+                              setServTitle(srv.title);
+                              setServCategory(srv.category);
+                              setServSubtitle(srv.subtitle || '');
+                              setServPrice(String(srv.pricePhp || srv.price || 0));
+                              setServDuration(srv.duration || '60 mins');
+                              setServBadge(srv.badge || 'Popular');
+                              setServImage(srv.image);
+                              setServDesc(srv.description || '');
+                              setServInclusions(Array.isArray(srv.inclusions) ? srv.inclusions.join('\n') : srv.inclusions || '');
+                              setIsAddGarageOpen(true);
+                            }}
+                          >
+                            <BootstrapIcon name="pencil" size={13} color="#475569" />
+                          </TouchableOpacity>
                         </View>
                       </View>
-                      <Text style={[styles.tableSub, { flex: 1.2, color: '#0F172A', fontWeight: '700' }]}>{srv.category}</Text>
-                      <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#EA580C' }]}>
-                        ₱{(srv.pricePhp || srv.price || 0).toLocaleString()}
-                      </Text>
-                      <Text style={[styles.tableSub, { flex: 1.2, textAlign: 'center' }]}>{srv.duration || '60 mins'}</Text>
-                      <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center' }}>
-                        <TouchableOpacity
-                          style={styles.actionIconBtn}
-                          onPress={() => {
-                            setEditingGarageService(srv);
-                            setServTitle(srv.title);
-                            setServCategory(srv.category);
-                            setServSubtitle(srv.subtitle || '');
-                            setServPrice(String(srv.pricePhp || srv.price || 0));
-                            setServDuration(srv.duration || '60 mins');
-                            setServBadge(srv.badge || 'Popular');
-                            setServImage(srv.image);
-                            setServDesc(srv.description || '');
-                            setServInclusions(Array.isArray(srv.inclusions) ? srv.inclusions.join('\n') : srv.inclusions || '');
-                            setIsAddGarageOpen(true);
-                          }}
-                        >
-                          <BootstrapIcon name="pencil" size={13} color="#475569" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+                    ))}
+                  </View>
                 )}
               </View>
             )}
@@ -8087,6 +8105,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         tokens={orderModalTokens}
         styles={styles}
         showConfirm={showConfirm}
+        toastMessage={toastMessage}
         onClose={() => setIsOrderModalOpen(false)}
         onApprove={handleApproveCOD}
         onAdvanceStatus={handleAdvanceOrderStatus}
@@ -8242,8 +8261,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             await refreshOrderDeliveryPanel(oid);
             setSelectedOrderForModal((prev) => {
               if (!prev) return prev;
+              const dsLower = String(delivery?.delivery_status || '').toLowerCase();
               const newStatus =
-                delivery?.delivery_status === 'out_for_delivery' || delivery?.delivery_status === 'shipped'
+                dsLower === 'out for delivery' ||
+                  dsLower === 'out_for_delivery' ||
+                  dsLower === 'shipped'
                   ? 'Out for Delivery'
                   : 'Ready for Delivery';
               return {
@@ -8258,8 +8280,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           }
           if (tokenBundle?.token || tokenBundle?.confirmUrl) {
             setDeliveryTokenModal({ order: assignedOrder, bundle: tokenBundle });
-          }
-          if (riderAccess?.success || riderAccess?.dashboardUrl || riderAccess?.token) {
+          } else if (
+            !delivery?.rider_id &&
+            (riderAccess?.success || riderAccess?.dashboardUrl || riderAccess?.token)
+          ) {
             setRiderAccessModal({
               rider: {
                 id: delivery?.rider_id || assignedOrder?.rider_id,
@@ -8423,11 +8447,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             setSelectedOrderForModal((prev) =>
               prev
                 ? {
-                    ...prev,
-                    status: nextStatus,
-                    rider_reported_delivered: Boolean(res?.delivery?.rider_reported_delivered),
-                    admin_confirmed: Boolean(res?.delivery?.admin_confirmed),
-                  }
+                  ...prev,
+                  status: nextStatus,
+                  rider_reported_delivered: Boolean(res?.delivery?.rider_reported_delivered),
+                  admin_confirmed: Boolean(res?.delivery?.admin_confirmed),
+                }
                 : prev
             );
             await refreshOrderDeliveryPanel(oid);

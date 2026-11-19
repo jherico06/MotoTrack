@@ -252,6 +252,11 @@ export default function AdminSidebar({
           attentionTitle: `${posCart.length} item(s) in register cart`,
         },
         {
+          id: 'payment_logs',
+          label: 'Payment Logs',
+          icon: 'wallet2',
+        },
+        {
           id: 'analytics',
           label: 'Reports',
           icon: 'graph-up-arrow',

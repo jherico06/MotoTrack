@@ -81,6 +81,7 @@ import NotificationsPage from '../customer/NotificationsPage.jsx';
 import { auditLogService } from '../../../services/system/auditLogService.js';
 import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, AdminCustomerRatingsReportsPanel, AdminRescheduleModal } from '../../../components/admin';
 import WebOverviewDashboard from '../../../components/web/admin/WebOverviewDashboard.jsx';
+import WebPaymentLogsPanel from '../../../components/web/admin/WebPaymentLogsPanel.jsx';
 import { ratingsReportsService } from '../../../services/feedback/ratingsReportsService.js';
 import {
   buildDashboardInsights,
@@ -1124,9 +1125,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     message: 'Ready to test',
   });
 
+  const toastTimerRef = useRef(null);
   const showToast = (msg) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 2800);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage('');
+      toastTimerRef.current = null;
+    }, 3200);
   };
 
   // ─── CUSTOM CENTERED CONFIRMATION & ALERT STATE ───
@@ -1246,7 +1254,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             catRes,
           ] = await Promise.allSettled([
             productService.getProducts(),
-            orderService.getAllOrders(),
+            orderService.getAllOrders({ force: Boolean(forceRefresh) }),
             promoService.getPromos(),
             userService.getAllUsers(),
             garageService.fetchServices().catch(() => garageService.getServices()),
@@ -1403,20 +1411,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setGarageMechanics(garageService.getMechanics());
     };
 
+    let sharedOrdersTimer = null;
     const handleSharedOrdersStorage = (e) => {
-      if (e?.key && e.key !== 'mototrack_orders_db') return;
-      orderService.getAllOrders().then((ords) => {
-        if (Array.isArray(ords)) setOrders(ords);
-      });
+      if (e?.type === 'storage' && e?.key && e.key !== 'mototrack_orders_db') return;
+      if (Array.isArray(e?.detail)) {
+        setOrders(e.detail);
+      }
+      if (sharedOrdersTimer) clearTimeout(sharedOrdersTimer);
+      sharedOrdersTimer = setTimeout(() => {
+        orderService.getAllOrders({ force: true }).then((ords) => {
+          if (Array.isArray(ords)) setOrders(ords);
+        });
+      }, 280);
     };
 
     if (typeof window !== 'undefined') {
       window.addEventListener('mototrack_bookings_updated', handleWindowBookings);
       window.addEventListener('storage', handleWindowBookings);
       window.addEventListener('storage', handleSharedOrdersStorage);
+      window.addEventListener('mototrack_orders_updated', handleSharedOrdersStorage);
     }
 
     return () => {
+      if (sharedOrdersTimer) clearTimeout(sharedOrdersTimer);
       unsubscribeProd?.();
       unsubscribeOrders?.();
       unsubscribeBookings?.();
@@ -1429,6 +1446,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         window.removeEventListener('mototrack_bookings_updated', handleWindowBookings);
         window.removeEventListener('storage', handleWindowBookings);
         window.removeEventListener('storage', handleSharedOrdersStorage);
+        window.removeEventListener('mototrack_orders_updated', handleSharedOrdersStorage);
       }
     };
   }, [currentUser]);
@@ -4280,6 +4298,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   /** Guided workflow advance — respects ALLOWED_TRANSITIONS (no skipping stages). */
   const handleAdvanceOrderStatus = async (orderId, newStatus) => {
+    const isShippingStep =
+      orderService.canonicalizeStatus?.(newStatus) === 'Out for Delivery' ||
+      /out for delivery|shipped/i.test(String(newStatus || ''));
+
+    if (isShippingStep) {
+      const outRes = await deliveryService.markOutForDelivery(orderId, currentUser);
+      if (outRes?.success) {
+        await loadData({ forceRefresh: true });
+        setSelectedOrderForModal((prev) => {
+          if (!prev || (prev.order_id !== orderId && prev.id !== orderId)) return prev;
+          return {
+            ...prev,
+            status: 'Out for Delivery',
+            delivery_status: 'Out for Delivery',
+          };
+        });
+        await refreshOrderDeliveryPanel(orderId);
+        showToast('Order marked as shipped — now Out for Delivery');
+        return;
+      }
+    }
+
     const res = await orderService.updateOrderStatus(
       orderId,
       newStatus,
@@ -4290,7 +4330,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       }
     );
     if (res.success) {
-      await loadData();
+      await loadData({ forceRefresh: true });
       setSelectedOrderForModal((prev) => {
         if (!prev || (prev.order_id !== orderId && prev.id !== orderId)) return prev;
         const updated = res.order || {};
@@ -4474,6 +4514,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     orders: 'Orders Fulfillment Management',
     inventory: 'Inventory Telemetry',
     pos: 'Point of Sale (POS) Cashier Terminal',
+    payment_logs: 'Payment Logs',
     analytics: 'Sales Analytics',
     forecast: 'Inventory Forecasting',
     products: 'Products & Price Management',
@@ -4495,6 +4536,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     orders: 'receipt',
     inventory: 'box-seam-fill',
     pos: 'cart-check-fill',
+    payment_logs: 'wallet2',
     analytics: 'graph-up-arrow',
     forecast: 'clipboard-data',
     products: 'tag-fill',
@@ -4552,6 +4594,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         return 'Workspace / Analytics';
       case 'pos':
         return 'Workspace / POS Cashier';
+      case 'payment_logs':
+        return 'Workspace / Payment Logs';
       case 'forecast':
         return 'Workspace / Forecast';
       case 'moto_models':
@@ -4601,6 +4645,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         return 'Analytics';
       case 'pos':
         return 'POS Cashier';
+      case 'payment_logs':
+        return 'Payment Logs';
       case 'forecast':
         return 'Forecast';
       case 'moto_models':
@@ -4799,27 +4845,79 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         onNavigateToStore={handleBackToStorefront}
         adminUser={currentUser}
       />
-      {/* Toast Notification */}
+      {/* Toast Notification (Portal on web so it always appears IN FRONT of open modals) */}
       {toastMessage ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: 20,
-            alignSelf: 'center',
-            backgroundColor: '#24272B',
-            paddingHorizontal: 22,
-            paddingVertical: 12,
-            borderRadius: 9999,
-            zIndex: 9999,
-            shadowColor: '#0F172A',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 10,
-            elevation: 10,
-          }}
-        >
-          <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5 }}>{toastMessage}</Text>
-        </View>
+        Platform.OS === 'web' && typeof document !== 'undefined' ? (
+          createPortal(
+            <div
+              ref={(el) => {
+                if (
+                  el &&
+                  typeof document !== 'undefined' &&
+                  document.body &&
+                  el.parentElement === document.body &&
+                  document.body.lastElementChild !== el
+                ) {
+                  try {
+                    document.body.appendChild(el);
+                  } catch (_e) {}
+                }
+              }}
+              style={{
+                position: 'fixed',
+                top: 18,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2147483647,
+                pointerEvents: 'none',
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: '#24272B',
+                  paddingHorizontal: 22,
+                  paddingVertical: 12,
+                  borderRadius: 9999,
+                  shadowColor: '#0F172A',
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 14,
+                  elevation: 24,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.14)',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5, textAlign: 'center' }}>
+                  {toastMessage}
+                </Text>
+              </View>
+            </div>,
+            document.body
+          )
+        ) : (
+          <View
+            style={{
+              position: 'absolute',
+              top: 20,
+              alignSelf: 'center',
+              backgroundColor: '#24272B',
+              paddingHorizontal: 22,
+              paddingVertical: 12,
+              borderRadius: 9999,
+              zIndex: 999999,
+              shadowColor: '#0F172A',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 20,
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5 }}>{toastMessage}</Text>
+          </View>
+        )
       ) : null}
 
       <View style={styles.adminLayout}>
@@ -9339,6 +9437,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                 </View>
               </View>
+            )}
+
+            {/* ─── TAB 3B: PAYMENT LOGS & BALANCE TRACKER ─── */}
+            {activeNav === 'payment_logs' && (
+              <WebPaymentLogsPanel
+                orders={orders}
+                garageBookings={garageBookings}
+                usersList={usersList}
+                isDarkMode={isDarkMode}
+                tokens={tokens}
+                isDesktop={isDesktop}
+                showToast={showToast}
+                onOpenOrder={(order) => openOrderModalWithOrder(order, false)}
+                onOpenBooking={(booking) => handleOpenBookingModal(booking)}
+              />
             )}
 
             {/* ─── TAB 4: ANALYTICS & REPORTS ─── */}
@@ -18069,6 +18182,41 @@ onRequestClose = {() => setIsAddProductOpen(false)}
             }}
           />
         </View>
+        {toastMessage ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 18,
+              left: 0,
+              right: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 999999,
+              elevation: 99,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: '#24272B',
+                paddingHorizontal: 22,
+                paddingVertical: 12,
+                borderRadius: 9999,
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.35,
+                shadowRadius: 14,
+                elevation: 24,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.14)',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5, textAlign: 'center' }}>
+                {toastMessage}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   )
@@ -20096,6 +20244,25 @@ onRequestClose = {() => setIsAddProductOpen(false)}
           </View>
         </TouchableOpacity>
 
+        {/* Payment Logs */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'payment_logs' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('payment_logs');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="wallet2"
+            size={20}
+            color={activeNav === 'payment_logs' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Payment Logs</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>GCash, deposits & balances</Text>
+          </View>
+        </TouchableOpacity>
+
         {/* Promos */}
         <TouchableOpacity
           style={[styles.mobileMoreCard, activeNav === 'promos' && styles.mobileMoreCardActive]}
@@ -20472,6 +20639,7 @@ onRequestClose = {() => setIsAddProductOpen(false)}
   tokens={tokens}
   styles={styles}
   showConfirm={showConfirm}
+  toastMessage={toastMessage}
   onClose={() => setIsOrderModalOpen(false)}
   onApprove={handleApproveCOD}
   onRetryEmail={handleRetryCodApprovalEmail}
@@ -20510,14 +20678,17 @@ onRequestClose = {() => setIsAddProductOpen(false)}
         onSuccess={async (delivery, tokenBundle, riderAccess) => {
           const assignedOrder = assignDeliveryOrder;
           setAssignDeliveryOrder(null);
-          await loadData();
+          await loadData({ forceRefresh: true });
           const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
           if (oid) {
             await refreshOrderDeliveryPanel(oid);
             setSelectedOrderForModal((prev) => {
               if (!prev) return prev;
+              const dsLower = String(delivery?.delivery_status || '').toLowerCase();
               const newStatus =
-                delivery?.delivery_status === 'out_for_delivery' || delivery?.delivery_status === 'shipped'
+                dsLower === 'out for delivery' ||
+                dsLower === 'out_for_delivery' ||
+                dsLower === 'shipped'
                   ? 'Out for Delivery'
                   : 'Ready for Delivery';
               return {
@@ -20535,8 +20706,10 @@ onRequestClose = {() => setIsAddProductOpen(false)}
               order: assignedOrder,
               bundle: tokenBundle,
             });
-          }
-          if (riderAccess?.success || riderAccess?.dashboardUrl || riderAccess?.token) {
+          } else if (
+            !delivery?.rider_id &&
+            (riderAccess?.success || riderAccess?.dashboardUrl || riderAccess?.token)
+          ) {
             setRiderAccessModal({
               rider: {
                 id: delivery?.rider_id || assignedOrder?.rider_id,
@@ -20559,6 +20732,7 @@ onRequestClose = {() => setIsAddProductOpen(false)}
         showToast={showToast}
       />
 
+      {proofViewer?.uri ? (
       <Modal
         visible={Boolean(proofViewer?.uri)}
         transparent
@@ -20673,6 +20847,7 @@ onRequestClose = {() => setIsAddProductOpen(false)}
           </View>
         </View>
       </Modal>
+      ) : null}
 
       <RiderAccessModal
         visible={Boolean(riderAccessModal)}

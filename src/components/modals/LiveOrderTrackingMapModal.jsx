@@ -945,7 +945,11 @@ export default function LiveOrderTrackingMapModal({
                           status: activeOrder?.status,
                         }}
                         statusOverride={activeOrder?.status}
-                        height={240}
+                        height={isDesktop ? 280 : 240}
+                        autoFollow={true}
+                        routeFromRider={true}
+                        showShopToRiderRoute={true}
+                        showFollowControl={true}
                         title="Live delivery map"
                         showWhenInactive={isRiderView}
                         hideHeader={true}
@@ -1980,7 +1984,6 @@ const createStyles = (isDarkMode) =>
     },
 
     mapCanvasWrapper: {
-      height: 240,
       minHeight: 240,
       backgroundColor: isDarkMode ? '#14181D' : '#EDF1F5',
       borderRadius: 12,

@@ -33,7 +33,9 @@ import {
 import RiderOrderCard from '../../../components/mobile/rider/RiderOrderCard.jsx';
 import RiderOrderDetailsSheet from '../../../components/mobile/rider/RiderOrderDetailsSheet.jsx';
 import RiderHomeDeliveryMapCard from '../../../components/mobile/rider/RiderHomeDeliveryMapCard.jsx';
-import RiderCustomerTrackModal from '../../../components/mobile/rider/RiderCustomerTrackModal.jsx';
+import RiderCustomerTrackModal, {
+  prefetchRiderOrderRoute,
+} from '../../../components/mobile/rider/RiderCustomerTrackModal.jsx';
 import RiderEarningsView from '../../../components/mobile/rider/RiderEarningsView.jsx';
 import RiderAccountView from '../../../components/mobile/rider/RiderAccountView.jsx';
 import RiderSettingsView from '../../../components/mobile/rider/RiderSettingsView.jsx';
@@ -173,6 +175,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
   const scanOrderRef = useRef(scanOrder);
   scanOrderRef.current = scanOrder;
   const consumedInitialTokenRef = useRef('');
+  const gpsSyncErrorShownRef = useRef(false);
 
   const prefsStorageKey = useMemo(
     () => `mototrack_rider_prefs_${userUid || sessionRiderId || 'default'}`,
@@ -416,24 +419,54 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         setRawNotifications(notifs);
       } catch (_e) { }
 
-      // Sync GPS watcher for active Out for Delivery jobs
-      const activeOut = (rows || []).find(
-        (d) =>
-          !isCancelledOrder(d) &&
-          !isNeedsPickupOrder(d) &&
-          String(d.deliveryStatus || '')
-            .toLowerCase()
-            .includes('out')
-      );
-      if (activeOut?.orderId && id) {
-        const session = riderGpsTrackingService.getActiveSession();
-        if (!session || session.orderId !== activeOut.orderId) {
-          riderGpsTrackingService
-            .start({ orderId: activeOut.orderId, riderId: id })
-            .catch(() => { });
+      // Sync GPS watcher across all active Out for Delivery jobs
+      const activeOutIds = (rows || [])
+        .filter(
+          (d) =>
+            !isCancelledOrder(d) &&
+            !isNeedsPickupOrder(d) &&
+            String(d.deliveryStatus || '')
+              .toLowerCase()
+              .includes('out')
+        )
+        .map((d) => d.orderId)
+        .filter(Boolean);
+      if (activeOutIds.length > 0 && id) {
+        const gpsRes = await riderGpsTrackingService
+          .start({ orderIds: activeOutIds, riderId: id })
+          .catch((gpsErr) => ({
+            success: false,
+            error: gpsErr?.message || 'Unable to start GPS tracking.',
+          }));
+        const gpsErrMsg =
+          gpsRes?.syncError || (!gpsRes?.success ? gpsRes?.error : '');
+        if (gpsErrMsg) {
+          if (!gpsSyncErrorShownRef.current) {
+            gpsSyncErrorShownRef.current = true;
+            showFeedback(`GPS sync error: ${gpsErrMsg}`, true);
+          }
+        } else if (gpsRes?.success && !gpsRes?.already) {
+          gpsSyncErrorShownRef.current = false;
         }
-      } else if (!activeOut && riderGpsTrackingService.isTracking()) {
+      } else if (activeOutIds.length === 0 && riderGpsTrackingService.isTracking()) {
+        gpsSyncErrorShownRef.current = false;
         riderGpsTrackingService.stop({ clearDb: true }).catch(() => { });
+      }
+
+      // Warm OSRM route cache for the top active delivery so Track Customer opens instantly
+      const topActiveDelivery =
+        (rows || []).find(
+          (d) =>
+            !isCancelledOrder(d) &&
+            !isDeliveredOrder(d) &&
+            !isNeedsPickupOrder(d) &&
+            String(d.deliveryStatus || '').toLowerCase().includes('out')
+        ) ||
+        (rows || []).find(
+          (d) => !isCancelledOrder(d) && !isDeliveredOrder(d)
+        );
+      if (topActiveDelivery) {
+        prefetchRiderOrderRoute(topActiveDelivery);
       }
     } catch (e) {
       setError(e?.message || 'Unable to load your deliveries.');
@@ -441,7 +474,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [resolveRiderId, userUid, userEmail, userUsername]);
+  }, [resolveRiderId, userUid, userEmail, userUsername, showFeedback]);
 
   useEffect(() => {
     load();
@@ -798,15 +831,31 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         showFeedback(res.error || 'Could not update delivery status.', true);
         return;
       }
+      const otherActiveOutIds = (deliveries || [])
+        .filter(
+          (item) =>
+            item?.orderId &&
+            item.orderId !== d.orderId &&
+            !isCancelledOrder(item) &&
+            !isNeedsPickupOrder(item) &&
+            String(item.deliveryStatus || '').toLowerCase().includes('out')
+        )
+        .map((item) => item.orderId);
       const gps = await riderGpsTrackingService.start({
-        orderId: d.orderId,
+        orderIds: [d.orderId, ...otherActiveOutIds],
         riderId,
       });
       if (!gps.success) {
         showFeedback(
           `${formatOrderCode(d.orderId)} is Out for Delivery (GPS unavailable).`
         );
+      } else if (gps.syncError) {
+        showFeedback(
+          `${formatOrderCode(d.orderId)} is Out for Delivery · GPS sync failed: ${gps.syncError}`,
+          true
+        );
       } else {
+        gpsSyncErrorShownRef.current = false;
         showFeedback(
           `${formatOrderCode(d.orderId)} is Out for Delivery · Live GPS active.`
         );
@@ -1061,6 +1110,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
 
   const openOrderMap = useCallback((delivery) => {
     if (!delivery?.orderId) return;
+    prefetchRiderOrderRoute(delivery);
     setSelectedOrder((prev) => {
       const hadDetailSheet = Boolean(prev);
       if (hadDetailSheet && Platform.OS === 'ios') {
@@ -1337,6 +1387,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
               palette={palette}
               onViewMap={openOrderMap}
               onViewDetails={(order) => {
+                prefetchRiderOrderRoute(order);
                 setPodPhoto(null);
                 setSelectedOrder(order);
                 setVerified(null);
@@ -1354,6 +1405,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
         palette={palette}
         onViewMap={openOrderMap}
         onViewDetails={(order) => {
+          prefetchRiderOrderRoute(order);
           setPodPhoto(null);
           setSelectedOrder(order);
           setVerified(null);
