@@ -1,0 +1,102 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile to use
+        required: false
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production-apk
+          - development
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve build profile
+        id: profile
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "name=production-apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ inputs.profile || 'preview' }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android APK (${{ steps.profile.outputs.name }})
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_APP_URL: ${{ secrets.EXPO_PUBLIC_APP_URL }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_ADMIN_SECRET_KEY: ${{ secrets.EXPO_PUBLIC_ADMIN_SECRET_KEY }}
+          EXPO_PUBLIC_ADMIN_DEFAULT_PIN: ${{ secrets.EXPO_PUBLIC_ADMIN_DEFAULT_PIN }}
+          EXPO_PUBLIC_ADMIN_EMAIL: ${{ secrets.EXPO_PUBLIC_ADMIN_EMAIL }}
+          EXPO_PUBLIC_USD_TO_PHP_RATE: ${{ secrets.EXPO_PUBLIC_USD_TO_PHP_RATE }}
+          EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
+          EXPO_PUBLIC_GEMINI_MODEL: ${{ secrets.EXPO_PUBLIC_GEMINI_MODEL }}
+          EXPO_PUBLIC_CUSTOMIZE_API_URL: ${{ secrets.EXPO_PUBLIC_CUSTOMIZE_API_URL }}
+        run: |
+          eas build \
+            --platform android \
+            --profile "${{ steps.profile.outputs.name }}" \
+            --local \
+            --non-interactive \
+            --output "${{ github.workspace }}/mototrack.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mototrack-android-${{ steps.profile.outputs.name }}-apk
+          path: ${{ github.workspace }}/mototrack.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ github.workspace }}/mototrack.apk
+          generate_release_notes: true

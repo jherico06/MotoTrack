@@ -32,6 +32,20 @@
         "EXPO_PUBLIC_ENABLE_DEMO_LOGINS": "true"
       }
     },
+    "production-apk": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_APP_NAME": "MotoTrack",
+        "EXPO_PUBLIC_ENABLE_DEMO_LOGINS": "false"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "android": {
