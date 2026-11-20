@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   TextInput,
   StyleSheet,
   Platform,
@@ -18,6 +19,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { parseDeliveryQrPayload, sameOrderIdentifier } from '../../utils/orderIdentifier.js';
+import { ANDROID_TOP_INSET, ANDROID_BOTTOM_INSET } from '../../utils/safeArea.js';
 
 /**
  * Minimal full-screen QR scanner for MotoTrack riders (native iOS / Android via expo-camera).
@@ -51,13 +53,19 @@ const COLORS = {
   preview: '#111315',
 };
 
-// Preserves compatibility with existing order QR codes and packing-label barcodes.
+// Android inline CameraX + ML Kit runs fastest when restricted to QR decoding;
+// iOS AVFoundation scans hardware-accelerated across packing-label symbologies.
 // Note: 'code39' is intentionally omitted because expo-camera iOS routes code39 through
 // ExpoCameraZXingProvider (extra AVCaptureVideoDataOutput + CPU binarizer per frame),
 // which competes with hardware AVFoundation QR detection.
 const BARCODE_SETTINGS = {
-  barcodeTypes: ['qr', 'code128', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e'],
+  barcodeTypes:
+    Platform.OS === 'android'
+      ? ['qr']
+      : ['qr', 'code128', 'code93', 'ean13', 'ean8', 'upc_a', 'upc_e'],
 };
+
+const MODERN_SCANNER_BARCODE_TYPES = ['qr', 'code128'];
 
 // Approximate optical magnification steps shown to the user.
 const ZOOM_STEPS = [1, 1.5, 2, 3, 4];
@@ -96,7 +104,7 @@ const STATUS_COPY = {
   searching: { text: 'Searching for QR code...', icon: null, color: COLORS.charcoal },
   detected: { text: 'QR code detected!', icon: 'check-circle-fill', color: COLORS.success },
   unreadable: {
-    text: 'Unable to read QR code. Move closer or adjust focus.',
+    text: 'Unable to read QR code. Tap preview to refocus, zoom in, or use Auto-Zoom.',
     icon: 'exclamation-circle',
     color: COLORS.warn,
   },
@@ -117,6 +125,7 @@ export default function RiderQrScanSheet({
   onScan,
 }) {
   const [permission, requestPermission] = useCameraPermissions();
+  const [cameraMounted, setCameraMounted] = useState(Platform.OS !== 'android');
   const [cameraReady, setCameraReady] = useState(false);
   const [camError, setCamError] = useState('');
   const [status, setStatus] = useState('searching'); // searching | unreadable | invalid | detected
@@ -124,6 +133,10 @@ export default function RiderQrScanSheet({
   const [submitting, setSubmitting] = useState(false);
   const [zoomStep, setZoomStep] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
+  const [autofocusMode, setAutofocusMode] = useState('off');
+  const [focusHint, setFocusHint] = useState(false);
+  const [modernScanning, setModernScanning] = useState(false);
+  const [modernScannerError, setModernScannerError] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
   const [paste, setPaste] = useState('');
   const [manualError, setManualError] = useState('');
@@ -133,6 +146,9 @@ export default function RiderQrScanSheet({
   const lockedRef = useRef(false); // blocks duplicate detections
   const submittedRef = useRef(false); // blocks duplicate submissions to the backend
   const autoEmitTimerRef = useRef(null);
+  const focusTimerRef = useRef(null);
+  const modalMountTimerRef = useRef(null);
+  const modernSubRef = useRef(null);
   const emitScannedRef = useRef(onScanned || onScan);
   emitScannedRef.current = onScanned || onScan;
   const lastInvalidRef = useRef({ raw: '', at: 0 });
@@ -146,7 +162,35 @@ export default function RiderQrScanSheet({
     }
   }, []);
 
+  const clearFocusTimer = useCallback(() => {
+    if (focusTimerRef.current) {
+      clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = null;
+    }
+  }, []);
+
+  const clearModalMountTimer = useCallback(() => {
+    if (modalMountTimerRef.current) {
+      clearTimeout(modalMountTimerRef.current);
+      modalMountTimerRef.current = null;
+    }
+  }, []);
+
+  const clearModernScannerSub = useCallback(() => {
+    if (modernSubRef.current) {
+      try {
+        modernSubRef.current.remove?.();
+      } catch (_e) {}
+      modernSubRef.current = null;
+    }
+  }, []);
+
   const isWeb = Platform.OS === 'web';
+  const canUseModernScanner =
+    Platform.OS === 'android' &&
+    Boolean(CameraView?.isModernBarcodeScannerAvailable) &&
+    typeof CameraView?.launchScanner === 'function' &&
+    typeof CameraView?.onModernBarcodeScanned === 'function';
   const hasPermission = Boolean(permission?.granted);
   const isDetected = status === 'detected';
   const cameraSupported = !isWeb && !camError;
@@ -156,13 +200,21 @@ export default function RiderQrScanSheet({
     hasPermission &&
     !isDetected &&
     !submitting;
-  const scanningActive = cameraLive && cameraReady;
+  const scanningActive = cameraLive && cameraMounted && cameraReady;
 
   // Fresh session every time the scanner opens; the camera unmounts (and is released) on close.
   useEffect(() => {
     clearAutoEmitTimer();
+    clearFocusTimer();
+    clearModalMountTimer();
+    clearModernScannerSub();
     if (!visible) {
       permissionAskedRef.current = false;
+      setCameraMounted(false);
+      setAutofocusMode('off');
+      setFocusHint(false);
+      setModernScanning(false);
+      setModernScannerError('');
       return undefined;
     }
     lockedRef.current = false;
@@ -173,14 +225,41 @@ export default function RiderQrScanSheet({
     setSubmitting(false);
     setZoomStep(0);
     setTorchOn(false);
+    setAutofocusMode('off');
+    setFocusHint(false);
+    setModernScanning(false);
+    setModernScannerError('');
     setManualOpen(false);
     setPaste('');
     setManualError('');
     setCamError('');
     setCameraReady(false);
     setSessionKey((k) => k + 1);
-    return () => clearAutoEmitTimer();
-  }, [visible, clearAutoEmitTimer]);
+
+    if (Platform.OS === 'android') {
+      // Wait for Android Modal dialog layout to settle before binding CameraX PreviewView + ImageAnalysis.
+      setCameraMounted(false);
+      modalMountTimerRef.current = setTimeout(() => {
+        modalMountTimerRef.current = null;
+        setCameraMounted(true);
+      }, 240);
+    } else {
+      setCameraMounted(true);
+    }
+
+    return () => {
+      clearAutoEmitTimer();
+      clearFocusTimer();
+      clearModalMountTimer();
+      clearModernScannerSub();
+    };
+  }, [
+    visible,
+    clearAutoEmitTimer,
+    clearFocusTimer,
+    clearModalMountTimer,
+    clearModernScannerSub,
+  ]);
 
   // Ask for camera permission once per opening.
   useEffect(() => {
@@ -219,6 +298,19 @@ export default function RiderQrScanSheet({
     return () => loop.stop();
   }, [scanningActive, scanAnim]);
 
+  const triggerRefocus = useCallback(() => {
+    if (isWeb || !cameraLive || !cameraMounted || !cameraReady) return;
+    clearFocusTimer();
+    setAutofocusMode('on');
+    setFocusHint(true);
+    setStatus((s) => (s === 'unreadable' ? 'searching' : s));
+    focusTimerRef.current = setTimeout(() => {
+      focusTimerRef.current = null;
+      setAutofocusMode('off');
+      setFocusHint(false);
+    }, 800);
+  }, [isWeb, cameraLive, cameraMounted, cameraReady, clearFocusTimer]);
+
   // Guidance when nothing is readable after searching for a few seconds.
   useEffect(() => {
     if (!scanningActive || status !== 'searching') return undefined;
@@ -240,7 +332,11 @@ export default function RiderQrScanSheet({
   const handleBarcodeScanned = useCallback(
     (event) => {
       if (lockedRef.current) return;
-      const raw = String(event?.data ?? event?.nativeEvent?.data ?? event?.raw ?? '').trim();
+      const candidates = [event?.data, event?.nativeEvent?.data, event?.raw, event?.nativeEvent?.raw];
+      const rawValue = candidates.find(
+        (v) => typeof v === 'string' && v.trim() && v.trim() !== 'null' && v.trim() !== 'undefined'
+      );
+      const raw = String(rawValue || '').trim();
       if (!raw) return;
 
       const parsed = parseDeliveryQrPayload(raw);
@@ -268,6 +364,33 @@ export default function RiderQrScanSheet({
     },
     [clearAutoEmitTimer]
   );
+
+  const handleLaunchModernScanner = useCallback(async () => {
+    if (!canUseModernScanner || modernScanning || submittedRef.current) return;
+    setModernScannerError('');
+    setModernScanning(true);
+    clearModernScannerSub();
+    try {
+      modernSubRef.current = CameraView.onModernBarcodeScanned((event) => {
+        clearModernScannerSub();
+        setModernScanning(false);
+        handleBarcodeScanned(event);
+      });
+      await CameraView.launchScanner({
+        barcodeTypes: MODERN_SCANNER_BARCODE_TYPES,
+      });
+    } catch (e) {
+      clearModernScannerSub();
+      const msg = String(e?.message || e || '');
+      if (!/cancel/i.test(msg)) {
+        setModernScannerError(
+          'Auto-Zoom scanner is not ready on this device yet. Use the camera above or enter the code manually.'
+        );
+      }
+    } finally {
+      setModernScanning(false);
+    }
+  }, [canUseModernScanner, modernScanning, clearModernScannerSub, handleBarcodeScanned]);
 
   const handleConfirm = useCallback(() => {
     if (!result?.raw || submittedRef.current) return;
@@ -323,8 +446,17 @@ export default function RiderQrScanSheet({
 
   const handleClose = useCallback(() => {
     clearAutoEmitTimer();
+    clearFocusTimer();
+    clearModalMountTimer();
+    clearModernScannerSub();
     onClose?.();
-  }, [clearAutoEmitTimer, onClose]);
+  }, [
+    clearAutoEmitTimer,
+    clearFocusTimer,
+    clearModalMountTimer,
+    clearModernScannerSub,
+    onClose,
+  ]);
 
   const handleRequestClose = useCallback(() => {
     if (manualOpen) {
@@ -428,25 +560,27 @@ export default function RiderQrScanSheet({
     }
 
     return (
-      <>
-        <CameraView
-          key={sessionKey}
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          // 'off' = continuous autofocus in expo-camera SDK 58 ('on' focuses once and locks).
-          autofocus="off"
-          zoom={zoomPropForMagnification(zoomMag)}
-          enableTorch={torchOn}
-          animateShutter={false}
-          {...(Platform.OS === 'ios' ? { active: cameraLive, pictureSize: 'High' } : null)}
-          barcodeScannerSettings={BARCODE_SETTINGS}
-          onBarcodeScanned={cameraLive ? handleBarcodeScanned : undefined}
-          onCameraReady={() => setCameraReady(true)}
-          onMountError={(e) => {
-            const msg = e?.message || e?.nativeEvent?.message || 'The camera could not be started.';
-            setCamError(msg);
-          }}
-        />
+      <Pressable style={StyleSheet.absoluteFill} onPress={triggerRefocus}>
+        {cameraMounted ? (
+          <CameraView
+            key={sessionKey}
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            // 'off' = continuous autofocus in expo-camera SDK 58; pulsing 'on' re-triggers focus metering.
+            autofocus={autofocusMode}
+            zoom={zoomPropForMagnification(zoomMag)}
+            enableTorch={torchOn}
+            animateShutter={false}
+            {...(Platform.OS === 'ios' ? { active: cameraLive, pictureSize: 'High' } : null)}
+            barcodeScannerSettings={BARCODE_SETTINGS}
+            onBarcodeScanned={cameraLive ? handleBarcodeScanned : undefined}
+            onCameraReady={() => setCameraReady(true)}
+            onMountError={(e) => {
+              const msg = e?.message || e?.nativeEvent?.message || 'The camera could not be started.';
+              setCamError(msg);
+            }}
+          />
+        ) : null}
 
         <View style={styles.frameLayer} pointerEvents="none">
           <View style={{ width: frameSize, height: frameSize }}>
@@ -462,12 +596,20 @@ export default function RiderQrScanSheet({
           </View>
         </View>
 
-        {!cameraReady ? (
+        {scanningActive ? (
+          <View style={styles.focusBadge} pointerEvents="none">
+            <Text style={styles.focusBadgeText}>
+              {focusHint ? 'Focusing…' : 'Tap preview to focus'}
+            </Text>
+          </View>
+        ) : null}
+
+        {!cameraMounted || !cameraReady ? (
           <View style={styles.loadingLayer} pointerEvents="none">
             <ActivityIndicator color="#FFFFFF" />
           </View>
         ) : null}
-      </>
+      </Pressable>
     );
   };
 
@@ -489,7 +631,7 @@ export default function RiderQrScanSheet({
           <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
           <KeyboardAvoidingView
             style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             {/* Header */}
             <View style={styles.header}>
@@ -516,7 +658,11 @@ export default function RiderQrScanSheet({
 
           {/* Camera preview */}
           <View
-            style={[styles.preview, (isDetected || !cameraLive) && styles.previewLight]}
+            style={[
+              styles.preview,
+              manualOpen && styles.previewCompact,
+              (isDetected || !cameraLive) && styles.previewLight,
+            ]}
             onLayout={(e) => {
               const { width, height } = e.nativeEvent.layout;
               setPreviewBox((prev) =>
@@ -528,7 +674,7 @@ export default function RiderQrScanSheet({
           </View>
 
           {/* Scanning status */}
-          {showStatus ? (
+          {showStatus && (!manualOpen || submitting || isDetected) ? (
             <View style={styles.statusRow} accessibilityLiveRegion="polite">
               {submitting ? (
                 <ActivityIndicator size="small" color={COLORS.orange} />
@@ -659,6 +805,30 @@ export default function RiderQrScanSheet({
                   </View>
                 ) : null}
 
+                {canUseModernScanner && !manualOpen && !submitting ? (
+                  <View style={styles.modernWrap}>
+                    <TouchableOpacity
+                      style={[styles.modernBtn, modernScanning && styles.btnDisabled]}
+                      onPress={handleLaunchModernScanner}
+                      disabled={modernScanning}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open Google Auto-Zoom QR Scanner"
+                    >
+                      {modernScanning ? (
+                        <ActivityIndicator size="small" color={COLORS.charcoal} />
+                      ) : (
+                        <BootstrapIcon name="qr-code-scan" size={16} color={COLORS.orange} />
+                      )}
+                      <Text style={styles.modernBtnText}>
+                        {modernScanning ? 'Opening Auto-Zoom Scanner…' : 'Use Auto-Zoom Scanner'}
+                      </Text>
+                    </TouchableOpacity>
+                    {modernScannerError ? (
+                      <Text style={styles.modernError}>{modernScannerError}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 {cameraSupported && !submitting ? (
                   <TouchableOpacity
                     style={styles.textBtn}
@@ -690,7 +860,7 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.bg,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0,
+    paddingTop: Platform.OS === 'android' ? ANDROID_TOP_INSET : 0,
   },
   header: {
     flexDirection: 'row',
@@ -738,6 +908,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.preview,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  previewCompact: {
+    flex: 0,
+    height: 160,
+    minHeight: 140,
   },
   previewLight: {
     backgroundColor: '#F9FAFB',
@@ -797,6 +972,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.preview,
+  },
+  focusBadge: {
+    position: 'absolute',
+    bottom: 14,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(17, 19, 21, 0.62)',
+  },
+  focusBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '500',
   },
   stateWrap: {
     alignItems: 'center',
@@ -906,8 +1096,37 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 10 : Math.max(48, ANDROID_BOTTOM_INSET + 36),
     gap: 6,
+  },
+  modernWrap: {
+    gap: 4,
+    marginTop: 4,
+  },
+  modernBtn: {
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    backgroundColor: COLORS.soft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  modernBtnText: {
+    color: COLORS.charcoal,
+    fontSize: 13.5,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  modernError: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: COLORS.warn,
+    textAlign: 'center',
   },
   controlsRow: {
     flexDirection: 'row',

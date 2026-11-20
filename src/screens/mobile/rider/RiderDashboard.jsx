@@ -223,7 +223,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     toastTimerRef.current = setTimeout(() => {
       setFeedbackToast(null);
       toastTimerRef.current = null;
-    }, 3600);
+    }, isError ? 5200 : 3600);
   }, []);
 
   useEffect(() => {
@@ -744,7 +744,7 @@ export default function RiderDashboard({ onLogout, initialConfirmToken }) {
     if (scanOpenTimerRef.current) {
       clearTimeout(scanOpenTimerRef.current);
     }
-    const settleMs = Platform.OS === 'ios' ? 340 : 160;
+    const settleMs = Platform.OS === 'ios' ? 340 : 280;
     scanOpenTimerRef.current = setTimeout(() => {
       scanOpenTimerRef.current = null;
       setScanOrder(targetOrder);
